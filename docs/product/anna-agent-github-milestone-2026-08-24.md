@@ -16,7 +16,7 @@ From this milestone forward, GitHub `main` is the public source of truth for Ann
 
 ## Repository history
 
-The GitHub repository was originally created on April 2, 2026 for a book project that is no longer maintained. It was repurposed for Anna on August 24, 2026, published as the `0.2.0` Developer Preview, and then renamed from `Anna` to `Anna-Agent`.
+The GitHub repository was created on April 2, 2026 to plan the Anna project. As Harness technology continued to evolve, advanced paradigms such as Pi Agent provided substantial technical reference and inspiration for the project, ultimately shaping Anna. On August 24, 2026, Anna was published as the `0.2.0` Developer Preview and the repository was renamed from `Anna` to `Anna-Agent`. We are grateful to the GitHub community.
 
 The repository creation timestamp was intentionally preserved:
 
@@ -53,4 +53,3 @@ Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://
 ## Current release boundary
 
 `v0.2.0` remains a Developer Preview. The public source, local verification path, CI, and unsigned macOS packaging smoke have been validated. Signed and notarized distribution, production provider/MCP configuration, and complete production Runtime/domain cutover remain later release work and must not be inferred from this milestone.
-

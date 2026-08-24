@@ -184,7 +184,7 @@ Hiker 是外部合作项目，作者为 [kc8zshnt6n-gif](https://github.com/kc8z
 
 ## 仓库与维护
 
-该 GitHub 仓库创建于 2026 年 4 月 2 日，最初用于一个已经停止维护的书籍项目；2026 年 8 月 24 日，仓库被用于发布 Anna。Anna 的软件版本历史从 `0.2.0` Developer Preview 开始，仓库创建时间不代表软件发布时间。
+该 GitHub 仓库创建于 2026 年 4 月 2 日，最初用于规划 Anna 项目。随着 Harness 技术持续发展，Pi Agent 等先进范式为本项目提供了大量技术参考与启发，并最终形成今天的 Anna。感谢 GitHub 社区。
 
 [Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) 是唯一公开维护仓库。发布里程碑、命名边界和后续 GitHub 维护流程记录在 [Anna Agent GitHub Milestone - 2026-08-24](docs/product/anna-agent-github-milestone-2026-08-24.md)。
 
