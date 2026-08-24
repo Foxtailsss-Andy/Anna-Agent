@@ -4,9 +4,11 @@
 
 > Start with a request. End with a traceable Run, an Artifact, and a clear next action.
 
-Anna is a local-first desktop AI agent for enterprise workflows. It brings conversation, tools, approvals, memory, and execution evidence into one working loop, extending AI from “a useful answer” to “work that can continue and be checked.”
+Anna is a governed, local-first desktop AI agent for enterprise work. It brings direct conversation, channel collaboration, specialist Associates, MCP-connected business systems, approvals, memory, and execution evidence into one working loop, extending AI from “a useful answer” to “work that can continue and be checked.”
 
 ![Anna](../../apps/desktop/src/assets/anna-login-portrait.png)
+
+Anna's interface follows an iris-inspired visual system, with a dedicated character identity that keeps Chat, Workflows, and Associate experiences coherent without competing with the work itself.
 
 **Current version: `0.2.0 Developer Preview`** · Local macOS preview · MIT License
 
@@ -20,7 +22,7 @@ Anna is built around an Agent Runtime with three durable foundations:
 - **Judgment**: an explicit decision to continue, wait, request more information, or finish;
 - **Memory**: a controlled distinction between confirmed business memory and task context.
 
-Anna runs as a desktop application and keeps runtime state local by default. Models and enterprise systems connect through a configurable OpenAI-compatible provider and MCP connectors. When credentials are missing, Anna reports `not_configured` instead of inventing model output, tool output, or success states.
+Anna runs as a desktop application and keeps runtime state local by default. Channels provide a durable collaboration context for people, Anna, specialist Agents, tasks, artifacts, and review decisions. Models and enterprise systems connect through a configurable OpenAI-compatible provider and MCP connectors for both scoped data access and governed business operations. When credentials are missing, Anna reports `not_configured` instead of inventing model output, tool output, or success states.
 
 ## The problem it addresses
 
@@ -67,7 +69,7 @@ Create turns “build this capability for me” into a reviewable draft flow:
 Cowork brings enterprise workbench scenarios together while keeping external systems at the edge:
 
 - **Reimbursement**: draft creation, policy checks, missing-field collection, submit intent, approval, and audit;
-- **Hiker integration**: a read-only entry point for global customer and business analysis through an external MCP; Hiker is a collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif) and is not currently open source;
+- **Hiker integration**: MCP access to a complete ERP system for small teams, covering finance, supply chain, and marketing data and governed operations; Hiker is a collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif) and is not currently open source;
 - **Associate**: receivables recovery, node execution, and approval collaboration;
 - **MCP connectors**: configure, probe, and display connector state independently;
 - external writes require explicit permission and human-in-the-loop approval.
@@ -196,6 +198,6 @@ This version does not claim:
 
 Anna is released under the MIT License. Read [CONTRIBUTING.md](../../CONTRIBUTING.md) before opening a change, and follow [SECURITY.md](../../SECURITY.md) for the security boundary. Do not commit `.anna/`, databases, runtime logs, provider responses, API keys, or real enterprise data.
 
-This repository open-sources only Anna's Hiker connector and UI integration. It does not include the Hiker platform, server source, deployment, or business data, and Anna's MIT License does not extend to Hiker.
+Hiker is a complete ERP system for small teams, with integrated finance, supply-chain, and marketing capabilities. Anna uses MCP to access the ERP services that Hiker exposes for data retrieval, business analysis, and governed operations. This repository open-sources only Anna's Hiker MCP connector and UI integration. It does not include the Hiker platform, server source, deployment, or business data, and Anna's MIT License does not extend to Hiker.
 
 Issues and pull requests are welcome around the Runtime, Connectors, Trace/Eval, desktop experience, and reproducible tests.

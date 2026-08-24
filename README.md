@@ -1,14 +1,16 @@
 # Anna
 
-> Start with a request. Continue with a durable Run. Finish with a reviewable Artifact and traceable evidence.
+![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner.png)
 
-Anna is a local-first desktop AI agent for enterprise workflows. It brings conversation, tools, approvals, memory, artifacts, and execution evidence into one working loop so a task can pause, resume, be reviewed, and continue without losing its state.
+Anna is a governed, local-first desktop AI agent for enterprise work. It combines direct conversation, channel collaboration, business workflows, specialist Associates, and MCP-connected systems in one working loop so a task can pause, resume, be reviewed, and continue without losing its state.
 
-- **Local-first runtime.** Runtime state, databases, and configuration stay on the machine by default.
-- **Work has durable structure.** Goals become Runs with state, events, artifacts, and a clear next action.
-- **Automation stays governed.** Tool calls pass through permission, approval, and audit boundaries.
-- **Collaboration is visible.** Crew connects project graphs, tasks, channels, reviews, and deliverables.
-- **Evidence is built in.** Trace and Eval connect model calls, tools, approvals, retries, and terminal results.
+- **Chat with a working agent.** Give Anna a goal, add context, interject, continue, and inspect the Run behind the conversation.
+- **Coordinate through channels.** Humans, Anna, and specialist Agents share task context, artifacts, decisions, review gates, and durable history.
+- **Run governed workflows.** Goals become Runs with explicit state, permissions, approvals, artifacts, and next actions.
+- **Connect business systems through MCP.** Read operational data, inspect business records, and invoke governed actions in external systems.
+- **Review how work happened.** Trace and Eval connect model calls, tools, approvals, retries, and terminal results.
+
+The product uses an iris-inspired visual system and a dedicated Anna character identity to keep Chat, Workflows, and Associate experiences coherent. The visual language reinforces the product's completeness while governed execution remains the core.
 
 **Current release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)** | macOS source preview | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
@@ -49,12 +51,21 @@ The sidecar switch is a development and validation boundary. It does not imply t
 | Surface | What it demonstrates |
 | --- | --- |
 | **Chat** | Streaming background Runs, stop/continue/interject, history, workspace context, and explicit provider failure states. |
+| **Channels** | Human-Agent coordination around tasks, mentions, artifacts, active Runs, decisions, and review history. |
 | **Create** | Reviewable Skill, Prompt, and Python Tool drafts with workspace context, permission modes, validation, and confirmation. |
-| **Cowork** | Reimbursement, approval, audit, Associate workflows, and external MCP connectors kept at a controlled boundary. |
+| **Cowork** | Reimbursement, Hiker ERP access, approval, audit, and external MCP connectors kept at a controlled boundary. |
+| **Associate** | Specialist Agents that analyze business context, propose actions, and advance work under the same governance model. |
 | **Crew** | SOP-driven projects, task graphs, assignment, channels, artifacts, review gates, rework, notifications, and delivery. |
+| **MCP systems** | Structured access to external business data and operations, with write actions kept behind permission, approval, idempotency, and audit. |
 | **Harness v2** | Durable events, channel isolation, Tool Gateway controls, memory policy, Trace/Eval evidence, scheduling, and recovery foundations. |
 
 These surfaces can be explored with deterministic fixtures. Real provider and enterprise-system results require explicit local configuration.
+
+## Channels and connected business systems
+
+Channels are Anna's collaboration layer. A channel keeps people, Anna, and specialist Agents aligned around the same tasks, active Runs, artifacts, mentions, review decisions, and project history. A message can add context, steer an active execution, request a person or Agent, or return the team to the exact task and artifact under discussion.
+
+MCP is Anna's external-system boundary. Anna can use MCP connectors to retrieve operational data, inspect records, and invoke business operations in ERP or other enterprise systems. Read access stays scoped; external writes retain permission checks, human approval, idempotency, read-back verification, and audit evidence when the connected workflow supports them.
 
 ## How work moves through Anna
 
@@ -165,7 +176,9 @@ This release does not claim:
 
 ## External project boundary
 
-Anna includes an independently maintained connector and UI integration for **Hiker**, an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). Hiker itself is not included in this repository and is not currently open source. Anna's MIT License applies only to the Anna-side integration code and other files committed here.
+**Hiker** is a complete ERP system for small teams, with integrated finance, supply-chain, and marketing capabilities. Anna connects to Hiker through MCP to retrieve ERP data, inspect business context, and invoke governed business operations across the ERP services that Hiker exposes.
+
+Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). The Hiker platform, server source, deployment, and business data are not included in this repository, and Hiker is not currently open source. Anna's MIT License applies only to the Anna-side MCP connector, UI integration, and other files committed here; it does not extend to Hiker.
 
 ## Repository and maintenance
 

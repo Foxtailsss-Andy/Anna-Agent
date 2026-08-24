@@ -6,6 +6,6 @@ Before distributing a binary or enabling additional connectors, re-run the depen
 
 ## Hiker
 
-Anna contains an independently maintained connector and user-interface integration for Hiker. Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif); the Hiker platform and its source code are not included in this repository and are not currently open source.
+Hiker is a complete ERP system for small teams, with integrated finance, supply-chain, and marketing capabilities. Anna connects to the ERP services exposed by Hiker through MCP for data retrieval, business analysis, and governed operations. Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif); the Hiker platform and its source code are not included in this repository and are not currently open source.
 
-The MIT License in this repository covers the Anna-side integration code only. It does not grant rights to Hiker, its service implementation, deployment, data, or other unpublished materials.
+The MIT License in this repository covers the Anna-side MCP connector, user-interface integration, and other committed Anna code only. It does not grant rights to Hiker, its service implementation, deployment, data, or other unpublished materials.

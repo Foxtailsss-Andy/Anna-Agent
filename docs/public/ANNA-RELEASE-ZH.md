@@ -4,9 +4,11 @@
 
 > 从一句需求开始，走到可追溯的 Run、Artifact 和下一步动作。
 
-Anna 是一个面向企业工作流的 local-first 桌面 AI Agent。它把对话、工具、审批、记忆和执行证据放在同一条工作链路里，让 AI 的价值从“回答得不错”延伸到“事情可以继续、结果可以检查”。
+Anna 是一个面向企业工作的受治理、local-first 桌面 AI Agent。它把直接对话、频道协同、专业 Associate、通过 MCP 连接的业务系统、审批、记忆和执行证据放在同一条工作链路里，让 AI 的价值从“回答得不错”延伸到“事情可以继续、结果可以检查”。
 
 ![Anna](../../apps/desktop/src/assets/anna-login-portrait.png)
+
+Anna 采用鸢尾花设计语言，并拥有独立的角色形象，让 Chat、Workflows 与 Associate 形成一致的产品体验；视觉用于强化产品完整性，工作的推进与治理仍是核心。
 
 **当前版本：`0.2.0 Developer Preview`** · macOS 本地预览 · MIT License
 
@@ -20,7 +22,7 @@ Anna 的核心是一套可以长期工作的 Agent Runtime：
 - **Judgment**：在继续、等待、请求补充信息或结束之间做出可解释判断；
 - **Memory**：把经过确认的业务记忆和当前任务上下文区分管理。
 
-它以桌面应用运行，默认把运行状态保留在本地；模型和企业系统通过可配置的 OpenAI-compatible provider 与 MCP connector 接入。没有配置凭据时，Anna 会明确显示 `not_configured`，不会伪造模型结果、工具结果或成功状态。
+它以桌面应用运行，默认把运行状态保留在本地。频道为人、Anna、专业 Agent、任务、产物和评审决策提供长期协同上下文；模型和企业系统通过可配置的 OpenAI-compatible provider 与 MCP connector 接入，支持受限取数、记录查看和受治理的业务操作。没有配置凭据时，Anna 会明确显示 `not_configured`，不会伪造模型结果、工具结果或成功状态。
 
 ## 它解决什么问题
 
@@ -66,7 +68,7 @@ Create 把“帮我做一个能力”变成可检查的草稿流程：
 Cowork 聚合企业工作台场景，并把外部系统连接放在边界上：
 
 - **Reimbursement**：报销草稿、政策校验、缺字段补充、提交意图、审批与审计；
-- **Hiker 集成**：通过外部 MCP 提供全球客户与业务数据的只读分析入口；Hiker 是合作项目，作者为 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif)，目前未开源；
+- **Hiker 集成**：通过 MCP 连接一套适用于小型团队的完整 ERP 系统，覆盖财务、供应链、营销数据与受治理的业务操作；Hiker 是合作项目，作者为 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif)，目前未开源；
 - **Associate**：应收回款恢复、节点执行和审批协作；
 - **MCP Connector**：连接器可单独配置、探测和显示状态；
 - 涉及外部写入的动作需要明确的 permission 与 human-in-the-loop 审批。
@@ -195,6 +197,6 @@ CI 在没有私有 provider、MCP endpoint、本机运行状态或签名身份�
 
 Anna 使用 MIT License。提交代码前请阅读 [CONTRIBUTING.md](../../CONTRIBUTING.md)，并遵守 [SECURITY.md](../../SECURITY.md) 的安全边界。不要提交 `.anna/`、数据库、运行日志、provider 响应、API key 或真实企业数据。
 
-本仓库只开源 Anna 侧的 Hiker Connector 与界面集成代码，不包含 Hiker 平台、服务端源码、部署或业务数据；Anna 的 MIT License 不延伸至 Hiker。
+Hiker 是一套适用于小型团队的完整 ERP 系统，具备财务、供应链和营销能力。Anna 通过 MCP 使用 Hiker 对外提供的 ERP 服务，完成业务取数、分析和受治理的业务操作。本仓库只开源 Anna 侧的 Hiker MCP Connector 与界面集成代码，不包含 Hiker 平台、服务端源码、部署或业务数据；Anna 的 MIT License 不延伸至 Hiker。
 
 欢迎围绕 Runtime、Connector、Trace/Eval、桌面体验和可复现测试提出 Issue 或 Pull Request。
