@@ -14,11 +14,27 @@ The product uses an iris-inspired visual system and a dedicated Anna character i
 
 **Current release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)** | macOS source preview | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
-[Quick start](#quick-start) | [What you can explore](#what-you-can-explore) | [Architecture](#how-work-moves-through-anna) | [中文发布说明](docs/public/ANNA-RELEASE-ZH.md) | [English release brief](docs/public/ANNA-RELEASE-EN.md)
+[Product walkthrough](#product-walkthrough) | [Quick start](#quick-start) | [What you can explore](#what-you-can-explore) | [Architecture](#how-work-moves-through-anna) | [中文发布说明](docs/public/ANNA-RELEASE-ZH.md) | [English release brief](docs/public/ANNA-RELEASE-EN.md)
 
-![Anna Crew workflow with project graph, channel, artifacts, and review gate](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/19-run-done.png)
+## Product walkthrough
 
-*A synthetic repository walkthrough showing a project graph, channel activity, generated artifacts, and a human review gate in the same workspace.*
+### Create
+
+![Anna Create workflow from a request to a validated artifact and file preview](docs/public/assets/demos/anna-create.gif)
+
+*A high-fidelity Iris design walkthrough showing Create move from a request to validation, registration, and a reviewable file preview.*
+
+### Cowork · Hiker
+
+![Anna Cowork Hiker dashboard with KPI, collection, aging, customer, insight, and copilot views](docs/public/assets/demos/anna-cowork-hiker.gif)
+
+*The current Hiker dashboard UI rendered with synthetic fixture data. It shows the complete customer and contract view without using Hiker's real service, credentials, or business data.*
+
+### Crew
+
+![Anna Crew workflow with project graph, channel, artifacts, review, and delivery views](docs/public/assets/demos/anna-crew.gif)
+
+*A synthetic repository walkthrough showing the project graph, channel activity, generated artifacts, human review gates, and delivery in the same workspace.*
 
 ## Quick start
 
