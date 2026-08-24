@@ -14,7 +14,7 @@ The product uses an iris-inspired visual system and a dedicated Anna character i
 
 **Current release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)** | macOS source preview | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
-[Product walkthrough](#product-walkthrough) | [Quick start](#quick-start) | [What you can explore](#what-you-can-explore) | [Architecture](#how-work-moves-through-anna) | [中文发布说明](docs/public/ANNA-RELEASE-ZH.md) | [English release brief](docs/public/ANNA-RELEASE-EN.md)
+[中文](README.zh-CN.md) | [Product walkthrough](#product-walkthrough) | [Quick start](#quick-start) | [What you can explore](#what-you-can-explore) | [Architecture](#how-work-moves-through-anna)
 
 ## Product walkthrough
 
@@ -188,10 +188,8 @@ The GitHub repository was created on April 2, 2026 for a retired book project an
 
 [Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) is the canonical public repository. The publication milestone, naming boundary, and future GitHub-centered workflow are recorded in [Anna Agent GitHub Milestone - 2026-08-24](docs/product/anna-agent-github-milestone-2026-08-24.md).
 
-For deeper release detail, see:
+For deeper project and release detail, see:
 
-- [中文发布说明](docs/public/ANNA-RELEASE-ZH.md)
-- [English release brief](docs/public/ANNA-RELEASE-EN.md)
 - [Developer Preview Wayfinder](docs/product/anna-github-developer-preview-wayfinder-2026-08-23.md)
 - [Developer Preview Spec](docs/product/anna-github-developer-preview-spec-2026-08-23.md)
 - [Release tickets](docs/superpowers/plans/2026-08-23-github-developer-preview/00-tickets.md)
