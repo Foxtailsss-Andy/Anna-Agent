@@ -1,6 +1,6 @@
 # Anna
 
-![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner.png)
+![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner-v2.png)
 
 Anna is a governed, local-first desktop AI agent for enterprise work. It combines direct conversation, channel collaboration, business workflows, specialist Associates, and MCP-connected systems in one working loop so a task can pause, resume, be reviewed, and continue without losing its state.
 
