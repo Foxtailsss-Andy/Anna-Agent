@@ -18,23 +18,9 @@ The product uses an iris-inspired visual system and a dedicated Anna character i
 
 ## Product walkthrough
 
-### Create
+![Anna product tour across the Create page, Cowork Hiker dashboard, and Crew workflow](docs/public/assets/demos/anna-product-tour.gif)
 
-![Anna Create workflow from a request to a validated artifact and file preview](docs/public/assets/demos/anna-create.gif)
-
-*A high-fidelity Iris design walkthrough showing Create move from a request to validation, registration, and a reviewable file preview.*
-
-### Cowork · Hiker
-
-![Anna Cowork Hiker dashboard with KPI, collection, aging, customer, insight, and copilot views](docs/public/assets/demos/anna-cowork-hiker.gif)
-
-*The current Hiker dashboard UI rendered with synthetic fixture data. It shows the complete customer and contract view without using Hiker's real service, credentials, or business data.*
-
-### Crew
-
-![Anna Crew workflow with project graph, channel, artifacts, review, and delivery views](docs/public/assets/demos/anna-crew.gif)
-
-*A synthetic repository walkthrough showing the project graph, channel activity, generated artifacts, human review gates, and delivery in the same workspace.*
+*One loop across three surfaces: the Create page before a task starts, the complete Cowork Hiker customer-and-contract dashboard, and the Crew workflow canvas. The Hiker view uses synthetic fixture data and contains no real service response, credentials, or business data.*
 
 ## Quick start
 
