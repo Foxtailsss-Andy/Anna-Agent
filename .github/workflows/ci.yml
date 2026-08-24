@@ -48,8 +48,8 @@ jobs:
       - name: Run maintained frontend smoke
         run: npm run frontend:smoke
 
-      - name: Run Python tests
-        run: uv run pytest -q
-
       - name: Build web and Harness v2 service
         run: npm run build && npm run harness:v2:build
+
+      - name: Run Python tests
+        run: uv run pytest -q
