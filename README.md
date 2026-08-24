@@ -11,6 +11,8 @@ Anna is a local-first desktop AI agent for enterprise Cowork workflows. This rep
 
 This GitHub repository was created on April 2, 2026 for a retired book project and was repurposed for Anna on August 24, 2026. Anna's first public software release is the `0.2.0` Developer Preview; the repository creation date is not the Anna software release date.
 
+The canonical public repository is [Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent). The publication milestone, naming boundary, and future GitHub-centered maintenance workflow are recorded in [Anna Agent GitHub Milestone - 2026-08-24](docs/product/anna-agent-github-milestone-2026-08-24.md).
+
 ## External project boundary
 
 Anna includes an independently maintained connector and UI integration for **Hiker**, an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). Hiker itself is not included in this repository and is not currently open source. Anna's MIT License applies only to the Anna-side integration code and other files committed here.
