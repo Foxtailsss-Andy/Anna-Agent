@@ -443,6 +443,19 @@ function denyHostHomeReadsExcept(allowedPaths: readonly string[]): string {
   ].join("");
 }
 
+function resolveNpmCliPath(): string {
+  const npmExecPath = process.env.npm_execpath;
+  if (npmExecPath !== undefined && existsSync(npmExecPath)) {
+    return realpathSync(npmExecPath);
+  }
+  const nodeDirectory = dirname(realpathSync(process.execPath));
+  const bundledNpmCli = resolve(nodeDirectory, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js");
+  if (existsSync(bundledNpmCli)) {
+    return realpathSync(bundledNpmCli);
+  }
+  throw new Error("npm CLI is unavailable for contained command execution");
+}
+
 function requireLocalAnnaBackendOrigin(value: string | undefined): string {
   if (value === undefined || value.length === 0) {
     throw new Error("live evidence requires an explicit local Anna backend origin");
@@ -776,6 +789,10 @@ async function executeAllowedCommand(
   const useLiveLocalVitest = targetedTestPath !== undefined
     && evidenceMode === "live"
     && process.platform === "darwin";
+  const usesNpm = command === "npm test"
+    || command === "npm run build"
+    || (targetedTestPath !== undefined && !useLiveLocalVitest);
+  const npmCliPath = usesNpm ? resolveNpmCliPath() : undefined;
   const invocation = command === "git diff"
     ? ["git", ["diff"]] as const
     : command === "git status --short"
@@ -787,7 +804,7 @@ async function executeAllowedCommand(
           : command === "git rev-parse --git-common-dir"
             ? ["git", ["rev-parse", "--git-common-dir"]] as const
         : command === "npm test"
-        ? ["npm", ["test"]] as const
+        ? [process.execPath, [npmCliPath!, "test"]] as const
         : targetedTestPath !== undefined && targetedTestPath.length > 0
           ? useLiveLocalVitest
             ? [
@@ -804,9 +821,9 @@ async function executeAllowedCommand(
                   targetedTestPath,
                 ],
               ] as const
-            : ["npm", ["exec", "--no", "--", "vitest", "run", "--configLoader", "runner", targetedTestPath]] as const
+            : [process.execPath, [npmCliPath!, "exec", "--no", "--", "vitest", "run", "--configLoader", "runner", targetedTestPath]] as const
         : command === "npm run build"
-          ? ["npm", ["run", "build"]] as const
+          ? [process.execPath, [npmCliPath!, "run", "build"]] as const
           : undefined;
   if (invocation === undefined) {
     throw new Error(`command is not allowlisted: ${command}`);
@@ -819,6 +836,8 @@ async function executeAllowedCommand(
   const processDirectory = requiresProcessContainment
     ? join(root, "dist", ".t07-process")
     : tmpdir();
+  const nodeDirectory = dirname(realpathSync(process.execPath));
+  const npmPackageRoot = npmCliPath === undefined ? undefined : resolve(dirname(npmCliPath), "..");
   const fixtureNetworkGuardPath = fileURLToPath(new URL("./review-test-fixture-runner.cjs", import.meta.url));
   if (requiresProcessContainment) {
     await ensureSecureDirectory(root, processDirectory);
@@ -828,7 +847,8 @@ async function executeAllowedCommand(
     `--allow-fs-read=${root}`,
     `--allow-fs-read=${processDirectory}`,
     `--allow-fs-read=${dirname(fixtureNetworkGuardPath)}`,
-    "--allow-fs-read=/usr/local",
+    `--allow-fs-read=${nodeDirectory}`,
+    ...(npmPackageRoot === undefined ? [] : [`--allow-fs-read=${npmPackageRoot}`]),
     "--allow-fs-read=/dev",
     `--allow-fs-write=${root}`,
     "--allow-child-process",
@@ -852,11 +872,17 @@ async function executeAllowedCommand(
     "(deny network*)",
     denyHostHomeReadsExcept([
       root,
+      nodeDirectory,
+      ...(npmPackageRoot === undefined ? [] : [npmPackageRoot]),
       ...(dependencyBridge === undefined
         ? []
         : [dependencyBridge.sourceRoot, dependencyBridge.dependencyRoot]),
     ]),
     `(allow file-read* (subpath ${JSON.stringify(root)}))`,
+    `(allow file-read* (subpath ${JSON.stringify(nodeDirectory)}))`,
+    ...(npmPackageRoot === undefined
+      ? []
+      : [`(allow file-read* (subpath ${JSON.stringify(npmPackageRoot)}))`]),
     ...(dependencyBridge === undefined
       ? []
       : [
@@ -873,7 +899,7 @@ async function executeAllowedCommand(
   const args = useProcessContainment
     ? ["-p", sandboxProfile, invocation[0], ...invocation[1]]
     : useFixtureWorker
-      ? [...fixturePermissionFlags, realpathSync("/usr/local/bin/npm"), ...invocation[1]]
+      ? [...fixturePermissionFlags, ...invocation[1]]
       : [...invocation[1]];
   try {
     const result = await execFile(executable, args, {
