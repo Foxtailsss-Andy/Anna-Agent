@@ -789,10 +789,13 @@ async function executeAllowedCommand(
   const useLiveLocalVitest = targetedTestPath !== undefined
     && evidenceMode === "live"
     && process.platform === "darwin";
-  const usesNpm = command === "npm test"
-    || command === "npm run build"
+  const usesFixtureScript = evidenceMode === "fixture"
+    && (command === "npm test" || command === "npm run build");
+  const usesNpm = (!usesFixtureScript && command === "npm test")
+    || (!usesFixtureScript && command === "npm run build")
     || (targetedTestPath !== undefined && !useLiveLocalVitest);
   const npmCliPath = usesNpm ? resolveNpmCliPath() : undefined;
+  const fixtureCommandRunnerPath = fileURLToPath(new URL("./review-fixture-command-runner.cjs", import.meta.url));
   const invocation = command === "git diff"
     ? ["git", ["diff"]] as const
     : command === "git status --short"
@@ -804,7 +807,7 @@ async function executeAllowedCommand(
           : command === "git rev-parse --git-common-dir"
             ? ["git", ["rev-parse", "--git-common-dir"]] as const
         : command === "npm test"
-        ? [process.execPath, [npmCliPath!, "test"]] as const
+        ? [process.execPath, [usesFixtureScript ? fixtureCommandRunnerPath : npmCliPath!, "test"]] as const
         : targetedTestPath !== undefined && targetedTestPath.length > 0
           ? useLiveLocalVitest
             ? [
@@ -823,7 +826,9 @@ async function executeAllowedCommand(
               ] as const
             : [process.execPath, [npmCliPath!, "exec", "--no", "--", "vitest", "run", "--configLoader", "runner", targetedTestPath]] as const
         : command === "npm run build"
-          ? [process.execPath, [npmCliPath!, "run", "build"]] as const
+          ? usesFixtureScript
+            ? [process.execPath, [fixtureCommandRunnerPath, "build"]] as const
+            : [process.execPath, [npmCliPath!, "run", "build"]] as const
           : undefined;
   if (invocation === undefined) {
     throw new Error(`command is not allowlisted: ${command}`);

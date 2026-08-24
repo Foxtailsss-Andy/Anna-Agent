@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
@@ -212,23 +212,10 @@ async function withScenario<T>(callback: (
   }
 }
 
-test("fixture commands use the active npm CLI path", async () => {
-  const npmFixtureRoot = await mkdtemp(join(tmpdir(), "anna-t07-npm-cli-"));
-  const npmCliPath = join(npmFixtureRoot, "bin", "npm-cli.cjs");
+test("fixture commands do not load the host npm CLI", async () => {
   const previousNpmExecPath = process.env.npm_execpath;
   try {
-    await mkdir(dirname(npmCliPath), { recursive: true });
-    await writeFile(npmCliPath, [
-      'const { readFileSync } = require("node:fs");',
-      'const { spawnSync } = require("node:child_process");',
-      'if (process.argv[2] !== "test") process.exit(64);',
-      'process.stdout.write("active-npm-cli\\n");',
-      'const script = JSON.parse(readFileSync("package.json", "utf8")).scripts.test;',
-      'const result = spawnSync("/bin/sh", ["-c", script], { stdio: "inherit", env: process.env });',
-      'process.exit(result.status ?? 1);',
-      "",
-    ].join("\n"));
-    process.env.npm_execpath = npmCliPath;
+    process.env.npm_execpath = join(tmpdir(), "anna-t07-missing-npm-cli.cjs");
 
     await withScenario(async (scenario) => {
       const prepared = await scenario.prepare();
@@ -243,7 +230,6 @@ test("fixture commands use the active npm CLI path", async () => {
       const result = await scenario.runTests(development);
 
       expect(result.passed).toBe(true);
-      expect(result.evidence.stdout).toContain("active-npm-cli");
       expect(result.evidence.stdout).toContain("t07-test-ok");
     });
   } finally {
@@ -252,7 +238,6 @@ test("fixture commands use the active npm CLI path", async () => {
     } else {
       process.env.npm_execpath = previousNpmExecPath;
     }
-    await rm(npmFixtureRoot, { recursive: true, force: true });
   }
 });
 
