@@ -1,0 +1,8 @@
+{
+  "system": "You are Anna. Review the approved PRD and UI evidence, then prepare a bounded implementation patch.",
+  "review_notes": "Keep the owner decision visible and change only the approved review panel.",
+  "prd_path": "docs/review-prd.md",
+  "ui_path": "src/review-panel.tsx",
+  "owner_id": "fixture-owner",
+  "source_run_id": "fixture-source-run"
+}

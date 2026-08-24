@@ -1,0 +1,351 @@
+/* LoginPage · Cofounder 式仪式分栏：左侧承担 Anna 的人格，右侧保持登录工具的安静。 */
+
+.ir-login {
+  position: relative;
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 96px 56px 72px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg-grad-top);
+  overflow-y: auto;
+}
+
+.ir-login::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+.ir-login__corner-mark {
+  position: absolute;
+  top: 42px;
+  left: 52px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink);
+}
+
+.ir-login__corner-name {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ir-login__corner-meta,
+.ir-login__visual-index,
+.ir-login__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: var(--ink-3);
+}
+
+.ir-login__layout {
+  width: 100%;
+  max-width: 1000px;
+  display: grid;
+  grid-template-columns: minmax(360px, 430px) minmax(340px, 390px);
+  align-items: center;
+  justify-content: center;
+  gap: 92px;
+  position: relative;
+  z-index: 1;
+}
+
+.ir-login__theme {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--ink-2);
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.ir-login__theme:hover {
+  color: var(--ink);
+  background: var(--tint-strong);
+  border-color: var(--line-strong);
+}
+
+.ir-login__theme:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
+
+.ir-login__theme svg {
+  width: 17px;
+  height: 17px;
+}
+
+.ir-login__visual {
+  width: 100%;
+}
+
+.ir-login__visual-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card), var(--inset-top);
+}
+
+.ir-login__portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 43%;
+}
+
+.ir-login__brand {
+  position: absolute;
+  top: 16px;
+  left: 14px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  color: #232328;
+  text-shadow: 0 1px 12px rgb(255 255 255 / 80%);
+}
+
+.ir-login__brand-name {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ir-login__brand-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+
+.ir-login__caption {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+.ir-login__visual-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 0 2px;
+}
+
+.ir-login__visual-index {
+  white-space: nowrap;
+}
+
+.ir-login__form-card {
+  width: 100%;
+  max-width: 390px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 30px 32px 32px;
+  background: rgb(255 255 255 / 58%);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 18px 42px rgb(35 35 40 / 6%), var(--inset-top);
+}
+
+[data-theme="dark"] .ir-login__form-card {
+  background: rgb(35 35 40 / 64%);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 20%), var(--inset-top);
+}
+
+.ir-login__eyebrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ir-login__eyebrow span:last-child {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+[data-theme="dark"] .ir-login__portrait {
+  filter: brightness(0.88) saturate(0.92);
+}
+
+.ir-login__title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 31px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.ir-login__sub {
+  margin: -4px 0 6px;
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.ir-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ir-login__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ir-login__label {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.ir-login__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ir-login__input::placeholder {
+  color: var(--ink-3);
+}
+
+.ir-login__input:focus {
+  border-color: rgb(87 91 196 / 50%);
+  box-shadow: 0 0 0 3px var(--iris-soft);
+}
+
+.ir-login__submit {
+  min-height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  box-shadow: var(--shadow-button);
+  cursor: pointer;
+  transition: filter 140ms ease, opacity 140ms ease;
+}
+
+.ir-login__submit:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+.ir-login__submit:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.ir-login__submit:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .ir-login {
+    align-items: flex-start;
+    padding: 96px 24px 48px;
+  }
+
+  .ir-login::before {
+    inset: 12px;
+    border-radius: 16px;
+  }
+
+  .ir-login__corner-mark {
+    top: 28px;
+    left: 30px;
+  }
+
+  .ir-login__layout {
+    grid-template-columns: minmax(0, 360px);
+    gap: 36px;
+  }
+
+  .ir-login__visual {
+    width: min(100%, 360px);
+    margin: 0 auto;
+  }
+
+  .ir-login__form-card {
+    max-width: 360px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .ir-login {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .ir-login__visual-frame {
+    aspect-ratio: 1;
+  }
+
+  .ir-login__portrait {
+    object-position: 50% 34%;
+  }
+
+  .ir-login__theme {
+    top: 18px;
+    right: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ir-login__theme,
+  .ir-login__input,
+  .ir-login__submit {
+    transition: none;
+  }
+}

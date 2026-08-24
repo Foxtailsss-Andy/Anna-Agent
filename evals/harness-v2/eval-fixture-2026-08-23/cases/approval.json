@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "setId": "smoke",
+  "caseId": "approval",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "productionEvidence": false,
+  "traceId": "smoke:approval",
+  "evidence": {
+    "traceId": "smoke:approval",
+    "events": [
+      {
+        "id": "approval:started",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:approval",
+        "seq": 0,
+        "type": "run.started",
+        "timestamp": "2026-08-20T00:00:00.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      },
+      {
+        "id": "approval:middle:0",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:approval",
+        "seq": 1,
+        "type": "tool.approval.requested",
+        "timestamp": "2026-08-20T00:00:01.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "runId": "smoke:approval",
+          "approvalId": "approval:approval"
+        }
+      },
+      {
+        "id": "approval:completed",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:approval",
+        "seq": 2,
+        "type": "run.awaiting_approval",
+        "timestamp": "2026-08-20T00:00:02.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "approval:artifact",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "runId": "smoke:approval",
+        "kind": "smoke_artifact",
+        "uri": "artifact://approval",
+        "hash": "sha256:approval",
+        "version": "1",
+        "validationStatus": "passed",
+        "reviewState": "accepted"
+      }
+    ],
+    "metrics": {
+      "stability": 1,
+      "latencyMs": 1000,
+      "cost": 0
+    }
+  },
+  "contract": {
+    "passed": true,
+    "version": "contract-1",
+    "failedRules": [],
+    "checkedEventIds": [
+      "approval:started",
+      "approval:middle:0",
+      "approval:completed"
+    ]
+  },
+  "quality": {
+    "passed": true,
+    "score": 1,
+    "cacheKey": "quality:b13433a3b4e4367009b0fdd50a937fde4c09f2b438a40be50caea403295c5b7b",
+    "promptVersion": "fixture-prompt-1",
+    "modelVersion": "fixture-model-1",
+    "rubricId": "eval-fixture",
+    "rubricVersion": "1",
+    "failedCriteria": []
+  },
+  "releaseGate": {
+    "passed": true,
+    "blockedBy": []
+  },
+  "toolTrajectory": [
+    {
+      "id": "approval:middle:0",
+      "type": "tool.approval.requested",
+      "seq": 1
+    }
+  ],
+  "terminal": "run.awaiting_approval",
+  "metrics": {
+    "stability": 1,
+    "latencyMs": 1000,
+    "cost": 0,
+    "source": "fixture",
+    "productionComparable": false
+  },
+  "firstTraceDivergence": null
+}

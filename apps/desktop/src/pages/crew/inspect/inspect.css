@@ -1,0 +1,731 @@
+/* ============================================================
+   F4 · 轻检视 popover / 任务抽屉 / 共识面板 / 列表视图
+   —— ir-insp- 前缀,tokens + 组件级 CSS var(沿 F2/F3 先例,不扰全局 tokens),双主题。
+   ============================================================ */
+
+.ir-insp-pop,
+.ir-insp-drawer,
+.ir-insp-consensus,
+.ir-insp-list,
+.ir-insp-picker {
+  --insp-lav: #8b8ed9;          /* 薰衣草 · 待审 */
+  --insp-green: #3e9c82;        /* 通过 / 命中勾 */
+  --insp-green-soft: rgba(62, 156, 130, 0.12);
+  --insp-gold-line: rgba(203, 187, 142, 0.75);
+  --insp-gold-ink: #8a7b52;
+  --insp-gold-soft: rgba(203, 187, 142, 0.14);
+  --insp-danger: var(--danger);
+  --insp-shadow: 0 2px 6px rgba(35, 35, 40, 0.06), 0 22px 54px rgba(35, 35, 40, 0.16);
+}
+:root[data-theme="dark"] .ir-insp-pop,
+:root[data-theme="dark"] .ir-insp-drawer,
+:root[data-theme="dark"] .ir-insp-consensus,
+:root[data-theme="dark"] .ir-insp-list,
+:root[data-theme="dark"] .ir-insp-picker {
+  --insp-lav: #a6a9e4;
+  --insp-green: #57b79c;
+  --insp-green-soft: rgba(87, 183, 156, 0.18);
+  --insp-gold-line: rgba(166, 153, 111, 0.6);
+  --insp-gold-ink: #c3b487;
+  --insp-gold-soft: rgba(166, 153, 111, 0.18);
+  --insp-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 22px 54px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------------- 状态章(七态,色盲安全:形状即状态) ---------------- */
+.ir-insp-seal {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.ir-insp-seal--pending {
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 26%, transparent);
+  background: transparent;
+}
+.ir-insp-seal--ready {
+  border: 1.5px solid var(--iris);
+  background: transparent;
+}
+.ir-insp-seal--running {
+  background: var(--iris);
+}
+.ir-insp-seal--running .ir-insp-seal__innerring {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  border: 1.5px solid #fff;
+}
+.ir-insp-seal--review {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--insp-lav);
+  background: transparent;
+}
+.ir-insp-seal--blocked {
+  background: var(--danger);
+}
+.ir-insp-seal--rework {
+  border: 1.5px solid var(--danger);
+  color: var(--danger);
+  background: transparent;
+}
+.ir-insp-seal--done {
+  background: var(--insp-green);
+}
+
+/* 门章 ◇「审」 */
+.ir-insp-gateseal {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+}
+.ir-insp-gateseal__c {
+  transform: rotate(-45deg);
+  font-family: var(--font-serif);
+  font-size: 9px;
+  line-height: 1;
+}
+.ir-insp-gateseal--active {
+  border: 1.5px solid var(--gold);
+  color: var(--insp-gold-ink);
+}
+.ir-insp-gateseal--passed {
+  border: 1px solid color-mix(in srgb, var(--insp-green) 55%, transparent);
+  color: var(--insp-green);
+}
+.ir-insp-gateseal--dormant {
+  border: 1px dashed color-mix(in srgb, var(--ink) 22%, transparent);
+  color: var(--ink-3);
+}
+
+/* 状态 pill(章 + 词) */
+.ir-insp-statuspill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  flex: none;
+}
+.ir-insp-statuspill--running { color: var(--iris); border-color: color-mix(in srgb, var(--iris) 35%, transparent); background: var(--iris-soft); }
+.ir-insp-statuspill--review { color: var(--insp-lav); border-color: color-mix(in srgb, var(--insp-lav) 50%, transparent); }
+.ir-insp-statuspill--blocked { color: var(--danger); border-color: var(--danger-line); }
+.ir-insp-statuspill--rework { color: var(--danger); border-color: var(--danger-line); }
+.ir-insp-statuspill--done { color: var(--insp-green); border-color: color-mix(in srgb, var(--insp-green) 45%, transparent); }
+
+/* ---------------- 头像 / 名(1g 人=圆 · Agent=方圆角) ---------------- */
+.ir-insp-ava {
+  border-radius: 999px;
+  background: var(--tint-strong);
+  color: var(--ink-2);
+  font-size: 9px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.ir-insp-ava--owner { background: var(--iris-deep); color: #f7f6f2; }
+.ir-insp-ava--agent {
+  border-radius: 6px;
+  background: var(--delegate-soft);
+  color: var(--delegate-ink);
+  border: 1px solid color-mix(in srgb, var(--delegate) 30%, transparent);
+}
+.ir-insp-who { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.ir-insp-who__name { font-size: 11.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ir-insp-who__name--agent { color: var(--delegate-ink); }
+.ir-insp-who__tag { font-family: var(--font-mono); font-size: 8px; color: var(--delegate-ink); background: var(--delegate-soft); border-radius: 999px; padding: 1px 5px; flex: none; }
+.ir-insp-who__role { font-size: 10px; color: var(--ink-3); flex: none; }
+
+/* ---------------- 轻检视 popover(372 · r18 · 2a) ---------------- */
+.ir-insp-pop {
+  position: fixed;
+  z-index: 60;
+  width: 372px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--insp-shadow);
+  padding: 14px 16px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: irInspPopIn 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.ir-insp-pop--below { animation-name: irInspPopInDown; }
+.ir-insp-pop__caret {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--surface-2);
+  transform: rotate(45deg);
+}
+.ir-insp-pop--above .ir-insp-pop__caret {
+  bottom: -6.5px;
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+.ir-insp-pop--below .ir-insp-pop__caret {
+  top: -6.5px;
+  border-left: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line-strong);
+}
+.ir-insp-pop__head { display: flex; align-items: center; gap: 8px; }
+.ir-insp-pop__title { font-family: var(--font-serif); font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ir-insp-pop__headright { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.ir-insp-audit { font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint); }
+.ir-insp-x {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+}
+.ir-insp-x:hover { color: var(--ink); background: var(--tint); }
+
+.ir-insp-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* 目标 */
+.ir-insp-goal { padding: 8px 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.ir-insp-goal__k { font-size: 10px; color: var(--ink-3); }
+.ir-insp-goal__v { font-size: 12px; line-height: 1.6; color: var(--ink); margin-top: 2px; }
+.ir-insp-goal__src { display: inline-flex; margin-top: 5px; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); border: 1px solid color-mix(in srgb, var(--iris) 25%, transparent); border-radius: 999px; padding: 1px 7px; }
+
+/* 执行者行 */
+.ir-insp-exec { display: flex; align-items: center; gap: 7px; position: relative; }
+.ir-insp-exec__load { font-family: var(--font-mono); font-size: 9px; color: var(--ink-2); }
+.ir-insp-exec__reassign { margin-left: auto; }
+
+/* 进度 */
+.ir-insp-prog { display: flex; align-items: baseline; gap: 8px; }
+.ir-insp-prog__k { font-size: 10px; color: var(--ink-3); }
+.ir-insp-prog__mono { font-family: var(--font-mono); font-size: 10px; color: var(--ink); }
+.ir-insp-prog__elapsed { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); }
+.ir-insp-estimate { font-family: var(--font-mono); font-size: 8.5px; color: var(--ink-3); }
+
+/* 正在:… */
+.ir-insp-now { display: flex; align-items: center; gap: 7px; padding: 7px 11px; background: var(--iris-soft); border-radius: 10px; }
+.ir-insp-now__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--iris); flex: none; }
+.ir-insp-now__t { font-size: 11.5px; color: var(--iris-deep); animation: irInspShimmer 5s ease-in-out infinite; }
+.ir-insp-now__step { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--insp-lav); flex: none; }
+
+/* 输入 · 产出 */
+.ir-insp-io { display: flex; gap: 10px; }
+.ir-insp-io__col { flex: 1; min-width: 0; }
+.ir-insp-io__k { font-size: 10px; color: var(--ink-3); margin-bottom: 4px; }
+.ir-insp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ir-insp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ink-2);
+  background: var(--tint);
+  border-radius: 999px;
+  padding: 2px 8px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  cursor: default;
+}
+.ir-insp-chip--muted { color: var(--ink-3); }
+.ir-insp-chip--hit { color: var(--ink); }
+.ir-insp-chip--out { color: var(--ink-2); border: 1px dashed var(--line-strong); background: transparent; }
+
+/* 依赖链(还差 n 道门) */
+.ir-insp-reason { padding: 9px 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.ir-insp-reason__k { font-size: 10.5px; color: var(--ink-2); }
+.ir-insp-chain { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.ir-insp-chain__seg { display: inline-flex; align-items: center; gap: 5px; }
+.ir-insp-chain__arrow { color: var(--ink-3); display: inline-flex; }
+.ir-insp-chain__chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-2); border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px 8px; }
+.ir-insp-chain__chip--self { color: var(--ink); border-color: color-mix(in srgb, var(--iris) 40%, transparent); background: var(--iris-soft); }
+.ir-insp-chain__chip--gate { color: var(--insp-gold-ink); border-color: var(--insp-gold-line); }
+
+/* 解锁即通知 */
+.ir-insp-unlock { display: flex; align-items: center; gap: 7px; padding: 7px 11px; background: var(--tint); border-radius: 10px; color: var(--ink-2); }
+.ir-insp-unlock__t { font-size: 11px; color: var(--ink-2); }
+.ir-insp-unlock__pill { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); border: 1px solid color-mix(in srgb, var(--iris) 30%, transparent); border-radius: 999px; padding: 1px 8px; flex: none; }
+
+/* 届时注入 */
+.ir-insp-inject__k { font-size: 10px; color: var(--ink-3); margin-bottom: 4px; }
+
+/* 操作组 */
+.ir-insp-actions { display: flex; align-items: center; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line); }
+.ir-insp-actions__hint { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--ink-faint); }
+
+/* 按钮 */
+.ir-insp-btn {
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+.ir-insp-btn:disabled { opacity: 0.55; cursor: default; }
+.ir-insp-btn--primary { background: var(--iris); color: #fff; box-shadow: 0 1px 3px rgba(87, 91, 196, 0.35); }
+.ir-insp-btn--default { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+.ir-insp-btn--danger { background: transparent; color: var(--danger); border-color: var(--danger-line); }
+.ir-insp-btn--lg { border-radius: 10px; padding: 8px 16px; font-size: 12.5px; }
+
+.ir-insp-chip.ir-insp-exec__reassign,
+button.ir-insp-chip {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 2px 10px;
+  font-size: 10px;
+}
+button.ir-insp-chip:hover { background: var(--tint); }
+
+.ir-insp-err { font-size: 11px; color: var(--danger); padding: 4px 2px; }
+.ir-insp-err--drawer { padding: 6px 22px; }
+
+/* ---------------- 改派浮层 ---------------- */
+.ir-insp-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  width: 200px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: var(--insp-shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ir-insp-picker__head { font-size: 10px; color: var(--ink-3); padding: 2px 8px 4px; }
+.ir-insp-picker__empty { font-size: 11px; color: var(--ink-3); padding: 6px 8px; }
+.ir-insp-picker__opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; cursor: pointer; text-align: left; color: var(--ink); }
+.ir-insp-picker__opt:hover { background: var(--tint); }
+.ir-insp-picker__opt.is-current { background: var(--iris-soft); }
+.ir-insp-picker__name { font-size: 11.5px; font-weight: 500; }
+.ir-insp-picker__role { font-size: 9.5px; color: var(--ink-3); }
+.ir-insp-picker__cur { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); }
+
+/* ---------------- 任务抽屉(480 右滑 · 1h) ---------------- */
+.ir-insp-drawer-layer { position: fixed; inset: 0; z-index: 55; }
+.ir-insp-scrim { position: absolute; inset: 0; background: rgba(20, 20, 24, 0.06); animation: irInspFade 240ms ease; }
+.ir-insp-scrim--light { background: rgba(20, 20, 24, 0.04); }
+.ir-insp-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 480px;
+  max-width: 92vw;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border-left: 1px solid var(--line-strong);
+  box-shadow: -18px 0 44px rgba(35, 35, 40, 0.16);
+  display: flex;
+  flex-direction: column;
+  animation: irInspDrawerIn 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.ir-insp-drawer__head { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+.ir-insp-drawer__titlerow { display: flex; align-items: center; gap: 10px; }
+.ir-insp-drawer__title { font-family: var(--font-serif); font-size: 17px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ir-insp-drawer__headright { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.ir-insp-drawer__sign { display: flex; align-items: center; gap: 8px; margin-top: 12px; position: relative; }
+.ir-insp-sign__spacer { margin-left: auto; }
+.ir-insp-sign__unassigned { font-size: 11.5px; color: var(--ink-3); }
+.ir-insp-drawer__meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); }
+
+.ir-insp-drawer__body { flex: 1; overflow-y: auto; padding: 16px 22px; display: flex; flex-direction: column; gap: 16px; }
+.ir-insp-sec--trace { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ir-insp-sec__h { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.ir-insp-sec__note { font-family: var(--font-mono); font-size: 9.5px; font-weight: 400; color: var(--ink-3); margin-left: 8px; }
+.ir-insp-empty-inline { font-size: 11.5px; color: var(--ink-3); padding: 8px 0; }
+
+/* 验收标准 */
+.ir-insp-crit { display: flex; flex-direction: column; gap: 6px; }
+.ir-insp-crit__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
+.ir-insp-crit__box { width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid color-mix(in srgb, var(--ink) 25%, transparent); flex: none; }
+
+/* 产物版本卡 */
+.ir-insp-arts { display: flex; flex-direction: column; gap: 8px; }
+.ir-insp-art { background: linear-gradient(180deg, var(--surface), var(--surface-2)); border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px 12px; }
+.ir-insp-art__row { display: flex; align-items: center; gap: 9px; color: var(--ink-2); }
+.ir-insp-art__title { font-size: 12.3px; font-weight: 600; color: var(--ink); }
+.ir-insp-art__ver { font-family: var(--font-mono); font-size: 9px; color: var(--iris); background: var(--iris-soft); border-radius: 999px; padding: 1px 6px; }
+.ir-insp-art__at { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+.ir-insp-art__preview { margin-left: auto; }
+/* R-F1:产物预览改 markdown 渲染(CrewMarkdown 内联排版),容器保留滚动/背景 */
+/* R3(§3j):产物盒高放开 260 → 400,产出先行让 Boss 第一眼见结果 */
+.ir-insp-art__body { margin: 8px 0 0; padding: 10px 12px; background: var(--panel); border-radius: 8px; max-height: 400px; overflow: auto; }
+/* HTML 产物内联展开 = 转义源码(CrewMarkdown 会吞标签;沉浸预览留全幅阅读器沙箱) */
+.ir-insp-art__html { display: flex; flex-direction: column; gap: 6px; }
+.ir-insp-art__htmlhead { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.ir-insp-art__htmlsrc { margin: 0; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--ink-2); white-space: pre; overflow-x: auto; }
+
+/* 执行 trace */
+.ir-insp-sec--trace .ir-insp-trace { flex: 1; min-height: 0; }
+.ir-insp-trace-empty { flex: 1; border: 1px dashed var(--line-strong); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: color-mix(in srgb, var(--surface) 40%, transparent); }
+.ir-insp-trace-empty__pill { align-self: flex-start; font-family: var(--font-mono); font-size: 9px; color: var(--ink-3); border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 7px; }
+.ir-insp-trace-empty__note { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); line-height: 1.6; }
+.ir-insp-hits { margin-top: 10px; }
+.ir-insp-hits__k { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); margin-bottom: 5px; }
+
+/* ============================================================
+   R3 · 抽屉信息序改版(①产物 ②验收 ③执行过程 ④元信息)+ 三级 Trace(§3j)
+   ============================================================ */
+
+/* 序号徽 + 段头 */
+.ir-insp-sec__hnum { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.ir-insp-sec__htitle { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.ir-insp-sec__tag { font-family: var(--font-mono); font-size: 9px; color: var(--ink-3); }
+.ir-insp-sec__tag--iris { color: var(--iris); background: var(--iris-soft); border-radius: 999px; padding: 1px 7px; }
+.ir-insp-num {
+  width: 15px; height: 15px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+}
+.ir-insp-num--iris { background: var(--iris); color: #fff; }
+.ir-insp-num--gray { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink-2); }
+
+/* ④ 元信息(沉底) */
+.ir-insp-sec--meta { margin-top: auto; }
+.ir-insp-metagrid { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); }
+
+/* ① 产物卡增件:icon 盒 / 元 / 全幅阅读 iris chip / 下载 */
+.ir-insp-art__icon {
+  width: 26px; height: 26px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: var(--iris-soft); color: var(--iris);
+}
+.ir-insp-art__meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+.ir-insp-art__spacer { margin-left: auto; }
+.ir-insp-art__read {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  color: var(--iris-deep); background: var(--iris-soft);
+  border: 1px solid color-mix(in srgb, var(--iris) 45%, transparent);
+  border-radius: 999px; padding: 4px 11px; cursor: pointer;
+}
+.ir-insp-art__read:hover { background: color-mix(in srgb, var(--iris) 16%, transparent); }
+.ir-insp-art__dl {
+  width: 28px; height: 28px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: transparent; color: var(--ink-3); cursor: pointer;
+}
+.ir-insp-art__dl:hover { color: var(--ink); background: var(--tint); }
+
+/* ① 交付面板(产物区即交付区 · 可用性收束二批):正文框=产物本身,上传文档读入(文本类),提交即 vN+1 */
+.ir-insp-deliver {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 10px; padding: 12px;
+  background: linear-gradient(180deg, var(--iris-soft), transparent);
+  border: 1px solid color-mix(in srgb, var(--iris) 30%, transparent);
+  border-radius: 12px;
+}
+.ir-insp-deliver__label { font-size: 11.5px; font-weight: 600; color: var(--iris-deep); }
+.ir-insp-deliver__ta {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 96px;
+  font-family: inherit; font-size: 12.5px; line-height: 1.55; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 11px;
+}
+.ir-insp-deliver__ta::placeholder { color: var(--ink-faint); }
+.ir-insp-deliver__ta:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--iris) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--iris-soft);
+}
+.ir-insp-deliver__err { font-size: 11px; color: var(--danger); }
+.ir-insp-deliver__note { font-family: var(--font-mono); font-size: 9.5px; color: var(--insp-green); }
+.ir-insp-deliver__act { display: flex; align-items: center; gap: 8px; }
+.ir-insp-deliver__spacer { margin-left: auto; }
+.ir-insp-deliver__upload {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font-family: inherit; font-size: 11px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer;
+}
+.ir-insp-deliver__upload:hover:not(:disabled) { background: var(--tint); color: var(--ink); }
+.ir-insp-deliver__upload:disabled { opacity: 0.55; cursor: default; }
+.ir-insp-deliver__help { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); line-height: 1.6; }
+
+/* ② 验收标准依据提示(对照产物逐条核对) */
+.ir-insp-crit-basis { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); margin: -2px 0 8px; line-height: 1.6; }
+
+/* ③ 执行过程 · 折叠头行 */
+.ir-insp-proc { display: flex; flex-direction: column; gap: 8px; }
+.ir-insp-proc__row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  box-sizing: border-box; text-align: left; font-family: inherit;
+  padding: 8px 11px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+}
+.ir-insp-proc__row:hover { border-color: color-mix(in srgb, var(--iris) 35%, transparent); }
+.ir-insp-proc__row.is-open { border-color: color-mix(in srgb, var(--iris) 40%, transparent); background: var(--iris-soft); }
+.ir-insp-proc__meta { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--ink-3); }
+.ir-insp-proc__chev { flex: none; color: var(--ink-3); display: inline-flex; }
+.ir-insp-proc__caption { font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint); padding-left: 2px; }
+
+/* 三级 Trace 容器 */
+.ir-tl { border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; background: var(--surface); }
+
+/* L1 执行摘要(吸顶,即点即关) */
+.ir-tl__l1 {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.ir-tl__l1pill {
+  flex: none; font-family: var(--font-mono); font-size: 9px; color: var(--iris);
+  background: var(--iris-soft); border: 1px solid color-mix(in srgb, var(--iris) 25%, transparent);
+  border-radius: 999px; padding: 1px 8px;
+}
+.ir-tl__l1k { font-size: 12px; font-weight: 600; color: var(--ink); flex: none; }
+.ir-tl__summary {
+  flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 10px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ir-tl__collapse {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit; font-size: 10px; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px;
+  background: var(--surface); cursor: pointer;
+}
+.ir-tl__collapse:hover { color: var(--ink); background: var(--tint); }
+
+/* L2 步骤列表 */
+.ir-tl__l2 { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; }
+.ir-tl__empty { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); padding: 2px; }
+.ir-tl__step { display: flex; flex-direction: column; }
+.ir-tl__row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  box-sizing: border-box; text-align: left; font-family: inherit;
+  padding: 7px 10px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+}
+.ir-tl__row:disabled { cursor: default; }
+.ir-tl__row[aria-expanded="true"] { border-color: color-mix(in srgb, var(--iris) 35%, transparent); }
+.ir-tl__tag {
+  flex: none; font-family: var(--font-mono); font-size: 8.5px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 5px; padding: 1px 6px; color: var(--ink-2);
+}
+.ir-tl__tag--thinking { color: var(--iris); border-color: color-mix(in srgb, var(--iris) 32%, transparent); }
+.ir-tl__tag--tool { color: var(--ink-2); }
+.ir-tl__tag--system { color: var(--insp-green); border-color: color-mix(in srgb, var(--insp-green) 35%, transparent); }
+.ir-tl__tag--error { color: var(--danger); border-color: var(--danger-line); }
+.ir-tl__sum {
+  flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ir-tl__x { flex: none; color: var(--danger); font-size: 10px; }
+.ir-tl__chev { flex: none; color: var(--ink-3); display: inline-flex; }
+.ir-tl__step--fail .ir-tl__row { border-color: var(--danger-line); }
+
+/* L3 展开帧(原文) */
+.ir-tl__l3 {
+  margin-top: 6px; border: 1px solid color-mix(in srgb, var(--iris) 35%, transparent);
+  border-radius: 9px; overflow: hidden; box-shadow: 0 2px 10px rgba(87, 91, 196, 0.08);
+}
+.ir-tl__l3--fail { border-color: var(--danger-line); box-shadow: none; }
+.ir-tl__l3head { display: flex; align-items: center; gap: 7px; padding: 7px 11px; background: var(--iris-soft); }
+.ir-tl__l3title { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ir-tl__l3pill { flex: none; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); border: 1px solid color-mix(in srgb, var(--iris) 28%, transparent); border-radius: 999px; padding: 1px 7px; }
+.ir-tl__l3body { position: relative; max-height: 196px; overflow: auto; padding: 10px 12px; background: var(--surface); }
+.ir-tl__fade { position: sticky; bottom: -10px; height: 24px; margin: 0 -12px -10px; background: linear-gradient(180deg, transparent, var(--surface)); pointer-events: none; }
+
+/* L3 工具帧等宽降噪 */
+.ir-tl__mono { display: flex; flex-direction: column; gap: 6px; }
+.ir-tl__monofield { display: flex; gap: 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; }
+.ir-tl__monok { flex: none; width: 52px; color: var(--iris); }
+.ir-tl__monov { flex: 1; min-width: 0; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; }
+.ir-tl__monoline { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+.ir-tl__lock { font-family: var(--font-mono); font-size: 9.5px; color: var(--insp-gold-ink); }
+.ir-tl__trunc { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); }
+
+/* 操作组(提交内联已废除 → ①区交付面板) */
+.ir-insp-drawer__foot { flex: none; padding: 14px 22px 18px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+.ir-insp-drawer__foothint { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); }
+.ir-insp-cons-edit__ta { width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; font-size: 12px; line-height: 1.5; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; }
+
+/* ---------------- 共识面板 ---------------- */
+.ir-insp-consensus-layer { position: fixed; inset: 0; z-index: 56; }
+.ir-insp-consensus {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border-left: 1px solid var(--line-strong);
+  box-shadow: -18px 0 44px rgba(35, 35, 40, 0.16);
+  display: flex;
+  flex-direction: column;
+  animation: irInspDrawerIn 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+.ir-insp-consensus__head { display: flex; align-items: center; gap: 8px; padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
+.ir-insp-consensus__title { font-family: var(--font-serif); font-size: 15px; font-weight: 700; color: var(--ink); }
+.ir-insp-consensus__count { font-family: var(--font-mono); font-size: 11px; color: var(--iris); background: var(--iris-soft); border-radius: 999px; padding: 1px 8px; }
+.ir-insp-consensus__body { flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+.ir-insp-consensus__foot { padding: 12px 20px 16px; border-top: 1px solid var(--line); }
+
+.ir-insp-cons-item { display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; background: linear-gradient(180deg, var(--surface), var(--surface-2)); border: 1px solid var(--line); border-radius: 10px; }
+.ir-insp-cons-item__text { flex: 1; font-size: 12px; line-height: 1.55; color: var(--ink); }
+.ir-insp-cons-item__act { display: flex; gap: 6px; flex: none; }
+.ir-insp-kind { font-family: var(--font-mono); font-size: 9px; padding: 2px 7px; border-radius: 999px; flex: none; }
+.ir-insp-kind--约束 { color: var(--danger); background: var(--danger-wash); }
+.ir-insp-kind--口径 { color: var(--iris); background: var(--iris-soft); }
+.ir-insp-kind--决策 { color: var(--insp-gold-ink); background: var(--insp-gold-soft); }
+.ir-insp-linkbtn { border: none; background: transparent; color: var(--ink-2); font-size: 11px; cursor: pointer; padding: 0 2px; }
+.ir-insp-linkbtn:hover { color: var(--iris); }
+.ir-insp-linkbtn--danger:hover { color: var(--danger); }
+
+.ir-insp-cons-edit { display: flex; flex-direction: column; gap: 8px; padding: 10px 11px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--iris) 30%, transparent); border-radius: 10px; }
+.ir-insp-cons-edit__kinds { display: flex; gap: 6px; }
+.ir-insp-kindpick { font-family: var(--font-mono); font-size: 10px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink-2); cursor: pointer; }
+.ir-insp-kindpick.is-on { background: var(--iris-soft); color: var(--iris); border-color: color-mix(in srgb, var(--iris) 40%, transparent); }
+.ir-insp-cons-edit__act { display: flex; gap: 8px; }
+
+/* ---------------- 列表视图 ---------------- */
+.ir-insp-listwrap { flex: 1; min-width: 0; overflow-y: auto; }
+.ir-insp-list { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; }
+.ir-insp-list--empty { align-items: center; justify-content: center; color: var(--ink-3); font-size: 12.5px; padding: 48px 18px; }
+.ir-insp-listrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.ir-insp-listrow:hover { border-color: color-mix(in srgb, var(--iris) 45%, transparent); transform: translateX(1px); }
+/* 行尾「执行」轻按钮(终审 #1):agent 任务 assigned|rework 才渲染,与行按钮并列。 */
+.ir-insp-listrow-wrap { display: flex; align-items: center; gap: 8px; }
+.ir-insp-listrow-wrap > .ir-insp-listrow { flex: 1; min-width: 0; }
+.ir-insp-listrow__run {
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--iris);
+  box-shadow: 0 1px 3px rgba(87, 91, 196, 0.35);
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+.ir-insp-listrow__run:hover { filter: brightness(1.06); }
+.ir-insp-listrow--gate { background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
+.ir-insp-listrow__title { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+.ir-insp-listrow__kind { font-family: var(--font-mono); font-size: 9px; color: var(--insp-gold-ink); }
+.ir-insp-listrow__role { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-3); }
+.ir-insp-roledot { width: 4px; height: 4px; border-radius: 999px; flex: none; }
+.ir-insp-roledot--product { background: #55589e; }
+.ir-insp-roledot--design { background: #9c56b8; }
+.ir-insp-roledot--eng { background: #3e9c82; }
+.ir-insp-roledot--accept { background: #b98a2f; }
+.ir-insp-roledot--other { background: var(--ink-3); }
+.ir-insp-listrow__spacer { margin-left: auto; }
+.ir-insp-listrow__who { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-2); }
+.ir-insp-listrow__ver { font-family: var(--font-mono); font-size: 9px; color: var(--iris); background: var(--iris-soft); border-radius: 999px; padding: 1px 6px; }
+.ir-insp-listrow__word { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3); min-width: 34px; text-align: right; }
+.ir-insp-listrow__word--running { color: var(--iris); }
+.ir-insp-listrow__word--review { color: var(--insp-lav); }
+.ir-insp-listrow__word--blocked,
+.ir-insp-listrow__word--rework { color: var(--danger); }
+.ir-insp-listrow__word--ready { color: var(--iris); }
+.ir-insp-listrow__word--done { color: var(--insp-green); }
+.ir-insp-listrow__word--gate-active { color: var(--insp-gold-ink); }
+.ir-insp-listrow__word--gate-passed { color: var(--insp-green); }
+
+/* ---------------- 画布节点选中环接管 + 呼吸暂歇(F4 → F2 TaskNode) ---------------- */
+.crewg-node--selected {
+  box-shadow: 0 0 0 2px var(--iris), 0 0 0 7px var(--iris-soft), 0 12px 30px rgba(87, 91, 196, 0.16) !important;
+  border-radius: var(--radius-node, 14px);
+}
+.crewg-node--selected .crewg-node__breath { animation: none !important; opacity: 0 !important; }
+
+/* ---------------- 动效 ---------------- */
+@keyframes irInspPopIn { from { opacity: 0; transform: translateY(6px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes irInspPopInDown { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes irInspDrawerIn { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes irInspFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes irInspShimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ir-insp-pop,
+  .ir-insp-drawer,
+  .ir-insp-consensus,
+  .ir-insp-scrim { animation: none; }
+  .ir-insp-now__t { animation: none; }
+}
+
+/* 可用性收束:验收标准可勾选(本机评审备忘)+ 门署名「评审人」后缀 */
+.ir-insp-crit__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 3px 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--ink-2, #3e3e44);
+  text-align: left;
+  cursor: pointer;
+}
+.ir-insp-crit__row .ir-insp-crit__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+}
+.ir-insp-crit__row.is-checked .ir-insp-crit__box {
+  background: var(--ok, #3e9c82);
+  border-color: var(--ok, #3e9c82);
+}
+.ir-insp-crit__row.is-checked { color: var(--ink-3); }
+.ir-insp-sign__role {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}

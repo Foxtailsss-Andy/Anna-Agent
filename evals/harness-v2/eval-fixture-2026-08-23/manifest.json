@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "caseId": "harness-v2-eval-fixture",
+  "generatedAt": "2026-08-22T23:12:22.064Z",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "cases/approval.json",
+      "size": 2809,
+      "sha256": "4d1980e71af034efa91ac5d2f64c6c41d43aa379244c6022a5ee3161ce7c7829"
+    },
+    {
+      "path": "cases/artifact.json",
+      "size": 2687,
+      "sha256": "b86d34aca76dbf0c839e3fa0190278a33d59de21829dd8d47045d6b704982abd"
+    },
+    {
+      "path": "cases/completion.json",
+      "size": 3165,
+      "sha256": "312a83ff857a7e92c92416012cadcde349b7319b5ad45387738613a45df34593"
+    },
+    {
+      "path": "cases/dev-01.json",
+      "size": 3087,
+      "sha256": "0532aaafc6acc0662940008e298395c531a4af33f8a3bc339ca404e387e141fb"
+    },
+    {
+      "path": "cases/dev-02.json",
+      "size": 2651,
+      "sha256": "b6ce6dd15b23a1bdb097eb89e65e0116393be0b0412c4835433e1ed3dc9efd2b"
+    },
+    {
+      "path": "cases/dev-03.json",
+      "size": 2704,
+      "sha256": "b4d167832518aa3e3c454b09d0db51d621e74976ff87ab5c0dd883096136835a"
+    },
+    {
+      "path": "cases/dev-04.json",
+      "size": 2769,
+      "sha256": "6cad3135e1b313a5d5647023c78914c569709d13ef388c8248f58af55c1ef12e"
+    },
+    {
+      "path": "cases/dev-05.json",
+      "size": 3087,
+      "sha256": "be4fb5edf78338d2ebe4a3a646bcb74f778053decb9e75e82377a420ec63b018"
+    },
+    {
+      "path": "cases/dev-06.json",
+      "size": 2651,
+      "sha256": "69389288e5cf3d3a5054ad6ce80d146a3f7746a2fe894d92894f3308a593f12e"
+    },
+    {
+      "path": "cases/dev-07.json",
+      "size": 2704,
+      "sha256": "b688709522061f9aa94ecd9133f38ecd8f3275d5f7d8662d1ec5e7971dde9e11"
+    },
+    {
+      "path": "cases/dev-08.json",
+      "size": 2769,
+      "sha256": "6aa09c8618a93d2a270f2c8983755f7cd4f4a5913dbe644b3b6a5bacac72093b"
+    },
+    {
+      "path": "cases/dev-09.json",
+      "size": 3087,
+      "sha256": "c59f8f4aaabcc863948586ceb398f7e9cf755f95ce74bf044e7af56b3f2a0e66"
+    },
+    {
+      "path": "cases/dev-10.json",
+      "size": 2651,
+      "sha256": "49636458e0f545711c78cc6fea91167e871d6d9eb5d0b9fb6a684d906b46ddf5"
+    },
+    {
+      "path": "cases/dev-11.json",
+      "size": 2704,
+      "sha256": "286deaa2b6ab0f99f375c1fabddb03ae3c12c5df6121251205cebb6c5c53f348"
+    },
+    {
+      "path": "cases/dev-12.json",
+      "size": 2769,
+      "sha256": "8a586da9dabb2c2254427de8cd8f957207812867c1ac6d3d5fea40be0effda5c"
+    },
+    {
+      "path": "cases/dev-13.json",
+      "size": 3087,
+      "sha256": "e321a2a20a5d30e3e47510998e93cf1995485006ab666874a72b0771749de6e4"
+    },
+    {
+      "path": "cases/dev-14.json",
+      "size": 2651,
+      "sha256": "232d1353806c6495cc7d014f0844986d181a3d428e74eb7f564e9eac091e365f"
+    },
+    {
+      "path": "cases/dev-15.json",
+      "size": 2704,
+      "sha256": "438d93caa79a8af363dddb211b993d62c8a6f6f835a5c5370b41a01bf298d4b5"
+    },
+    {
+      "path": "cases/dev-16.json",
+      "size": 3534,
+      "sha256": "cee52750257883519e88314fdf61a824f31a64a62b4cdbe60a0da494a4a322de"
+    },
+    {
+      "path": "cases/memory.json",
+      "size": 2706,
+      "sha256": "4806cb464fc1558ef151b853874c1008a335f4a2b2e6c0a0c27777f50cdcdc9d"
+    },
+    {
+      "path": "ground-truth.json",
+      "size": 401,
+      "sha256": "f537c02eef1898602f83b970ee77a5e380a57449e4e9c0d1f5d0721d0b7f2477"
+    },
+    {
+      "path": "regression-dev-16.json",
+      "size": 1241,
+      "sha256": "117f2c52e1eebd9ea6e93ef8cbfbe230042d87607ad848a2a593d535a5998894"
+    },
+    {
+      "path": "report.json",
+      "size": 6915,
+      "sha256": "3e1581391eb19b3fce5748c7c3be7a67386ed5eb32b189dbd2d003b98a785101"
+    }
+  ]
+}

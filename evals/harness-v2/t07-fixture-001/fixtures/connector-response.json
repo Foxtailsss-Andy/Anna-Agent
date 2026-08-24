@@ -1,0 +1,9 @@
+{
+  "connector": "fixture-review-connector",
+  "operations": [
+    "read_workspace",
+    "build_changed_ui",
+    "run_command"
+  ],
+  "external_writes": false
+}

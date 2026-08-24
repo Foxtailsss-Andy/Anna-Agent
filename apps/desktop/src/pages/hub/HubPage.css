@@ -1,0 +1,76 @@
+/* ============================================================
+   产物中心 · 页面级样式(R7)
+   数据源 = Create drafts;网格卡走 SurfaceKit .hub-*;分组用 PetalDivider(占点缀名额)。
+   纪律:色值一律 var(--*),ir- 前缀,禁裸 hex。
+   ============================================================ */
+
+.ir-hub {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.ir-hub__scroll {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 28px 48px;
+}
+.ir-hub__col {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- 页头 ---- */
+.ir-hub__head { display: flex; align-items: flex-end; gap: 12px; }
+.ir-hub__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-hub__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 2px;
+}
+.ir-hub__refresh {
+  margin-left: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 3px 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-btn);
+  cursor: pointer;
+  flex: none;
+}
+.ir-hub__refresh:hover:not(:disabled) { background: var(--tint); }
+.ir-hub__refresh:disabled { opacity: 0.45; cursor: default; }
+.ir-hub__refresh:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- 分组 ---- */
+.ir-hub__group { display: flex; flex-direction: column; gap: 12px; }
+.ir-hub__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ir-hub__group-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-3);
+  background: var(--tint);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}

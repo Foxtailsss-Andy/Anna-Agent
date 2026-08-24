@@ -1,0 +1,29 @@
+{
+  "source": "demo-erp REST :8970 + MCP /erp/rpc probe (primary per spec 2.4)",
+  "rest": {
+    "/api/pnl?period=2026-05": { "revenue": 4455000.0, "expense_total": 3238000.0, "profit": 1217000.0 },
+    "/api/pnl?period=2026-06": { "revenue": 4820000.0, "expense_total": 3640000.0, "profit": 1180000.0 },
+    "/api/trend": {
+      "2026-05": { "revenue": 4455000.0, "profit": 1217000.0, "operating_cash_flow": 927000.0 },
+      "2026-06": { "revenue": 4820000.0, "profit": 1180000.0, "operating_cash_flow": 760000.0 }
+    }
+  },
+  "tool_capability_probe": {
+    "erp.finance.query{question:'收入',period:'2026-05'}": "【演示数据】2026-05 本月收入约 446万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。",
+    "erp.finance.query{question:'净利润',period:'2026-05'}": "【演示数据】2026-05 利润约 122万，经营现金流约 93万；现金流低于利润主要因回款放缓。",
+    "erp.finance.query{question:'利润',period:'2026-06'}": "【演示数据】2026-06 利润约 118万，经营现金流约 76万；现金流低于利润主要因回款放缓。",
+    "erp.finance.query{question:'收入和净利润',period:'2026-06'}": "【演示数据】2026-06 本月收入约 482万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。"
+  },
+  "figure_reconciliation": {
+    "5月收入 ~446万": { "truth": "4455000.0 → 445.5万；工具原文『约 446万』", "ok": true },
+    "6月收入 ~482万": { "truth": "4820000.0", "ok": true },
+    "5月净利润 ~122万": { "truth": "1217000.0 → 121.7万；工具原文『约 122万』", "ok": true },
+    "6月净利润 ~118万": { "truth": "1180000.0", "ok": true },
+    "5月经营现金流 ~93万": { "truth": "operating_cash_flow 927000.0 → 92.7万；工具原文『约 93万』", "ok": true },
+    "6月经营现金流 ~76万": { "truth": "operating_cash_flow 760000.0", "ok": true },
+    "+36万（+8.1%）": { "truth": "482-446=36；36/446=8.07%", "derivable": true },
+    "-4万（-3.3%）": { "truth": "122-118=4；4/122=3.28%", "derivable": true },
+    "-17万": { "truth": "93-76=17", "derivable": true },
+    "『回款放缓』": { "truth": "工具原文『现金流低于利润主要因回款放缓』", "relayed": true }
+  }
+}

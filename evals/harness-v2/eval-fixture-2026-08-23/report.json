@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "productionEvidence": false,
+  "metricsSource": "fixture_only_not_production",
+  "smoke": {
+    "setId": "smoke",
+    "total": 4,
+    "passed": 4,
+    "blocked": 0,
+    "stability": 1,
+    "quality": 1,
+    "latencyMs": null,
+    "cost": null,
+    "metricsSource": "fixture_only_not_production",
+    "cases": [
+      {
+        "caseId": "completion",
+        "traceId": "smoke:completion",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "artifact",
+        "traceId": "smoke:artifact",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "memory",
+        "traceId": "smoke:memory",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "approval",
+        "traceId": "smoke:approval",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.awaiting_approval",
+        "toolTrajectory": [
+          "tool.approval.requested"
+        ],
+        "firstTraceDivergence": null
+      }
+    ]
+  },
+  "dev": {
+    "setId": "dev",
+    "total": 16,
+    "passed": 15,
+    "blocked": 1,
+    "stability": 1,
+    "quality": 1,
+    "latencyMs": null,
+    "cost": null,
+    "metricsSource": "fixture_only_not_production",
+    "cases": [
+      {
+        "caseId": "dev-01",
+        "traceId": "smoke:dev-01",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-02",
+        "traceId": "smoke:dev-02",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-03",
+        "traceId": "smoke:dev-03",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-04",
+        "traceId": "smoke:dev-04",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.awaiting_approval",
+        "toolTrajectory": [
+          "tool.approval.requested"
+        ],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-05",
+        "traceId": "smoke:dev-05",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-06",
+        "traceId": "smoke:dev-06",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-07",
+        "traceId": "smoke:dev-07",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-08",
+        "traceId": "smoke:dev-08",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.awaiting_approval",
+        "toolTrajectory": [
+          "tool.approval.requested"
+        ],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-09",
+        "traceId": "smoke:dev-09",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-10",
+        "traceId": "smoke:dev-10",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-11",
+        "traceId": "smoke:dev-11",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-12",
+        "traceId": "smoke:dev-12",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.awaiting_approval",
+        "toolTrajectory": [
+          "tool.approval.requested"
+        ],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-13",
+        "traceId": "smoke:dev-13",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-14",
+        "traceId": "smoke:dev-14",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-15",
+        "traceId": "smoke:dev-15",
+        "releaseGate": {
+          "passed": true,
+          "blockedBy": []
+        },
+        "terminal": "run.completed",
+        "toolTrajectory": [],
+        "firstTraceDivergence": null
+      },
+      {
+        "caseId": "dev-16",
+        "traceId": "smoke:dev-16",
+        "releaseGate": {
+          "passed": false,
+          "blockedBy": [
+            "contract"
+          ]
+        },
+        "terminal": "run.awaiting_approval",
+        "toolTrajectory": [
+          "tool.effect.succeeded",
+          "tool.approval.requested"
+        ],
+        "firstTraceDivergence": {
+          "eventId": "dev-16:prohibited-effect",
+          "type": "tool.effect.succeeded",
+          "reason": "prohibited_effect:prohibited"
+        }
+      }
+    ]
+  },
+  "regression": {
+    "caseId": "dev-16",
+    "classification": "contract_failure",
+    "evidencePath": "regression-dev-16.json",
+    "firstTraceDivergence": {
+      "eventId": "dev-16:prohibited-effect",
+      "type": "tool.effect.succeeded",
+      "reason": "prohibited_effect:prohibited"
+    }
+  }
+}

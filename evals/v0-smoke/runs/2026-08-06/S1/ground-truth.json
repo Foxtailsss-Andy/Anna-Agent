@@ -1,0 +1,46 @@
+{
+  "source": "demo-erp REST :8970 (primary per spec 2.4; seed doc fallback NOT used)",
+  "rest": {
+    "/api/ap-top?period=2026-06&limit=5": {
+      "period": "2026-06",
+      "rows": [
+        {
+          "supplier": "蓝云数据科技有限公司",
+          "supplier_id": "SUP-001",
+          "category": "cloud",
+          "outstanding": 420000.0
+        },
+        {
+          "supplier": "智联软件外包服务有限公司",
+          "supplier_id": "SUP-002",
+          "category": "outsourcing",
+          "outstanding": 320000.0
+        },
+        {
+          "supplier": "盛世国际会展服务有限公司",
+          "supplier_id": "SUP-003",
+          "category": "marketing",
+          "outstanding": 240000.0
+        },
+        {
+          "supplier": "利和办公科技有限公司",
+          "supplier_id": "SUP-004",
+          "category": "office",
+          "outstanding": 110000.0
+        },
+        {
+          "supplier": "畅行商旅管理有限公司",
+          "supplier_id": "SUP-005",
+          "category": "travel",
+          "outstanding": 90000.0
+        }
+      ],
+      "currency": "CNY",
+      "note": "演示数据"
+    }
+  },
+  "expected_interjection_answer": {
+    "top_supplier": "蓝云数据科技有限公司",
+    "outstanding": 420000.0
+  }
+}

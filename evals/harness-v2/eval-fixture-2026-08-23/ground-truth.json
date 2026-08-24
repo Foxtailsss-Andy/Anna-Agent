@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "evidenceMode": "fixture",
+  "productionEvidence": false,
+  "smoke": {
+    "setId": "smoke",
+    "caseCount": 4,
+    "requiredPassed": 4
+  },
+  "dev": {
+    "setId": "dev",
+    "caseCount": 16,
+    "requiredPassed": 15,
+    "requiredBlocked": 1,
+    "regressionCaseId": "dev-16",
+    "expectedRegressionClassification": "contract_failure"
+  }
+}

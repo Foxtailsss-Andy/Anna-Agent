@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "setId": "dev",
+  "caseId": "dev-14",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "productionEvidence": false,
+  "traceId": "smoke:dev-14",
+  "evidence": {
+    "traceId": "smoke:dev-14",
+    "events": [
+      {
+        "id": "dev-14:started",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-14",
+        "seq": 0,
+        "type": "run.started",
+        "timestamp": "2026-08-20T00:00:00.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      },
+      {
+        "id": "dev-14:middle:0",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-14",
+        "seq": 1,
+        "type": "artifact.validated",
+        "timestamp": "2026-08-20T00:00:01.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "artifactId": "dev-14:artifact",
+          "validationStatus": "passed"
+        }
+      },
+      {
+        "id": "dev-14:completed",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-14",
+        "seq": 2,
+        "type": "run.completed",
+        "timestamp": "2026-08-20T00:00:02.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "dev-14:artifact",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "runId": "smoke:dev-14",
+        "kind": "smoke_artifact",
+        "uri": "artifact://dev-14",
+        "hash": "sha256:dev-14",
+        "version": "1",
+        "validationStatus": "passed",
+        "reviewState": "accepted"
+      }
+    ],
+    "metrics": {
+      "stability": 1,
+      "latencyMs": 1000,
+      "cost": 0
+    }
+  },
+  "contract": {
+    "passed": true,
+    "version": "contract-1",
+    "failedRules": [],
+    "checkedEventIds": [
+      "dev-14:started",
+      "dev-14:middle:0",
+      "dev-14:completed"
+    ]
+  },
+  "quality": {
+    "passed": true,
+    "score": 1,
+    "cacheKey": "quality:b582d7010e4b62fda7917c55090d3b9d6ad9bf24c119128d49df30f3eb2d6dab",
+    "promptVersion": "fixture-prompt-1",
+    "modelVersion": "fixture-model-1",
+    "rubricId": "eval-fixture",
+    "rubricVersion": "1",
+    "failedCriteria": []
+  },
+  "releaseGate": {
+    "passed": true,
+    "blockedBy": []
+  },
+  "toolTrajectory": [],
+  "terminal": "run.completed",
+  "metrics": {
+    "stability": 1,
+    "latencyMs": 1000,
+    "cost": 0,
+    "source": "fixture",
+    "productionComparable": false
+  },
+  "firstTraceDivergence": null
+}

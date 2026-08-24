@@ -1,0 +1,208 @@
+/* ============================================================
+   开发者接管屏 · 页面级样式(R8 · Task 2)
+   数据密集面:零点缀零光晕(设计 §J 同理);宽表自身横向滚动,页面不横滚。
+   纪律:色值一律 var(--*),ir- 前缀,禁裸 hex。
+   ============================================================ */
+
+.ir-dev {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.ir-dev__scroll {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 28px 48px;
+}
+.ir-dev__col {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- 接管屏页头(含返回开关) ---- */
+.ir-dev__hero { display: flex; flex-direction: column; gap: 4px; }
+.ir-dev__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-dev__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ir-dev__note { font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+.ir-dev__toggle { margin-top: 8px; }
+
+/* ---- 面板块(每块独立) ---- */
+.ir-dev__block {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.ir-dev__block-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ir-dev__block-title { font-family: var(--font-sans); font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.ir-dev__block-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+.ir-dev__block-action { margin-left: auto; }
+
+/* ---- 总览:mono 键值面板网格 ---- */
+.ir-dev__overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.ir-dev__panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  padding: 10px 12px;
+  min-width: 0;
+}
+.ir-dev__panel-h {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--iris-deep);
+  margin-bottom: 6px;
+}
+.ir-dev__kv { display: flex; gap: 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.8; min-width: 0; }
+.ir-dev__kv-k { color: var(--ink-3); flex: none; min-width: 92px; }
+.ir-dev__kv-v {
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+}
+.ir-dev__mono-line {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.8;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 状态色点 ---- */
+.ir-dev__dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.ir-dev__dot--ok { background: var(--ok); }
+.ir-dev__dot--warn { background: var(--warn); }
+.ir-dev__dot--danger { background: var(--danger); }
+.ir-dev__dot--mute { background: var(--ink-3); }
+
+/* ---- Skill 注册表 ---- */
+.ir-dev__skills { display: flex; flex-direction: column; gap: 6px; }
+.ir-dev__skill { display: flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: 12px; }
+.ir-dev__skill-id { font-family: var(--font-mono); font-size: 11px; color: var(--ink); }
+.ir-dev__skill-meta { color: var(--ink-3); font-size: 11px; }
+.ir-dev__skill-active {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--ok-deep);
+  background: var(--ok-soft);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+/* ---- Agent 指令 ---- */
+.ir-dev__directives { display: flex; flex-direction: column; gap: 10px; }
+.ir-dev__dir { display: flex; flex-direction: column; gap: 4px; }
+.ir-dev__dir-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ir-dev__dir-key { font-family: var(--font-mono); font-size: 10px; font-weight: 400; color: var(--ink-faint); }
+.ir-dev__dir-input {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+}
+.ir-dev__dir-input:focus { border-color: var(--iris); box-shadow: 0 0 0 3px rgb(87 91 196 / 12%); }
+.ir-dev__dir-actions { display: flex; align-items: center; gap: 10px; }
+.ir-dev__dir-msg { font-size: 11.5px; color: var(--ok-deep); }
+
+/* ---- 按钮 ---- */
+.ir-dev__btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-btn);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  cursor: pointer;
+  flex: none;
+}
+.ir-dev__btn:hover:not(:disabled) { background: var(--tint); }
+.ir-dev__btn:disabled { opacity: 0.45; cursor: default; }
+.ir-dev__btn--primary {
+  border: 0;
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff;
+}
+
+/* ---- ir-table 宽表(自身横向滚动) ----
+   复刻自 pages/cowork/cowork.css(避免跨页 import);规则与其保持一致。 */
+.ir-dev .ir-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+}
+.ir-dev .ir-table__el {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.ir-dev .ir-table__el thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  position: sticky;
+  top: 0;
+}
+.ir-dev .ir-table__el tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line-hair);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.ir-dev .ir-table__el tbody td:nth-child(1),
+.ir-dev .ir-table__el tbody td:nth-child(2) { font-family: var(--font-sans); }
+.ir-dev .ir-table__el tbody td > .ir-dev__dot { margin-right: 5px; }
+.ir-dev .ir-table__el tbody tr:last-child td { border-bottom: 0; }
+.ir-dev .ir-table__el tbody tr:hover td { background: var(--tint); }

@@ -1,0 +1,139 @@
+/* ============================================================
+   SlideOverCopilot · 滑出副驾(容器 B)— R5 Task 3
+   右侧 420px 玻璃面板(全站唯一 backdrop-filter blur 24),挤压式滑出。
+   宿主页面须 position: relative,并在开启时给内容留出 padding-right(挤压)。
+   ============================================================ */
+
+.ir-copilot {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 420px;
+  max-width: 100%;
+  transform: translateX(100%);
+  transition: transform var(--dur-lift) var(--ease-lift);
+  z-index: 20;
+  pointer-events: none;
+}
+.ir-copilot--open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* 唯一玻璃:瓷玻 backdrop-filter blur 24,压在被挤压的看板上 */
+.ir-copilot__glass {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line-strong);
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow: -18px 0 48px color-mix(in oklab, var(--ink) 10%, transparent);
+}
+[data-theme="dark"] .ir-copilot__glass {
+  background: color-mix(in oklab, var(--surface) 66%, transparent);
+  box-shadow: -18px 0 48px rgb(0 0 0 / 40%);
+}
+
+/* 头:身份头 + 关闭 */
+.ir-copilot__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line-hair);
+}
+.ir-copilot__head .ash {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.ir-copilot__close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--tint);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ir-copilot__close:hover { background: var(--tint-strong); }
+.ir-copilot__close:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* 滚动区 */
+.ir-copilot__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 问题回声(注入的追问显示为首条) */
+.ir-copilot__query {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  align-self: flex-end;
+  max-width: 92%;
+  padding: 9px 13px;
+  border-radius: 14px 14px 4px 14px;
+  background: linear-gradient(180deg, var(--user-grad-top), var(--user-grad-bottom));
+  color: #fff;
+  box-shadow: var(--shadow-bubble);
+}
+[data-theme="dark"] .ir-copilot__query { color: var(--ink); }
+.ir-copilot__query-label {
+  flex: none;
+  font-family: var(--font-serif);
+  font-size: 11px;
+  opacity: 0.72;
+}
+.ir-copilot__query-text { font-size: 13.5px; line-height: 1.6; word-break: break-word; }
+
+/* 副驾内失败:无 resume/audit 通道,隐藏包内 ↻续办 / 查看审计,只留复制错误 */
+.ir-copilot__run--fail .loop-fail-actions .loop-btn:nth-of-type(1),
+.ir-copilot__run--fail .loop-fail-actions .loop-btn:nth-of-type(2) {
+  display: none;
+}
+
+/* I-1:调优未接线(仅 ChatPage 接通 onTune)→ CSS 隐藏,不改包源码。
+   附件恒为 .acp__bar 第 1 子元素、调优恒为第 2(AgentComposer.tsx 固定槽位序)。 */
+.ir-copilot .acp__bar > .acp__chip:nth-child(2) {
+  display: none;
+}
+
+.ir-copilot__stopped {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+/* 答案正文(阅读版式) */
+.ir-copilot__answer {
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--ink);
+  max-width: 68ch;
+}
+.ir-copilot__answer :first-child { margin-top: 0; }
+.ir-copilot__answer :last-child { margin-bottom: 0; }
+.ir-copilot__answer p { margin: 0 0 8px; }
+
+/* Composer 底栏 */
+.ir-copilot__composer {
+  flex: none;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--line-hair);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ir-copilot { transition: none; }
+}

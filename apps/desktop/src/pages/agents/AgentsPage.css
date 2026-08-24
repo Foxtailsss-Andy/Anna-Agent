@@ -1,0 +1,32 @@
+/* AgentsPage · Agent 中心(C1) · tokens only */
+
+.ir-agents {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 26px 28px 60px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.ir-agents__head {
+  margin: 0 0 18px;
+}
+.ir-agents__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-agents__title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 4px 0 6px;
+}
+.ir-agents__sub {
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.8;
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 68ch;
+}

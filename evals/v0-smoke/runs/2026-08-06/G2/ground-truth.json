@@ -1,0 +1,62 @@
+{
+  "source": "demo-erp REST :8970 (primary per spec 2.4; seed doc fallback NOT used)",
+  "note": "Current date 2026-08-06 -> 「上个月」= 2026-07. Seed only has 2026-04/05/06.",
+  "rest": {
+    "/api/trend": {
+      "series": [
+        {
+          "period": "2026-04",
+          "revenue": 4120000.0,
+          "expense": 2980000.0,
+          "profit": 1140000.0,
+          "operating_cash_flow": 1040000.0,
+          "ar_balance": 1640000.0,
+          "ap_balance": 1090000.0
+        },
+        {
+          "period": "2026-05",
+          "revenue": 4455000.0,
+          "expense": 3238000.0,
+          "profit": 1217000.0,
+          "operating_cash_flow": 927000.0,
+          "ar_balance": 1859000.0,
+          "ap_balance": 1135000.0
+        },
+        {
+          "period": "2026-06",
+          "revenue": 4820000.0,
+          "expense": 3640000.0,
+          "profit": 1180000.0,
+          "operating_cash_flow": 760000.0,
+          "ar_balance": 2150000.0,
+          "ap_balance": 1180000.0
+        }
+      ],
+      "note": "演示数据"
+    }
+  },
+  "available_periods": [
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "model_used_period": "2025-11 (WRONG: neither 2026-07 nor a seeded period)",
+  "stub_probe_2025_11": {
+    "note": "demo-erp returns a templated 0万 answer for ANY unseeded period (it does NOT error) -> Anna's 「0 万」+「市场费用环比上升明显」 is verbatim tool output, NOT fabricated by the model.",
+    "erp.finance.query{question:'费用',period:'2025-11'}": {
+      "jsonrpc": "2.0",
+      "id": "gt",
+      "result": {
+        "structuredContent": {
+          "question": "费用",
+          "period": "2025-11",
+          "answer": "【演示数据】2025-11 本月费用约 0万，其中主营成本、销售费用(含市场/差旅)、管理费用、研发费用按科目归集；市场费用环比上升明显。",
+          "sources": [
+            "erp.finance.query",
+            "演示租户账套 demo-erp-2026"
+          ]
+        }
+      }
+    }
+  }
+}

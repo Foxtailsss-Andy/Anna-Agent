@@ -1,0 +1,178 @@
+{
+  "source": "demo-erp REST :8970 (primary per spec 2.4; seed doc fallback NOT used)",
+  "rest": {
+    "/api/pnl?period=2026-06": {
+      "period": "2026-06",
+      "revenue": 4820000.0,
+      "cogs": 980000.0,
+      "opex": 2660000.0,
+      "expense_total": 3640000.0,
+      "profit": 1180000.0,
+      "opex_detail": {
+        "6601": 1440000.0,
+        "6602": 620000.0,
+        "6604": 600000.0
+      },
+      "has_detail": true,
+      "note": "演示数据"
+    },
+    "/api/ap-top?period=2026-06&limit=5": {
+      "period": "2026-06",
+      "rows": [
+        {
+          "supplier": "蓝云数据科技有限公司",
+          "supplier_id": "SUP-001",
+          "category": "cloud",
+          "outstanding": 420000.0
+        },
+        {
+          "supplier": "智联软件外包服务有限公司",
+          "supplier_id": "SUP-002",
+          "category": "outsourcing",
+          "outstanding": 320000.0
+        },
+        {
+          "supplier": "盛世国际会展服务有限公司",
+          "supplier_id": "SUP-003",
+          "category": "marketing",
+          "outstanding": 240000.0
+        },
+        {
+          "supplier": "利和办公科技有限公司",
+          "supplier_id": "SUP-004",
+          "category": "office",
+          "outstanding": 110000.0
+        },
+        {
+          "supplier": "畅行商旅管理有限公司",
+          "supplier_id": "SUP-005",
+          "category": "travel",
+          "outstanding": 90000.0
+        }
+      ],
+      "currency": "CNY",
+      "note": "演示数据"
+    },
+    "/api/customers": {
+      "rows": [
+        {
+          "customer_id": "CUST-DEMO-A",
+          "name": "远东重工集团股份有限公司",
+          "industry": "装备制造",
+          "payment_terms_days": 60,
+          "credit_limit": 3000000.0,
+          "owner": "张华",
+          "ar_balance": 480000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-B",
+          "name": "华信新零售连锁有限公司",
+          "industry": "零售连锁",
+          "payment_terms_days": 30,
+          "credit_limit": 1500000.0,
+          "owner": "张华",
+          "ar_balance": 420000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-C",
+          "name": "江南智能制造有限公司",
+          "industry": "智能制造",
+          "payment_terms_days": 60,
+          "credit_limit": 3000000.0,
+          "owner": "张华",
+          "ar_balance": 380000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-D",
+          "name": "恒瑞医药科技有限公司",
+          "industry": "生物医药",
+          "payment_terms_days": 30,
+          "credit_limit": 1500000.0,
+          "owner": "张华",
+          "ar_balance": 300000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-E",
+          "name": "中弘供应链集团有限公司",
+          "industry": "物流供应链",
+          "payment_terms_days": 30,
+          "credit_limit": 1500000.0,
+          "owner": "张华",
+          "ar_balance": 260000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-G",
+          "name": "启明教育科技有限公司",
+          "industry": "教育科技",
+          "payment_terms_days": 30,
+          "credit_limit": 1500000.0,
+          "owner": "张华",
+          "ar_balance": 190000.0,
+          "status": "active"
+        },
+        {
+          "customer_id": "CUST-DEMO-F",
+          "name": "银河金融信息服务有限公司",
+          "industry": "金融科技",
+          "payment_terms_days": 45,
+          "credit_limit": 2000000.0,
+          "owner": "张华",
+          "ar_balance": 120000.0,
+          "status": "active"
+        }
+      ],
+      "note": "演示数据"
+    }
+  },
+  "mcp": {
+    "erp.finance.get_receivables_aging{period:'2026-06'}": {
+      "jsonrpc": "2.0",
+      "id": "gt",
+      "result": {
+        "structuredContent": {
+          "period": "2026-06",
+          "overdue_days": 30,
+          "currency": "CNY",
+          "rows": [
+            {
+              "customer": "远东重工集团股份有限公司",
+              "customer_id": "CUST-DEMO-A",
+              "overdue_amount": 480000.0,
+              "aging_days": 72,
+              "currency": "CNY"
+            },
+            {
+              "customer": "江南智能制造有限公司",
+              "customer_id": "CUST-DEMO-C",
+              "overdue_amount": 380000.0,
+              "aging_days": 64,
+              "currency": "CNY"
+            },
+            {
+              "customer": "银河金融信息服务有限公司",
+              "customer_id": "CUST-DEMO-F",
+              "overdue_amount": 120000.0,
+              "aging_days": 41,
+              "currency": "CNY"
+            }
+          ],
+          "note": "演示数据"
+        }
+      }
+    }
+  },
+  "expected": {
+    "expense_total": 3640000.0,
+    "ar_balance": 2150000.0,
+    "ap_balance": 1180000.0,
+    "ap_top1": [
+      "蓝云数据科技有限公司",
+      420000.0
+    ]
+  }
+}

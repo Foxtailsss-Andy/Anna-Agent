@@ -1,0 +1,186 @@
+/* SurfaceKit · P4 界面套件:Create(hero/workshop)· 产物中心 · 设置分层
+   规格:《设计说明 · Iris》§7 + 设计画布 5e/5f;
+   纪律:hero 态允许光晕 + 绽放鸢尾(空态层级);workshop/数据区回到素面秩序;
+   唯一深色面板 = draft 账本;站位 = 虚线 + 即将上线。 */
+
+/* ============ Create · hero ============ */
+.crt-hero {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  padding: 44px 40px 36px;
+  text-align: center;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  /* 鸢尾光晕(白名单:hero/空态层级);三团彩晕全部收于透明 */
+  background:
+    radial-gradient(52% 44% at 16% 0%, rgb(139 142 217 / 22%), transparent 62%),
+    radial-gradient(40% 34% at 88% 10%, rgb(203 187 142 / 16%), transparent 60%),
+    radial-gradient(50% 42% at 72% 100%, rgb(87 91 196 / 12%), transparent 62%),
+    linear-gradient(180deg, var(--bg-grad-top), var(--bg-grad-bottom));
+}
+.crt-hero__title { font-family: var(--font-serif); font-size: 30px; font-weight: 500; line-height: 42px; margin: 12px 0 4px; }
+.crt-hero__sub { font-size: 13px; color: var(--ink-2); font-weight: 300; }
+.crt-hero__composer {
+  margin: 22px auto 0;
+  max-width: 640px;
+  text-align: left;
+}
+
+/* ============ Create · workshop 标签(1 真 + 4 虚线 W9) ============ */
+.crt-tabs { display: flex; gap: 6px; font-family: var(--font-sans); }
+.crt-tab {
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 18px;
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+}
+.crt-tab--on { background: var(--iris-soft); color: var(--iris-deep); font-weight: 600; box-shadow: inset 0 0 0 1px rgb(87 91 196 / 14%); }
+.crt-tab--stub { background: none; border: 1px dashed var(--line-strong); color: var(--ink-3); cursor: not-allowed; }
+.crt-tab:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ============ Create · draft 账本(唯一深色面板) ============ */
+.crt-ledger {
+  background: linear-gradient(180deg, #232328, #1E1E22);
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.9;
+  color: #C9CED8;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+  overflow: auto;
+}
+.crt-ledger__head { font-size: 10px; letter-spacing: 0.18em; color: #8B8ED9; margin-bottom: 6px; }
+
+/* ============ 产物中心 ============ */
+.hub-filters { display: flex; gap: 7px; flex-wrap: wrap; font-family: var(--font-sans); }
+.hub-filter {
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  padding: 4px 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hub-filter--on { background: var(--iris-soft); color: var(--iris-deep); font-weight: 600; }
+.hub-filter--stub { background: none; border: 1px dashed var(--line-strong); color: var(--ink-3); cursor: not-allowed; }
+.hub-filter:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+
+.hub-card {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+.hub-card__head { display: flex; align-items: center; gap: 10px; }
+.hub-card__tile {
+  width: 38px; height: 38px;
+  border-radius: 11px;
+  background: var(--iris-soft);
+  color: var(--iris);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  flex: none;
+}
+.hub-card__name { font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-card__meta { font-size: 11px; color: var(--ink-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-card__source { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); margin-top: 8px; }
+.hub-card__actions { display: flex; gap: 7px; margin-top: 10px; }
+.hub-card__act {
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-btn);
+  font-family: inherit;
+  font-size: 11.5px;
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(35 35 40 / 3%);
+}
+.hub-card__act--primary { background: var(--iris-soft); color: var(--iris-deep); font-weight: 500; box-shadow: none; }
+.hub-card__act:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ============ 设置(Boss 视角 5 卡 + 开发者模式开关) ============ */
+.set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+.set-card {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+.set-card__head { display: flex; align-items: center; gap: 8px; }
+.set-card__title { font-size: 13.5px; font-weight: 600; }
+.set-card__chip { margin-left: auto; font-size: 11px; border-radius: var(--radius-pill); padding: 2px 10px; flex: none; }
+.set-card__chip--ok { background: var(--ok-soft); color: var(--ok-deep); }
+.set-card__chip--stub { border: 1px dashed var(--line-strong); color: var(--ink-3); }
+.set-card__desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.8; margin-top: 6px; }
+.set-card__body { margin-top: 10px; }
+
+/* 开关(外观/开发者模式) */
+.set-switch-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink); }
+.set-switch {
+  width: 36px; height: 20px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--tint-strong);
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  transition: background 160ms ease;
+}
+.set-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(35 35 40 / 20%);
+  transition: transform 160ms var(--ease-lift);
+}
+.set-switch[aria-checked="true"] { background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom)); }
+.set-switch[aria-checked="true"]::after { transform: translateX(16px); }
+.set-switch:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.set-switch-note { font-size: 11.5px; color: var(--ink-3); }
+
+/* 外观三选 */
+.set-seg { display: inline-flex; background: var(--tint); border-radius: var(--radius-pill); padding: 2px; gap: 2px; }
+.set-seg__opt {
+  border: 0; background: none;
+  font-family: inherit; font-size: 12px; line-height: 18px;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.set-seg__opt--on {
+  background: linear-gradient(180deg, var(--surface), var(--surface-loop-2));
+  color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 3px rgb(35 35 40 / 10%);
+}
+.set-seg__opt:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }

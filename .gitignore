@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+
+# Node / frontend build
+node_modules/
+dist/
+
+# Desktop packaging output
+release/
+build/python-runtime/
+
+# Anna local runtime state (SQLite DBs, create-run artifacts, local runtime.json with secrets)
+.anna/
+runtime.json
+
+# Vendored reference repos (not part of Anna)
+vendor/
+
+# graphify knowledge-graph artifacts (local only)
+graphify-out/
+
+# Local scratch / session-tool state
+.tmp-tests/
+.superpowers/

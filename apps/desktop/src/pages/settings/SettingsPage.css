@@ -1,0 +1,217 @@
+/* ============================================================
+   设置 · 页面级样式(R8)
+   Boss 视角 5 卡走 SurfaceKit .set-*;本文件补页版式 + 连接卡 + 模型档案卡内件。
+   纪律:色值一律 var(--*),ir- / set- 前缀,禁裸 hex;数据密集区零点缀。
+   ============================================================ */
+
+.ir-set {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.ir-set__scroll {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 28px 48px;
+}
+.ir-set__col {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- 页头 ---- */
+.ir-set__head { display: flex; flex-direction: column; }
+.ir-set__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-set__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+/* ---- 连接卡:三 MCP 状态行 ---- */
+.set-conn { display: flex; flex-direction: column; gap: 8px; }
+.set-conn__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.set-conn__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.set-conn__dot--ok { background: var(--ok); }
+.set-conn__dot--warn { background: var(--warn); }
+/* J4:未配置 —— 既不是好也不是坏,是「没接」。灰点,不抢注意力。 */
+.set-conn__dot--off { background: var(--line, currentColor); opacity: 0.45; }
+
+/* ---- J4 数据出境卡 ---- */
+.set-egress { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.set-egress__row { display: flex; align-items: flex-start; gap: 9px; }
+.set-egress__row .set-conn__dot { margin-top: 6px; }
+.set-egress__main { display: grid; gap: 2px; min-width: 0; }
+.set-egress__name { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; }
+.set-egress__state { font-size: 12px; opacity: 0.62; }
+/* 真目的地:等宽 + 可断行,长 URL 不许撑破卡片(它必须完整可读,这是披露的全部意义) */
+.set-egress__dest {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  opacity: 0.78;
+  overflow-wrap: anywhere;
+}
+.set-egress__cats { font-size: 11.5px; opacity: 0.62; }
+.set-egress__unknown { font-size: 12.5px; opacity: 0.7; }
+/* 声明失守(遥测/训练回传被打开、记忆不在本机)—— 这条必须比清单更抢眼:
+   卡片的其余部分都在讲「只去你配置的地方」,它讲的是那句话已经不成立了。 */
+.set-egress__warn {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+/* v1 自述范围:披露版本 / 有无逐目的地计数(后端不给就整行不出现) */
+.set-egress__scope { margin-top: 10px; font-size: 11.5px; opacity: 0.55; }
+.set-conn__name { color: var(--ink); }
+.set-conn__state {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+/* ---- 外观卡 ---- */
+.set-appearance { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- 关于卡 ---- */
+.set-about__ver {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ============ 模型档案卡内件 ============ */
+.set-mp { display: flex; flex-direction: column; gap: 12px; }
+.set-mp__list { display: flex; flex-direction: column; gap: 8px; }
+.set-mp__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-hair);
+}
+.set-mp__row:last-child { border-bottom: 0; padding-bottom: 0; }
+.set-mp__name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.set-mp__default {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--iris-deep);
+  background: var(--iris-soft);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+.set-mp__id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+.set-mp__prov {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.set-mp__key {
+  margin-left: auto;
+  font-size: 10.5px;
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  flex: none;
+}
+.set-mp__key--on { background: var(--ok-soft); color: var(--ok-deep); }
+.set-mp__key--off { border: 1px dashed var(--line-strong); color: var(--ink-3); }
+.set-mp__del {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--danger-deep);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  cursor: pointer;
+  flex: none;
+}
+.set-mp__del:hover:not(:disabled) { background: var(--danger-soft); }
+.set-mp__del:disabled { opacity: 0.45; cursor: default; }
+
+/* 新增表单 */
+.set-mp__form { display: flex; flex-direction: column; gap: 10px; }
+.set-mp__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.set-mp__field { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-sans); }
+.set-mp__field--wide { grid-column: 1 / -1; }
+.set-mp__field > span { font-size: 10.5px; color: var(--ink-3); }
+.set-mp__field input {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 9px;
+  outline: none;
+}
+.set-mp__field input:focus { border-color: var(--iris); box-shadow: 0 0 0 3px rgb(87 91 196 / 12%); }
+
+.set-mp__actions { display: flex; gap: 8px; }
+.set-mp__btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-btn);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  cursor: pointer;
+  flex: none;
+}
+.set-mp__btn:hover:not(:disabled) { background: var(--tint); }
+.set-mp__btn:disabled { opacity: 0.45; cursor: default; }
+.set-mp__btn--primary {
+  border: 0;
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff;
+}
+.set-mp__btn--primary:hover:not(:disabled) { filter: brightness(1.03); background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom)); }
+
+.set-mp__restart {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--warn-soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.set-mp__restart-note { font-size: 12px; color: var(--warn-ink); }
+.set-mp__restart-hint { font-size: 11px; color: var(--ink-3); }

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "chat-live-2026-08-23",
+  "generatedAt": "2026-08-22T23:48:07.977Z",
+  "evidenceMode": "live",
+  "provider": "external-openai-compatible",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "summary.json",
+      "size": 403,
+      "sha256": "b152aa355d5dfb1709fd152964ebee615c65660607d5132ed2acf68290fd1da8"
+    }
+  ]
+}

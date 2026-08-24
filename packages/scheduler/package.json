@@ -1,0 +1,19 @@
+{
+  "name": "@anna/scheduler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@anna/harness-v2": "0.0.0"
+  },
+  "devDependencies": {
+    "@anna/event-store": "0.0.0"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "desktop-managed-bridge-live-2026-08-23",
+  "generatedAt": "2026-08-23T00:04:17.951Z",
+  "evidenceMode": "live",
+  "provider": "external-openai-compatible",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "summary.json",
+      "size": 395,
+      "sha256": "c262065d389c8a70d85e5ce31d4d398986e6a33774b482be0ed54354e8a3436a"
+    }
+  ]
+}

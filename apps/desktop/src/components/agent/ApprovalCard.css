@@ -1,0 +1,100 @@
+/* ApprovalCard · 通用审批卡(《设计说明 · Iris》§6.4,W4 通用化)
+   = LoopCard 暂停形态的嵌入卡:琥珀书脊 + 字段对账 + 原始 payload + 动作对 */
+
+.apv {
+  display: flex;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), var(--inset-top);
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.apv__spine { width: 3px; flex: none; background: var(--warn); }
+.apv__body { flex: 1; min-width: 0; padding: 13px 16px 12px; }
+
+.apv__head { display: flex; align-items: center; gap: 8px; }
+.apv__title { font-size: 13.5px; font-weight: 600; }
+.apv__risk {
+  font-size: 11px;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  flex: none;
+}
+.apv__risk--low { background: var(--ok-soft); color: var(--ok-deep); }
+.apv__risk--medium { background: var(--warn-soft); color: var(--warn-ink); }
+.apv__risk--high { background: var(--danger-soft); color: var(--danger-deep); }
+
+/* 字段网格:2-3 列,值用 mono(逐字段对账) */
+.apv__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 14px;
+  margin: 11px 0 4px;
+}
+.apv__k { font-size: 10.5px; color: var(--ink-3); }
+.apv__v { font-size: 12.5px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apv__v--mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* 缺信息变体:请您补充 */
+.apv__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 14px; margin: 11px 0 4px; }
+.apv__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+}
+.apv__input:focus { border-color: rgb(87 91 196 / 35%); }
+.apv__input--stub { border-style: dashed; color: var(--ink-3); font-family: var(--font-sans); cursor: not-allowed; background: none; }
+
+/* ▸ 原始 payload 折叠(240ms 掀开) */
+.apv__payload-btn {
+  background: none; border: 0; padding: 3px 0;
+  font-family: inherit; font-size: 11.5px; color: var(--ink-3);
+  cursor: pointer;
+}
+.apv__payload-btn:hover { color: var(--ink-2); }
+.apv__payload-btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 4px; }
+.apv__payload-lift {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-lift) var(--ease-lift), opacity var(--dur-lift) var(--ease-lift);
+  opacity: 0;
+}
+.apv__payload-lift.is-open { grid-template-rows: 1fr; opacity: 1; }
+.apv__payload-lift > div { overflow: hidden; min-height: 0; }
+.apv__payload {
+  margin: 4px 0 6px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 9px 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+/* 动作对(自包含,不依赖 LoopCard.css) */
+.apv__btn { border: 0; border-radius: var(--radius-pill); font-family: inherit; font-size: 12.5px; padding: 7px 14px; cursor: pointer; line-height: 20px; }
+.apv__btn--filled {
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff; font-weight: 600; padding: 7px 16px;
+  box-shadow: var(--shadow-button);
+}
+.apv__btn--tinted { background: var(--tint); color: var(--ink-btn); box-shadow: inset 0 0 0 1px rgb(35 35 40 / 3%); }
+.apv__btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* 动作对 + 暂停注 */
+.apv__actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.apv__note { margin-left: auto; font-size: 11px; color: var(--ink-3); white-space: nowrap; }

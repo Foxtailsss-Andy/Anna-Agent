@@ -1,0 +1,18 @@
+{
+  "name": "@anna/harness-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.config.ts && vite build --config vite.approval.config.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anna/eval": "0.0.0",
+    "@anna/event-store": "0.0.0",
+    "@anna/harness-v2": "0.0.0",
+    "@anna/pi-loop-kernel": "0.0.0",
+    "@anna/trace": "0.0.0"
+  }
+}

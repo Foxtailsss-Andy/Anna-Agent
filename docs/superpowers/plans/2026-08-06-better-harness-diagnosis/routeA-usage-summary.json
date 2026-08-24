@@ -1,0 +1,132 @@
+{
+  "kind": "better-harness.session-usage-summary",
+  "schemaVersion": 1,
+  "selection": {
+    "strategy": "all-eligible",
+    "eligibleCount": 38,
+    "analyzedCount": 38,
+    "complete": true
+  },
+  "usageEfficiency": {
+    "accountingMode": "host-estimated",
+    "coverage": {
+      "analyzedSessionCount": 38,
+      "responseCount": 16901,
+      "usageFieldObservedCount": 16901,
+      "nonZeroUsageCount": 16823,
+      "modelAttributedResponseCount": 16901,
+      "unattributedResponseCount": 0,
+      "exactCreditsAvailable": false
+    },
+    "longSessions": {
+      "longActiveCount": 19,
+      "longWallCount": 22,
+      "wallOnlyCount": 5
+    },
+    "tokenTotals": {
+      "inputTokens": 2684192,
+      "outputTokens": 19795978,
+      "cacheReadInputTokens": 3365960585,
+      "cacheCreationInputTokens": 118166590
+    },
+    "modelUsage": [
+      {
+        "model": "claude-opus-4-8",
+        "responseCount": 8246,
+        "usageFieldObservedCount": 8246,
+        "nonZeroUsageCount": 8246,
+        "tokenTotals": {
+          "inputTokens": 1343594,
+          "outputTokens": 11554351,
+          "cacheReadInputTokens": 1845539152,
+          "cacheCreationInputTokens": 62880833
+        }
+      },
+      {
+        "model": "claude-fable-5",
+        "responseCount": 3558,
+        "usageFieldObservedCount": 3558,
+        "nonZeroUsageCount": 3558,
+        "tokenTotals": {
+          "inputTokens": 602319,
+          "outputTokens": 4857251,
+          "cacheReadInputTokens": 1119518896,
+          "cacheCreationInputTokens": 34824173
+        }
+      },
+      {
+        "model": "claude-sonnet-5",
+        "responseCount": 1981,
+        "usageFieldObservedCount": 1981,
+        "nonZeroUsageCount": 1981,
+        "tokenTotals": {
+          "inputTokens": 682963,
+          "outputTokens": 1412817,
+          "cacheReadInputTokens": 136852466,
+          "cacheCreationInputTokens": 7492724
+        }
+      },
+      {
+        "model": "claude-opus-5",
+        "responseCount": 1273,
+        "usageFieldObservedCount": 1273,
+        "nonZeroUsageCount": 1273,
+        "tokenTotals": {
+          "inputTokens": 18695,
+          "outputTokens": 1347308,
+          "cacheReadInputTokens": 198086941,
+          "cacheCreationInputTokens": 8473555
+        }
+      },
+      {
+        "model": "claude-sonnet-4-6",
+        "responseCount": 1085,
+        "usageFieldObservedCount": 1085,
+        "nonZeroUsageCount": 1085,
+        "tokenTotals": {
+          "inputTokens": 13716,
+          "outputTokens": 375865,
+          "cacheReadInputTokens": 38643118,
+          "cacheCreationInputTokens": 2470576
+        }
+      },
+      {
+        "model": "claude-haiku-4-5-20251001",
+        "responseCount": 680,
+        "usageFieldObservedCount": 680,
+        "nonZeroUsageCount": 680,
+        "tokenTotals": {
+          "inputTokens": 22905,
+          "outputTokens": 248386,
+          "cacheReadInputTokens": 27320012,
+          "cacheCreationInputTokens": 2024729
+        }
+      },
+      {
+        "model": "<synthetic>",
+        "responseCount": 78,
+        "usageFieldObservedCount": 78,
+        "nonZeroUsageCount": 0,
+        "tokenTotals": null
+      }
+    ],
+    "outcomeReview": {
+      "status": "required",
+      "reviewedCandidateCount": 0,
+      "reviewedActiveLongCount": 0,
+      "comparableModelOutcomeEvidence": false,
+      "reason": "semantic-outcome-review-not-run"
+    },
+    "candidateCount": 7,
+    "opportunityCount": 3
+  },
+  "evidenceBoundary": {
+    "hasEligibleSessions": true,
+    "requiresSemanticReview": true,
+    "exactCostAvailable": false,
+    "warningCodes": [
+      "missing-optional-root",
+      "missing-optional-root"
+    ]
+  }
+}

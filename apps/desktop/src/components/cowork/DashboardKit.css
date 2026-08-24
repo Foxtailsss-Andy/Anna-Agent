@@ -1,0 +1,141 @@
+/* ============================================================
+   DashboardKit · Cowork 看板五段式套件(《设计说明 · Iris》§7;高保真:设计画布 5c)
+   五段式:焦点警示带 → KPI 带(Hero 鸢尾描边)→ 图表行 → 洞察/建议行 → Anna 解读(可折叠)
+   纪律:数据密集区守瓷白秩序;图表渐变全部收于透明;ProvenanceLine 必在。
+   ============================================================ */
+
+/* ---- 溯源行(必在;由代码计算,非模型生成) ---- */
+.dbk-prov { font-family: var(--font-sans); font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+/* ---- 焦点警示带(琥珀书脊) ---- */
+.dbk-alert {
+  display: flex;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.dbk-alert__spine { width: 3px; flex: none; background: linear-gradient(180deg, var(--warn), color-mix(in oklab, var(--warn), white 45%)); }
+.dbk-alert__body { flex: 1; display: flex; align-items: center; gap: 10px; padding: 11px 16px; min-width: 0; }
+.dbk-alert__label { font-size: 13px; font-weight: 600; color: var(--warn-ink); flex: none; }
+.dbk-alert__text { font-size: 13px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbk-alert__text b { font-family: var(--font-mono); color: var(--ink); }
+.dbk-alert__ask { margin-left: auto; flex: none; }
+
+/* ---- 追问 chip(iris tinted;接副驾并注入问题) ---- */
+.dbk-ask {
+  border: 0;
+  background: var(--iris-soft);
+  color: var(--iris-deep);
+  border-radius: var(--radius-pill);
+  padding: 4px 13px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dbk-ask--sm { padding: 2px 10px; font-size: 11.5px; }
+.dbk-ask:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- KPI 卡 ---- */
+.dbk-kpi {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+/* Hero:鸢尾描边 + 左上花晕 = 全屏唯一强调卡 */
+.dbk-kpi--hero {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(87 91 196 / 7%), transparent 46%),
+    linear-gradient(180deg, var(--surface), var(--surface-loop-2));
+  border-color: rgb(87 91 196 / 22%);
+  box-shadow: 0 1px 2px rgb(35 35 40 / 5%), 0 8px 24px rgb(87 91 196 / 8%), var(--inset-top-loop);
+}
+.dbk-kpi__label { font-size: 12px; color: var(--ink-2); }
+.dbk-kpi__row { display: flex; align-items: baseline; gap: 10px; }
+.dbk-kpi__value { font-family: var(--font-mono); font-size: 22px; font-weight: 600; margin-top: 4px; }
+.dbk-kpi--hero .dbk-kpi__value { font-size: 28px; margin-top: 0; }
+.dbk-kpi__delta { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; }
+.dbk-kpi--hero .dbk-kpi__delta { font-size: 12px; font-weight: 600; margin-top: 0; }
+.dbk-kpi__delta--ok { color: var(--ok-deep); }
+.dbk-kpi__delta--warn { color: var(--warn); }
+.dbk-kpi__spark { display: block; width: 100%; height: 30px; margin-top: 4px; }
+
+/* ---- 图表卡壳 ---- */
+.dbk-chart {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+.dbk-chart__head { display: flex; align-items: baseline; }
+.dbk-chart__title { font-size: 13.5px; font-weight: 600; }
+.dbk-chart__meta { margin-left: auto; font-size: 11px; color: var(--ink-3); }
+.dbk-chart__body { flex: 1; min-height: 0; margin-top: 8px; }
+.dbk-chart__legend { display: flex; gap: 14px; font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+.dbk-chart__legend-swatch { display: inline-block; width: 14px; height: 2px; vertical-align: 3px; margin-right: 5px; }
+
+/* ---- 指标条(应收账龄等) ---- */
+.dbk-bar { font-family: var(--font-sans); }
+.dbk-bar__head { display: flex; font-size: 12px; margin-bottom: 4px; color: var(--ink); }
+.dbk-bar__meta { margin-left: auto; font-family: var(--font-mono); color: var(--ink-2); }
+.dbk-bar__track { height: 8px; border-radius: 4px; background: rgb(120 120 128 / 10%); overflow: hidden; }
+.dbk-bar__fill { display: block; height: 100%; border-radius: 4px; }
+.dbk-bar__fill--iris { background: linear-gradient(90deg, var(--iris), rgb(87 91 196 / 35%)); }
+.dbk-bar__fill--warn { background: linear-gradient(90deg, var(--warn), rgb(185 138 47 / 40%)); }
+
+/* ---- 洞察 / 建议卡 ---- */
+.dbk-insight {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 12px 18px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+.dbk-insight__title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.dbk-insight__row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+
+/* ---- Anna 解读(可折叠;阅读版式 68ch) ---- */
+.dbk-reading {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.dbk-reading__btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 12px 18px;
+  background: none; border: 0; text-align: left;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+  cursor: pointer;
+}
+.dbk-reading__btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 12px; }
+.dbk-reading__caret { color: var(--ink-3); font-size: 10px; }
+.dbk-reading__lift {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-lift) var(--ease-lift), opacity var(--dur-lift) var(--ease-lift);
+  opacity: 0;
+}
+.dbk-reading__lift.is-open { grid-template-rows: 1fr; opacity: 1; }
+.dbk-reading__lift > div { overflow: hidden; min-height: 0; }
+.dbk-reading__body { padding: 0 18px 14px; font-size: 13.5px; line-height: 1.9; color: var(--ink); max-width: 68ch; }

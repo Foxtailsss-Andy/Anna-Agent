@@ -1,0 +1,69 @@
+HARNESS ANALYSIS EVIDENCE
+
+This is a read-only evidence brief, not a report conclusion.
+Projected report conclusions are intentionally excluded; use the observations and boundaries below to make your own evidence-backed decisions.
+Workspace: <repo-root>
+Platform: claude
+Language: zh-CN
+Budget: at most 6000 estimated tokens; each evidence domain uses bounded representative rows and reports omissions.
+
+OBSERVATION SCOPE
+Source roots: 1 of 3 enabled roots exist; 3 roots were discovered.
+Session selection: analyzed 24 of 24 eligible sessions with all-eligible selection; confidence High; representative yes.
+Scope: workspace; global capability metadata included no; since 2026-07-07T00:00:00.000Z; until 2026-08-06T23:59:59.000Z.
+Privacy boundary: reader-safe; raw prompts included no; raw commands included no; absolute home paths included no.
+Source warnings: missing-optional-root.
+
+REPOSITORY FACTS
+Project label: Anna.
+- Task understanding: 0 observed and 1 connected signal(s). Representative evidence: 4 architecture/readme and 7 spec file(s).
+- Controlled execution: 1 observed and 1 connected signal(s). Representative evidence: 2 workspace manifest(s), 工作区运行、构建或测试脚本.
+- Change validation: 1 observed and 1 connected signal(s). Representative evidence: 183 tracked test file(s), workspace test/check script.
+- Reliable delivery: 0 observed and 0 connected signal(s).
+- Agent practice coverage: Custom Agents has 0 asset(s) in Project.
+- Reusable Skill evidence: scanned-empty; 0 candidate asset(s), 0 observed project Skill(s), and 0 unresolved name match(es).
+- Regression-test evidence: candidates-present; inspected 200 commit(s) and retained 20 source/test co-change candidate(s).
+  - Sources: services/chat/app/evaluator.py. Tests: tests/chat/test_evaluator.py. Path-correlated yes.
+  - Sources: services/chat/app/capability.py. Tests: tests/chat/test_chat_agent.py. Path-correlated no.
+  - Sources: services/chat/app/capability.py, services/runtime/app/trace_assembler.py. Tests: tests/chat/test_chat_agent.py, tests/gates/test_gate_trace.py. Path-correlated no.
+  - 17 additional co-change candidate(s) omitted.
+- Canonical planning evidence: candidates-present; 7 candidate(s); paths: docs/adr/ADR-003-trace-and-terminology.md, docs/superpowers/specs/2026-06-21-crew-design.md, docs/superpowers/specs/2026-06-22-hiker-global-customer-cowork-design.md, docs/superpowers/specs/2026-07-07-anna-code-mode-design.md, docs/superpowers/specs/2026-07-07-anna-refinement-round.md (+2 omitted).
+- Sensitive-config scan coverage: complete; 6 of 6 candidate file(s) scanned, 0 skipped, 0 read error(s), truncated no.
+- Learning observation coverage: 2235 episode record(s), 0 recurring candidate(s), 0 scoped Skill observation(s), and 9 unscoped Skill observation(s).
+  - Aggregated friction signals: failed-event: 230, source-warning:missing-optional-root: 2.
+  - Coverage boundary: Asset Coverage=not-evaluable-missing-asset-inventory, Capture=not-evaluable-missing-normalized-events, Pattern Detection=insufficient-recurrence, Routing=checked-clean, Freshness=checked-clean, Application=not-evaluable-missing-application-events, Evolution=not-evaluable-missing-update-evidence, Effectiveness=pending-no-later-window, Memory Governance=checked-clean.
+- Workflow-demand observation: 0 current handoff(s) and 3 repeated candidate(s); candidate contents are not projected into this brief.
+  - Coverage boundary: Demand Signals=candidate-found, Current Handoff=checked-clean, Recurrence=candidate-found, Skill Inventory=checked-clean, Skill Activation=checked-clean.
+
+SESSION AND TASK FACTS
+Session packet: 24 selected session(s), 2235 retained candidate episode(s), and 80 discarded episode(s).
+Usage activity: 24 session(s) in the complete activity census; top bounded Skill observations: brainstorming: 8, run: 4, writing-plans: 4, graphify: 3, subagent-driven-development: 3.
+Usage census: analyzed 24 of 24 eligible sessions; complete yes; 12 active-long and 3 wall-only session(s); accounting host-estimated.
+- Episode 1 (episode:32bf60974357d3c0): session-start; 1 session(s); 1 change event(s) in 1 set(s); 0 validation event(s) in 0 set(s); closure unobserved; repair not-applicable; 2594.3 seconds; 5 tool call(s); 69 retained event(s).
+- Episode 2 (episode:e543d12d4eaf16ce): idle-gap; 1 session(s); 0 change event(s) in 0 set(s); 0 validation event(s) in 0 set(s); closure not-applicable; repair not-applicable; 2098.2 seconds; 117 tool call(s); 811 retained event(s).
+- Episode 3 (episode:53405489b7311623): progress-handoff; 1 session(s); 1 change event(s) in 1 set(s); 0 validation event(s) in 0 set(s); closure unobserved; repair not-applicable; 199.5 seconds; 18 tool call(s); 126 retained event(s).
+- Episode 4 (episode:c061a05d367135f0): progress-handoff; 1 session(s); 1 change event(s) in 1 set(s); 0 validation event(s) in 0 set(s); closure unobserved; repair not-applicable; 112.7 seconds; 8 tool call(s); 72 retained event(s).
+- Episode 5 (episode:12308514619f47c8): progress-handoff; 1 session(s); 1 change event(s) in 1 set(s); 0 validation event(s) in 0 set(s); closure unobserved; repair not-applicable; 49.2 seconds; 4 tool call(s); 26 retained event(s).
+- 2230 additional task episode(s) omitted; selection retained the first, last, and highest observed activity episodes.
+
+ANALYZER OBSERVATIONS
+- Analyzed 24 of 24 sessions; 1/3 enabled source roots exist. Use this as the current workspace evidence boundary for final insight cards.
+- Observed validation command category: pytest (435). Use observed validation as execution evidence, not just configured command availability. (3 bounded evidence reference(s))
+- Observed 1344 edit event(s), but no later validation command in the analyzed sample. Route this lead to Harness session-evidence review to inspect the affected Task Episodes and later relevant validation before any finding. (1 bounded evidence reference(s))
+- Observed friction category: failed-event (230). Open bounded sessions behind this category before turning it into a user-facing recommendation. (3 bounded evidence reference(s))
+- Most observed tool: Read (3340). Use this as workflow evidence, then inspect bounded sessions before claiming user intent. (5 bounded evidence reference(s))
+- Observed claude spec-reference: spec-session-reference (8, workspace). Use this as workspace session evidence for Goal/Plan/Spec workflow behavior. (3 bounded evidence reference(s))
+- Observed 12 active long session(s); longest active estimate: 14h 07m. Review task family, outcome, and friction before deciding whether this duration reflects a problem or any decomposition, tool, delegation, or model change is needed. (1 bounded evidence reference(s))
+- 本次分析覆盖 24 个会话，其中 12 个达到活跃长会话阈值，最长约 847 分钟；另有 3 个长跨度主要来自暂停或恢复。 这些活动证据不代表模型偏好或质量；模型效果仍需结合相同任务类型的结果比较。 (3 bounded evidence reference(s))
+
+DELIVERY EVIDENCE
+No bounded evidence observed.
+
+INTERVENTION HISTORY
+No bounded evidence observed.
+
+REVIEW BOUNDARIES
+- Source candidate: requires-review.
+- Repository review: requires-review; 2 framework(s), 9 repository check(s), and 5 Software Fluency capability review(s) remain in scope.
+- Score review: requires-review; 5 dimension(s) await AI judgment.
+- Session observation review: candidate; 8 observation card(s) from 24 analyzed session(s).

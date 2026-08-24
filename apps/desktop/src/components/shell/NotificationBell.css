@@ -1,0 +1,344 @@
+/* ============================================================
+   通知铃(F5 · 设计稿 1f)· 外壳右上,三段全程可见 · 双主题
+   tokens only,ir-bell- 前缀。弹卡驻留 6s→收进铃;跨段单摆 ±9°。
+   ============================================================ */
+
+.ir-bell {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 60;
+}
+
+/* ---------------- 铃钮 + 徽标 ---------------- */
+.ir-bell__btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transform-origin: top center;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+.ir-bell__btn:hover {
+  background: var(--tint);
+}
+.ir-bell__btn:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
+.ir-bell__btn--swing {
+  animation: ir-bell-swing 240ms ease-in-out 1;
+}
+@keyframes ir-bell-swing {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(9deg); }
+  70% { transform: rotate(-9deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.ir-bell__badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--iris);
+  color: #fff;
+  border: 2px solid var(--bg-grad-top);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ir-bell__badge--pop {
+  animation: ir-bell-badgepop 240ms var(--ease-lift) 1;
+}
+@keyframes ir-bell-badgepop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+
+/* ---------------- 弹卡堆叠(新在上) ---------------- */
+.ir-bell__stack {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ir-bell-pop {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-loop);
+  animation: ir-bell-pop-in 240ms var(--ease-lift) both;
+  transform-origin: top right;
+}
+.ir-bell-pop--iris { border-color: color-mix(in oklab, var(--iris) 35%, transparent); }
+.ir-bell-pop--gold { border-color: var(--gold); }
+.ir-bell-pop--danger { border-color: color-mix(in oklab, var(--danger) 40%, transparent); }
+.ir-bell-pop--delegate { border-color: color-mix(in oklab, var(--delegate) 35%, transparent); }
+@keyframes ir-bell-pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 收进铃:飞向右上角(铃在堆叠上方) */
+.ir-bell-pop--leaving {
+  animation: ir-bell-pop-fly 340ms var(--ease-lift) forwards;
+  pointer-events: none;
+}
+@keyframes ir-bell-pop-fly {
+  to { opacity: 0; transform: translate(28px, -48px) scale(0.3); }
+}
+
+.ir-bell-pop__body {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 12px 6px 12px 14px;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ir-bell-pop__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ir-bell-pop__icon {
+  flex: none;
+  display: inline-flex;
+}
+.ir-bell-pop__icon--iris { color: var(--iris); }
+.ir-bell-pop__icon--gold { color: var(--warn); }
+.ir-bell-pop__icon--danger { color: var(--danger); }
+.ir-bell-pop__icon--delegate { color: var(--delegate); }
+.ir-bell-pop__kind {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ir-bell-pop__time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.ir-bell-pop__title {
+  font-size: 12.3px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.ir-bell-pop__deep {
+  font-size: 11px;
+  color: var(--iris-deep);
+}
+.ir-bell-pop__x {
+  flex: none;
+  align-self: flex-start;
+  margin: 8px 8px 0 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ir-bell-pop__x:hover { background: var(--tint); color: var(--ink); }
+
+/* ---------------- 面板 ---------------- */
+.ir-bell__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+.ir-bell__panel {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  z-index: 61;
+  width: 304px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-loop);
+  animation: ir-bell-pop-in 200ms var(--ease-lift) both;
+}
+.ir-bell__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.ir-bell__panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.ir-bell__panel-count {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.ir-bell__markall {
+  border: none;
+  background: none;
+  color: var(--iris-deep);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.ir-bell__markall:hover { background: var(--iris-soft); }
+.ir-bell__panel-empty {
+  padding: 22px 18px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--ink-3);
+  text-align: center;
+}
+.ir-bell__panel-body {
+  padding: 6px 8px 10px;
+}
+.ir-bell__panel-foot {
+  padding: 8px 12px 12px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  border-top: 1px dashed var(--line);
+}
+.ir-bell__group + .ir-bell__group {
+  margin-top: 6px;
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 6px;
+}
+.ir-bell__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 4px;
+}
+.ir-bell__group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ir-bell__group-n {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.ir-bell__item {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 7px 8px;
+  border-radius: 10px;
+  font-family: inherit;
+}
+.ir-bell__item:hover { background: var(--tint); }
+.ir-bell__item-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-3);
+  box-sizing: border-box;
+}
+.ir-bell__item-dot--on {
+  border: none;
+  background: var(--iris);
+}
+/* 事件图元(与弹卡同族语气着色) */
+.ir-bell__item-glyph {
+  flex: none;
+  margin-top: 1px;
+  display: inline-flex;
+  color: var(--iris);
+}
+.ir-bell__item-glyph--iris { color: var(--iris); }
+.ir-bell__item-glyph--gold { color: var(--warn); }
+.ir-bell__item-glyph--danger { color: var(--danger); }
+.ir-bell__item-glyph--delegate { color: var(--delegate); }
+.ir-bell__item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ir-bell__item-title {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.ir-bell__item-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.ir-bell__item-time {
+  flex: none;
+  align-self: flex-start;
+  margin-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* ---------------- reduced-motion 降级(弹卡→无动画直列) ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .ir-bell__btn--swing,
+  .ir-bell__badge--pop,
+  .ir-bell-pop,
+  .ir-bell-pop--leaving,
+  .ir-bell__panel {
+    animation: none !important;
+  }
+}

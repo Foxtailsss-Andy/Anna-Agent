@@ -1,0 +1,1087 @@
+/* ============================================================
+   ChartingTable · Work Graph 画布(F2)
+   制图桌五层 + 节点七态 + 门三态 + 边三型 + 生长四幕 + 呼吸/点名环
+   规格来源:设计稿 v2 1a(384-813)/1b(814-1215)/1c(1216-1402)
+   + 设计说明 §三/§四。组件级变量双主题(非反相),不扰全局 tokens。
+   ============================================================ */
+
+.crewg {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+
+  /* ---- 制图桌(1a §3 精确值) ---- */
+  --crewg-paper-0: #FCFBF8;
+  --crewg-paper-1: #F8F7F2;
+  --crewg-paper-2: #F2F0E9;
+  --crewg-grid: rgb(87 91 196 / 5%);
+  --crewg-dotgrid: rgb(35 35 40 / 6.5%);
+  --crewg-glow-a: rgb(87 91 196 / 8%);
+  --crewg-glow-b: rgb(203 187 142 / 9%);
+  --crewg-veil: rgb(255 255 255 / 50%);
+  --crewg-frame: rgb(87 91 196 / 9%);
+  --crewg-frame-inset: inset 0 1px 0 rgb(255 255 255 / 60%);
+  --crewg-corner: rgb(87 91 196 / 35%);
+
+  /* ---- 卡面 ---- */
+  --crewg-done-0: #FBFAF7;
+  --crewg-done-1: #F7F6F1;
+  --crewg-pending-bg: rgb(255 255 255 / 45%);
+  --crewg-pending-border: rgb(35 35 40 / 16%);
+  --crewg-ready-border: rgb(35 35 40 / 12%);
+  --crewg-review-border: rgb(139 142 217 / 60%);
+  --crewg-iris-shadow: rgb(87 91 196 / 13%);
+  --crewg-danger-wash-a: rgb(190 74 68 / 8%);
+  --crewg-danger-wash-b: rgb(190 74 68 / 4%);
+  --crewg-danger-text: #A2352F;
+  --crewg-blocked-shadow: 0 6px 18px rgb(190 74 68 / 10%);
+  --crewg-run-wash-a: rgb(87 91 196 / 5.5%);
+  --crewg-run-wash-b: rgb(87 91 196 / 2%);
+
+  /* ---- 左缘色条(书脊)· 卡点行 ---- */
+  --crewg-spine-pending: rgb(35 35 40 / 12%);
+  --crewg-note-border: rgb(190 74 68 / 22%);
+
+  /* ---- 章(20px)/ 桩 / 头像 ---- */
+  --crewg-badge-dash: rgb(35 35 40 / 25%);
+  --crewg-badge-innerring: #FFFFFF;
+  --crewg-badge-run-halo: rgb(87 91 196 / 16%);
+  --crewg-badge-block-shadow: rgb(190 74 68 / 40%);
+  --crewg-claim-border: rgb(35 35 40 / 30%);
+  --crewg-review-ink: #8B8ED9;
+  --crewg-review-word: #7A7DC7;
+  --crewg-port-bg: #FFFFFF;
+  --crewg-port-idle: rgb(35 35 40 / 22%);
+  --crewg-port-glow: rgb(87 91 196 / 25%);
+  --crewg-boss-ava: #55589E;
+  --crewg-agent-ava-bg: #EFE7F4;
+
+  /* ---- 职能点(1c;深色仅产品调亮) ---- */
+  --crewg-role-product: #55589E;
+  --crewg-role-design: #9C56B8;
+  --crewg-role-eng: #3E9C82;
+  --crewg-role-accept: #B98A2F;
+
+  /* ---- 门 ---- */
+  --crewg-gate-dash: rgb(35 35 40 / 18%);
+  --crewg-gate-gold-ink: #8A7B52;
+
+  /* ---- 边四型(§3c 对比拉大:通电实 / 休眠淡 / 焦点流 / 返工弧) ---- */
+  --crewg-edge-powered: rgb(35 35 40 / 32%);
+  --crewg-flow: rgb(87 91 196 / 55%);
+  --crewg-edge-dot-powered: rgb(35 35 40 / 40%);
+  --crewg-edge-dot-dormant: rgb(35 35 40 / 18%);
+  /* §3c:休眠边刻意淡(状态语言靠四型对比,非「越实越好」) */
+  --crewg-edge-dormant: rgb(35 35 40 / 16%);
+  /* 就地主动作(金底深字) */
+  --crewg-act-gold-ink: #3C3113;
+
+  /* ---- 动效 ---- */
+  --crewg-shimmer-mid: var(--lavender-2);
+  --crewg-ring-strong: rgb(87 91 196 / 85%);
+  --crewg-ring-halo: rgb(87 91 196 / 12%);
+}
+
+[data-theme="dark"] .crewg {
+  /* 深色非反相(1b §6):底/网格/辉光换值,iris 亮化随 tokens */
+  --crewg-paper-0: #1B1B20;
+  --crewg-paper-1: #17171A;
+  --crewg-paper-2: #121215;
+  --crewg-grid: rgb(139 142 217 / 6%);
+  --crewg-dotgrid: rgb(255 255 255 / 5%);
+  --crewg-glow-a: rgb(139 142 217 / 14%);
+  --crewg-glow-b: rgb(166 153 111 / 12%);
+  --crewg-veil: rgb(255 255 255 / 4.5%);
+  --crewg-frame: rgb(139 142 217 / 12%);
+  --crewg-frame-inset: inset 0 1px 0 rgb(255 255 255 / 4%);
+  --crewg-corner: rgb(139 142 217 / 40%);
+
+  --crewg-done-0: #1E1E22;
+  --crewg-done-1: #1B1B1F;
+  --crewg-pending-bg: rgb(255 255 255 / 2%);
+  --crewg-pending-border: rgb(255 255 255 / 14%);
+  --crewg-ready-border: rgb(255 255 255 / 12%);
+  --crewg-review-border: rgb(139 142 217 / 55%);
+  --crewg-iris-shadow: rgb(139 142 217 / 9%);
+  --crewg-danger-wash-a: rgb(217 106 99 / 14%);
+  --crewg-danger-wash-b: rgb(217 106 99 / 5%);
+  --crewg-danger-text: #E79089;
+  --crewg-blocked-shadow: 0 8px 22px rgb(0 0 0 / 40%);
+  --crewg-run-wash-a: rgb(139 142 217 / 12%);
+  --crewg-run-wash-b: rgb(139 142 217 / 4%);
+
+  --crewg-spine-pending: rgb(255 255 255 / 10%);
+  --crewg-note-border: rgb(217 106 99 / 28%);
+
+  --crewg-badge-dash: rgb(255 255 255 / 22%);
+  --crewg-badge-innerring: #1B1B20;
+  --crewg-badge-run-halo: rgb(139 142 217 / 20%);
+  --crewg-badge-block-shadow: rgb(217 106 99 / 40%);
+  --crewg-claim-border: rgb(255 255 255 / 30%);
+  --crewg-review-ink: #B7B9E8;
+  --crewg-review-word: #B7B9E8;
+  --crewg-port-bg: #232328;
+  --crewg-port-idle: rgb(255 255 255 / 22%);
+  --crewg-port-glow: rgb(139 142 217 / 30%);
+  --crewg-agent-ava-bg: rgb(184 127 212 / 18%);
+
+  --crewg-role-product: #7B7EC0;
+
+  --crewg-gate-dash: rgb(255 255 255 / 15%);
+  --crewg-gate-gold-ink: #C9BC93;
+
+  --crewg-edge-powered: rgb(255 255 255 / 28%);
+  --crewg-flow: rgb(139 142 217 / 70%);
+  --crewg-edge-dot-powered: rgb(255 255 255 / 40%);
+  --crewg-edge-dot-dormant: rgb(255 255 255 / 18%);
+  --crewg-edge-dormant: rgb(255 255 255 / 14%);
+  --crewg-act-gold-ink: #241B08;
+
+  --crewg-shimmer-mid: var(--lavender);
+  --crewg-ring-strong: rgb(139 142 217 / 85%);
+  --crewg-ring-halo: rgb(139 142 217 / 14%);
+}
+
+/* ============================================================
+   制图桌五层(纸面 → 双尺网格(羽化)→ 双辉光 → 白纱 → 工作框)
+   ============================================================ */
+
+.crewg-table {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.crewg-table__paper {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--crewg-paper-0) 0%, var(--crewg-paper-1) 46%, var(--crewg-paper-2) 100%);
+}
+.crewg-table__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, var(--crewg-grid) 0 1px, transparent 1px 110px),
+    repeating-linear-gradient(90deg, var(--crewg-grid) 0 1px, transparent 1px 110px),
+    radial-gradient(var(--crewg-dotgrid) 1px, transparent 1.15px);
+  background-size: auto, auto, 22px 22px;
+  background-position: 0 0, 0 0, 11px 11px;
+  -webkit-mask-image: radial-gradient(120% 116% at 50% 46%, #000 52%, transparent 99%);
+  mask-image: radial-gradient(120% 116% at 50% 46%, #000 52%, transparent 99%);
+}
+.crewg-table__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(64px);
+}
+.crewg-table__glow--a {
+  left: 16%;
+  top: -34%;
+  width: 66%;
+  height: 60%;
+  background: radial-gradient(closest-side, var(--crewg-glow-a), transparent 70%);
+  animation: crewg-aurora-a 30s ease-in-out infinite;
+}
+.crewg-table__glow--b {
+  right: -16%;
+  bottom: -30%;
+  width: 50%;
+  height: 54%;
+  background: radial-gradient(closest-side, var(--crewg-glow-b), transparent 70%);
+  animation: crewg-aurora-b 40s ease-in-out infinite;
+}
+.crewg-table__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--crewg-veil), transparent 90px);
+}
+.crewg-table__frame {
+  position: absolute;
+  inset: 10px;
+  border: 1px solid var(--crewg-frame);
+  border-radius: 14px;
+  box-shadow: var(--crewg-frame-inset);
+}
+.crewg-table__corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 0 solid var(--crewg-corner);
+}
+.crewg-table__corner--tl { top: -5px; left: -5px; border-top-width: 1.5px; border-left-width: 1.5px; }
+.crewg-table__corner--tr { top: -5px; right: -5px; border-top-width: 1.5px; border-right-width: 1.5px; }
+.crewg-table__corner--bl { bottom: -5px; left: -5px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.crewg-table__corner--br { bottom: -5px; right: -5px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+@keyframes crewg-aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -18px) scale(1.06); }
+}
+@keyframes crewg-aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-24px, 14px) scale(1.05); }
+}
+
+/* ============================================================
+   React Flow 宿主
+   ============================================================ */
+
+.crewg .react-flow {
+  background: transparent;
+}
+/* DEV-4:位置迁移改 JS 位置补间(rAF 逐帧 setNodes,边天然逐帧跟随,消除脱线)——
+   不再用 CSS transform 过渡(它让节点滑移而边瞬时钉终点 → 每次重排边都脱线 240ms)。 */
+.crewg .react-flow__edge {
+  pointer-events: none;
+}
+.crewg .react-flow__pane { cursor: grab; }
+.crewg .react-flow__pane.dragging { cursor: grabbing; }
+
+/* 端口桩 8px(1a:白底 1.5px 态色描边;深色底 #232328) */
+.crewg .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--crewg-port-bg);
+  border: 1.5px solid var(--crewg-port-idle);
+  pointer-events: none !important;
+}
+.crewg .react-flow__handle-left { left: -4px; top: 28px; transform: none; }
+.crewg .react-flow__handle-right { right: -4px; top: 28px; transform: none; }
+.crewg-node--done .react-flow__handle,
+.crewg-gate--passed .react-flow__handle {
+  border-color: color-mix(in srgb, var(--ok) 70%, transparent);
+}
+/* 执行中卡左侧连线端口点(§3a):填色 iris 9px + 纸色 2px 环 + runPulse 光晕(在飞脉动)。 */
+.crewg-node--running .react-flow__handle-left {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  min-height: 9px;
+  left: -4.5px;
+  top: 27.5px;
+  background: var(--iris);
+  border: 2px solid var(--crewg-paper-0);
+}
+.crewg-node--running .react-flow__handle-left::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--crewg-port-glow);
+  animation: crewg-run-pulse 2s ease-in-out infinite;
+}
+.crewg-node--review .react-flow__handle-right { border-color: var(--iris); }
+.crewg-gate .react-flow__handle-left { left: 13px; top: 31px; }
+.crewg-gate .react-flow__handle-right { right: 13px; top: 31px; }
+/* 返工上弧的隐形桩 */
+.crewg .react-flow__handle.crewg-port--ghost {
+  width: 2px;
+  height: 2px;
+  min-width: 2px;
+  min-height: 2px;
+  opacity: 0;
+  border: none;
+  background: transparent;
+}
+
+/* ============================================================
+   任务节点(188×min66 · r14 · 七态双通道)
+   ============================================================ */
+
+.crewg-node {
+  position: relative;
+  width: 188px;
+  box-sizing: border-box;
+}
+/* 呼吸环(P1 全屏唯一,焦点执行节点) */
+.crewg-node__breath {
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  animation: anna-breath var(--dur-breath) ease-out infinite;
+  pointer-events: none;
+}
+/* 点名环(P6 单次:平移 320 → 入场 240 → 驻留 2.4s → 淡出 600) */
+.crewg-node__ring,
+.crewg-gate__ringlayer {
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  pointer-events: none;
+  animation: crewg-call-ring 3.24s ease-out 320ms forwards;
+}
+.crewg-gate__ringlayer { border-radius: 14px; }
+
+.crewg-card {
+  position: relative;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--crewg-ready-border);
+  border-radius: var(--radius-node);
+  /* 左 padding 16px 让位 5px 色条(裁定 #1) */
+  padding: 11px 13px 10px 16px;
+  box-shadow: 0 1px 2px rgb(35 35 40 / 4%), 0 4px 14px rgb(35 35 40 / 5%);
+  overflow: hidden;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 240ms var(--ease-lift),
+    background-color 240ms var(--ease-lift);
+}
+.crewg-card:hover { transform: translateY(-2px); }
+
+/* R5 远读层:左缘 5px 状态色条(书脊),七态各色(浅深双值) */
+.crewg-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 14px 0 0 14px;
+  background: var(--crewg-spine, transparent);
+}
+.crewg-node--pending .crewg-card { --crewg-spine: var(--crewg-spine-pending); }
+.crewg-node--ready .crewg-card { --crewg-spine: var(--iris); }
+.crewg-node--running .crewg-card { --crewg-spine: var(--iris); }
+.crewg-node--review .crewg-card { --crewg-spine: var(--crewg-review-ink); }
+.crewg-node--blocked .crewg-card { --crewg-spine: var(--danger); }
+.crewg-node--rework .crewg-card { --crewg-spine: var(--danger); }
+.crewg-node--done .crewg-card { --crewg-spine: var(--ok); }
+
+/* 01 待就绪:白 45% + 虚线框 */
+.crewg-node--pending .crewg-card {
+  background: var(--crewg-pending-bg);
+  border: 1px dashed var(--crewg-pending-border);
+  box-shadow: none;
+}
+/* 03 执行中:iris 洗色 + strokeFlow 描边(见 .crewg-strokeflow)+ iris 投影 */
+.crewg-node--running .crewg-card {
+  background:
+    linear-gradient(180deg, var(--crewg-run-wash-a), var(--crewg-run-wash-b)),
+    linear-gradient(180deg, var(--surface), var(--surface-loop-2));
+  border-color: color-mix(in srgb, var(--iris) 50%, transparent);
+  box-shadow: 0 1px 2px rgb(35 35 40 / 4%), 0 10px 28px var(--crewg-iris-shadow), var(--inset-top);
+}
+/* 04 已提交待审:薰衣草描边 */
+.crewg-node--review .crewg-card { border-color: var(--crewg-review-border); }
+/* 05 阻塞:danger 描边(.55)+ 洗色最刺眼 + danger 投影 */
+.crewg-node--blocked .crewg-card {
+  background:
+    linear-gradient(180deg, var(--crewg-danger-wash-a), var(--crewg-danger-wash-b)),
+    linear-gradient(180deg, var(--surface), var(--surface-2));
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  box-shadow: var(--crewg-blocked-shadow);
+}
+/* 06 返工:danger 细描边(.40),无洗色(在干活) */
+.crewg-node--rework .crewg-card { border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+/* 07 完成:沉入面板色(墨迹已干) */
+.crewg-node--done .crewg-card {
+  background: linear-gradient(180deg, var(--crewg-done-0), var(--crewg-done-1));
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.crewg-card__titlerow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crewg-card__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crewg-node--pending .crewg-card__title { font-weight: 500; color: var(--ink-2); }
+.crewg-node--done .crewg-card__title { color: var(--ink-2); }
+.crewg-card__role {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--ink-3);
+}
+.crewg-roledot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ink-3);
+}
+.crewg-roledot--product { background: var(--crewg-role-product); }
+.crewg-roledot--design { background: var(--crewg-role-design); }
+.crewg-roledot--eng { background: var(--crewg-role-eng); }
+.crewg-roledot--accept { background: var(--crewg-role-accept); }
+
+/* 产物徽记(O-C:有产物 → 文件图标 + vN)——ink-3 静默近读,不喧宾夺主,双主题随 token */
+.crewg-card__doc {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-3);
+}
+.crewg-card__doc svg { display: block; }
+.crewg-card__docv {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.crewg-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.crewg-card__who {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crewg-node--pending .crewg-card__who,
+.crewg-node--done .crewg-card__who { color: var(--ink-3); }
+.crewg-card__who--claim { color: var(--iris); }
+.crewg-card__word {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+.crewg-card__word--pending { color: var(--ink-3); }
+.crewg-card__word--ready { color: var(--iris); }
+.crewg-card__word--running { color: var(--iris); }
+.crewg-card__word--review { color: var(--crewg-review-word); }
+.crewg-card__word--blocked { color: var(--danger); }
+.crewg-card__word--rework { color: var(--danger); }
+.crewg-card__word--shimmer { animation: crewg-shimmer-ink var(--dur-shimmer) ease-in-out infinite; }
+/* done 无状态词,章顶到行尾 */
+.crewg-node--done .crewg-badge { margin-left: auto; }
+
+/* 卡点直陈(05)与溯源行(频道生长) */
+.crewg-card__note {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--crewg-note-border);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--crewg-danger-text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.crewg-card__origin {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.crewg-card__origin svg { color: var(--iris); flex: none; }
+
+/* R2 执行流光(§3d 逐字):渐变盒 + 遮罩挖空 —— 比卡略大的伪盒铺 3× 宽横向渐变,
+   靠 crewg-stroke-flow 平移 background-position 让渐变横向流动;mask 挖掉内容区只留 1.5px
+   描边环。非 border-image、非进度环。强度 < 焦点呼吸;可多节点同屏。 */
+.crewg-strokeflow {
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 15px;
+  padding: 1.5px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(115deg, #575bc4, #8b8ed9, #b7b9e8, #8b8ed9, #575bc4);
+  background-size: 300% 100%;
+  animation: crewg-stroke-flow 4.5s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+[data-theme="dark"] .crewg-strokeflow {
+  background: linear-gradient(115deg, #8b8ed9, #b7b9e8, #6e72c0, #b7b9e8, #8b8ed9);
+}
+
+/* ---- 章 20px(形状即状态,色盲安全;裁定 #2 近读层升级) ---- */
+.crewg-badge {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.crewg-badge svg { width: 11px; height: 11px; }
+/* 01 待就绪:虚环 */
+.crewg-badge--pending { border: 1.5px dashed var(--crewg-badge-dash); }
+/* 02 就绪待认领:iris 实描环 + iris 加号(currentColor) */
+.crewg-badge--ready { border: 1.5px solid var(--iris); color: var(--iris); }
+/* 03 执行中:iris 实心 + 3px 光晕,内套 7px 环 */
+.crewg-badge--running {
+  background: var(--iris);
+  box-shadow: 0 0 0 3px var(--crewg-badge-run-halo);
+}
+.crewg-badge__innerring {
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1.5px solid var(--crewg-badge-innerring);
+}
+/* 04 待审:菱形空章 18px rotate45 r5(呼应门◇) */
+.crewg-badge--review {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--crewg-review-ink);
+}
+/* 05 阻塞:danger 实心 + 白叹号 + danger 投影 */
+.crewg-badge--blocked {
+  background: var(--danger);
+  box-shadow: 0 1px 3px var(--crewg-badge-block-shadow);
+}
+/* 06 返工:danger 描环 + 回环图标 */
+.crewg-badge--rework { border: 1.5px solid var(--danger); color: var(--danger); }
+/* 07 完成:ok 实心 + 白勾 */
+.crewg-badge--done { background: var(--ok); }
+/* 完成落笔(转 done 一次 300ms) */
+.crewg-inkpath { stroke-dasharray: 22; stroke-dashoffset: 0; }
+.crewg-inkpath--draw {
+  stroke-dashoffset: 22;
+  animation: crewg-ink-draw 300ms ease-out forwards;
+}
+
+/* ---- 头像 16px(人=圆 · Boss=深 iris 圆 · Agent=方 r5 delegate) ---- */
+.crewg-ava {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--tint-strong);
+  color: var(--ink-2);
+  font-size: 8.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.crewg-ava--owner { background: var(--crewg-boss-ava); color: #FFFFFF; }
+.crewg-ava--agent {
+  border-radius: 5px;
+  background: var(--crewg-agent-ava-bg);
+  color: var(--delegate-ink);
+}
+.crewg-ava--dim { opacity: 0.6; }
+.crewg-ava--soft { opacity: 0.8; }
+.crewg-ava--claim {
+  background: transparent;
+  border: 1px dashed var(--crewg-claim-border);
+  color: var(--ink-3);
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   就地主动作按钮(#2 Asana:状态→唯一主动作,hover/选中显形一键推进)
+   —— 静止不扰七态署名行;悬停/选中掀开于卡右缘(节点子级,逃 card overflow)。
+   ============================================================ */
+
+.crewg-act {
+  position: absolute;
+  z-index: 4;
+  right: 8px;
+  top: 30px; /* 署名行高度带:覆于状态词/章之上,仅悬停时 */
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  /* 静止隐藏(visibility 同时移出 Tab 序,不留隐形焦点),悬停/选中显形 */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(5px);
+  transition:
+    opacity 160ms var(--ease-lift),
+    transform 160ms var(--ease-lift),
+    visibility 0s linear 160ms,
+    filter 140ms ease;
+}
+.crewg-node:hover .crewg-act,
+.crewg-node:focus-within .crewg-act,
+.crewg-node--selected .crewg-act,
+.crewg-node--focus .crewg-act,
+.crewg-gate:hover .crewg-act,
+.crewg-gate:focus-within .crewg-act {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 160ms var(--ease-lift),
+    transform 160ms var(--ease-lift),
+    visibility 0s,
+    filter 140ms ease;
+}
+/* tones */
+.crewg-act--primary {
+  background: var(--iris);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--crewg-iris-shadow), 0 1px 2px rgb(35 35 40 / 14%);
+}
+.crewg-act--primary:hover { filter: brightness(1.06); }
+.crewg-act--attention {
+  background: var(--gold);
+  color: var(--crewg-act-gold-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--gold) 42%, transparent), 0 1px 2px rgb(35 35 40 / 14%);
+}
+.crewg-act--attention:hover { filter: brightness(1.05); }
+.crewg-act--ghost {
+  background: var(--surface);
+  color: var(--ink-2);
+  border-color: var(--line-strong);
+  box-shadow: 0 1px 3px rgb(35 35 40 / 10%);
+}
+.crewg-act--ghost:hover { background: var(--tint); color: var(--ink); }
+.crewg-act:focus-visible { outline: 2px solid var(--iris); outline-offset: 1px; }
+
+/* 门的主动作:悬于门下方居中(不覆盖菱形/标签/mono) */
+.crewg-act--gate {
+  right: auto;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 5px);
+}
+.crewg-gate:hover .crewg-act--gate,
+.crewg-gate:focus-within .crewg-act--gate {
+  transform: translate(-50%, 0);
+}
+
+/* ============================================================
+   门节点 ◇(44×44 r8 rotate45 · serif「审」· 三态)
+   ============================================================ */
+
+.crewg-gate {
+  position: relative;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.crewg-gate__diamondbox {
+  width: 62px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.crewg-gate__diamond {
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 240ms var(--ease-lift), background-color 240ms var(--ease-lift);
+}
+.crewg-gate--dormant .crewg-gate__diamond {
+  background: var(--crewg-pending-bg);
+  border: 1px dashed var(--crewg-gate-dash);
+}
+/* 活跃门(裁定 #3):44→48 加重 + 金线 + goldPulse 4s(评审时刻的关卡仪式) */
+.crewg-gate--active .crewg-gate__diamond {
+  width: 48px;
+  height: 48px;
+  background: var(--surface);
+  border: 1.5px solid var(--gold);
+  animation: crewg-gold-pulse 4s ease-in-out infinite;
+}
+.crewg-gate--passed .crewg-gate__diamond {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--ok) 55%, transparent);
+  box-shadow: 0 1px 2px rgb(35 35 40 / 5%);
+}
+.crewg-gate__shen {
+  transform: rotate(-45deg);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.crewg-gate--active .crewg-gate__shen { color: var(--crewg-gate-gold-ink); font-weight: 700; }
+.crewg-gate__check {
+  transform: rotate(-45deg);
+  stroke: var(--ok);
+  fill: none;
+}
+.crewg-gate__label {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crewg-gate--dormant .crewg-gate__label { color: var(--ink-3); }
+.crewg-gate--active .crewg-gate__label { color: var(--ink); font-weight: 600; }
+.crewg-gate__mono {
+  margin-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+}
+.crewg-gate--active .crewg-gate__mono { color: var(--crewg-gate-gold-ink); }
+/* 生长的门(罕见):只显形,不占金预算 */
+.crewg-gate--born { animation: crewg-grow-node 240ms var(--ease-lift) 540ms both; }
+
+/* ============================================================
+   边三型 + 供电流(SVG 1.5px · 终点 2.5px 港点)
+   ============================================================ */
+
+.crewg-edge__line {
+  fill: none;
+  stroke-width: 1.5;
+  transition: stroke 240ms var(--ease-lift);
+}
+/* 已通电:实线 ink 32%(深 28%)/ 1.75px + 港点 .4 */
+.crewg-edge--powered .crewg-edge__line { stroke: var(--crewg-edge-powered); stroke-width: 1.75; }
+.crewg-edge--powered .crewg-edge__dot { fill: var(--crewg-edge-dot-powered); }
+/* 休眠:§3c 刻意淡 ink 16%(深 14%)/ 1.5px dash 5 4 + 港点 .18(四型对比拉大) */
+.crewg-edge--dormant .crewg-edge__line { stroke: var(--crewg-edge-dormant); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.crewg-edge--dormant .crewg-edge__dot { fill: var(--crewg-edge-dot-dormant); }
+/* 焦点流动:全图唯一,实 iris / 1.9px dash 5 7 dashFlow,指向焦点执行节点 */
+.crewg-edge--flow .crewg-edge__line {
+  stroke: var(--iris);
+  stroke-width: 1.9;
+  stroke-dasharray: 5 7;
+  animation: crewg-dash-flow 1.1s linear infinite;
+}
+.crewg-edge--flow .crewg-edge__dot { fill: var(--iris); }
+/* 评审直通(1b 供电边转移):亮 iris,不流动 */
+.crewg-edge--reviewLive .crewg-edge__line { stroke: var(--crewg-flow); stroke-width: 1.75; }
+.crewg-edge--reviewLive .crewg-edge__dot { fill: var(--iris); }
+/* 返工回路:danger 1.4px dash 3-3 上弧 + 回流箭头(驳回时画入,通过后消隐,不留疤) */
+.crewg-edge--rework .crewg-edge__line { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 3 3; }
+.crewg-edge--rework .crewg-edge__arrow { stroke: var(--danger); stroke-width: 1.4; fill: none; }
+.crewg-edge--rework .crewg-edge__dot { fill: var(--danger); }
+
+/* 生长幕二 · 画入 300ms(实线族 pathLength 落笔;虚线族 dash 行进;iris 3s 归常) */
+.crewg-edge--born.crewg-edge--powered .crewg-edge__line {
+  stroke-dasharray: 100;
+  animation:
+    crewg-edge-ink 300ms var(--ease-lift) 240ms both,
+    crewg-edge-tint 3s ease 540ms both;
+}
+.crewg-edge--born.crewg-edge--reviewLive .crewg-edge__line {
+  stroke-dasharray: 100;
+  animation: crewg-edge-ink 300ms var(--ease-lift) 240ms both;
+}
+.crewg-edge--born.crewg-edge--dormant .crewg-edge__line {
+  animation:
+    crewg-edge-march 300ms var(--ease-lift) 240ms both,
+    crewg-edge-tint-dormant 3s ease 540ms both;
+}
+.crewg-edge--born.crewg-edge--rework .crewg-edge__line {
+  animation: crewg-edge-march 300ms var(--ease-lift) both;
+}
+
+/* ============================================================
+   生长四幕(节点侧:幕三 显形 + 幕四 定名)
+   ============================================================ */
+
+.crewg-node--born .crewg-card {
+  animation:
+    crewg-grow-node 240ms var(--ease-lift) 540ms both,
+    crewg-grow-gold 2.6s ease-out 780ms both;
+}
+
+/* ============================================================
+   底栏(缩放条 / 计数 / 图例 / 同步)
+   ============================================================ */
+
+.crewg-bar {
+  position: absolute;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 5;
+}
+.crewg-bar--left { left: 16px; }
+.crewg-bar--right { right: 16px; }
+.crewg-bar__mono {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.crewg-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 4px;
+  box-shadow: 0 1px 2px rgb(35 35 40 / 6%);
+}
+.crewg-zoom__btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.crewg-zoom__btn:hover { background: var(--tint); color: var(--ink); }
+.crewg-zoom__btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 1px; }
+.crewg-zoom__pct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  min-width: 34px;
+  text-align: center;
+}
+
+.crewg-pillbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(35 35 40 / 6%);
+}
+.crewg-pillbtn:hover, .crewg-pillbtn--on { background: var(--tint); color: var(--ink); }
+.crewg-pillbtn:focus-visible { outline: 2px solid var(--iris); outline-offset: 1px; }
+
+/* ---- 图例卡 ---- */
+.crewg-legend { position: relative; display: flex; align-items: center; }
+.crewg-legend__card {
+  position: absolute;
+  right: 0;
+  bottom: 34px;
+  width: 198px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  z-index: 6;
+}
+.crewg-legend__sect {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+.crewg-legend__sect:first-child { margin-top: 0; }
+.crewg-legend__row { display: flex; align-items: center; gap: 8px; }
+/* 图例章缩到 14px(近读层 20px 在图例词表里过大);review 菱形 12px,去光晕/投影 */
+.crewg-legend__badge.crewg-badge { width: 14px; height: 14px; box-shadow: none; }
+.crewg-legend__badge.crewg-badge--review { width: 12px; height: 12px; }
+.crewg-legend__badge .crewg-badge__innerring { width: 5px; height: 5px; }
+.crewg-legend__gate {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+  border-radius: 3.5px;
+  margin: 2px 2px 2px 3px;
+}
+.crewg-legend__gate--dormant { background: var(--crewg-pending-bg); border: 1px dashed var(--crewg-gate-dash); }
+.crewg-legend__gate--active { background: var(--surface); border: 1.5px solid var(--gold); }
+.crewg-legend__gate--passed { background: var(--surface); border: 1px solid color-mix(in srgb, var(--ok) 55%, transparent); }
+.crewg-legend__edge { flex: none; }
+.crewg-legend__edge path { stroke-width: 1.5; fill: none; }
+.crewg-legend__edge--powered path { stroke: var(--crewg-edge-powered); }
+.crewg-legend__edge--powered circle { fill: var(--crewg-edge-dot-powered); }
+.crewg-legend__edge--dormant path { stroke: var(--crewg-edge-dormant); stroke-dasharray: 5 4; }
+.crewg-legend__edge--dormant circle { fill: var(--crewg-edge-dot-dormant); }
+/* 图例中的供电流是静态词条(全图唯一流动纪律,不在图例里动) */
+.crewg-legend__edge--flow path { stroke: var(--iris); stroke-width: 1.9; stroke-dasharray: 5 7; }
+.crewg-legend__edge--flow circle { fill: var(--iris); }
+.crewg-legend__edge--rework path { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 3 3; }
+.crewg-legend__edge--rework circle { fill: var(--danger); }
+
+/* ---- 空态即空态 ---- */
+.crewg-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  z-index: 2;
+}
+
+/* ============================================================
+   关键帧(设计稿实名对应:dashFlow/barSweep/goldPulse/shimmerInk/
+   growNode/growGold/callRing/inkDraw)
+   ============================================================ */
+
+@keyframes crewg-dash-flow { to { stroke-dashoffset: -24; } }
+
+/* R2 执行流光(§3d 逐字):3× 宽渐变横向平移出「活着」的流光 */
+@keyframes crewg-stroke-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+/* 在飞脉点(频道/健康条/图上执行端口同拍):.45↔1 */
+@keyframes crewg-run-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@keyframes crewg-gold-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 12%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--gold) 22%, transparent); }
+}
+
+@keyframes crewg-shimmer-ink {
+  0%, 100% { color: var(--iris); }
+  50% { color: var(--crewg-shimmer-mid); }
+}
+
+@keyframes crewg-grow-node {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 定名:金线一周 320ms(≈12%)+ iris 晕,3s 内淡出 */
+@keyframes crewg-grow-gold {
+  0% { box-shadow: 0 0 0 1.5px transparent, 0 0 0 0 transparent; }
+  12% {
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb, var(--gold) 90%, transparent),
+      0 0 0 10px color-mix(in srgb, var(--iris) 10%, transparent);
+  }
+  45% {
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb, var(--gold) 35%, transparent),
+      0 0 0 6px color-mix(in srgb, var(--iris) 5%, transparent);
+  }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+}
+
+@keyframes crewg-call-ring {
+  0% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+  7.4% { box-shadow: 0 0 0 2px var(--crewg-ring-strong), 0 0 0 9px var(--crewg-ring-halo); }
+  81.5% { box-shadow: 0 0 0 2px var(--crewg-ring-strong), 0 0 0 9px var(--crewg-ring-halo); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+}
+
+@keyframes crewg-ink-draw { to { stroke-dashoffset: 0; } }
+
+@keyframes crewg-edge-ink {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes crewg-edge-march {
+  from { stroke-dashoffset: 63; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes crewg-edge-tint {
+  from { stroke: var(--iris); }
+  to { stroke: var(--crewg-edge-powered); }
+}
+@keyframes crewg-edge-tint-dormant {
+  from { stroke: color-mix(in srgb, var(--iris) 45%, transparent); }
+  to { stroke: var(--crewg-edge-dormant); }
+}
+
+/* ============================================================
+   prefers-reduced-motion 全降级(设计说明 §四降级表)
+   呼吸→静态章 · 微光/流动/金脉→静态 · 平移→瞬时 ·
+   生长→直接出现+静态 iris 描边 3s · 落笔→直接呈现
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .crewg-node__breath { display: none; }
+  /* R2 流光降级:撤流光伪层,执行中卡退回静态 iris 描边 + 章(§3d demo③) */
+  .crewg-strokeflow { display: none; }
+  .crewg-node--running .crewg-card { border-color: var(--iris); }
+  .crewg-node--running .react-flow__handle-left::after { animation: none; }
+  .crewg-card__word--shimmer { animation: none; }
+  .crewg-edge--flow .crewg-edge__line { animation: none; }
+  .crewg-gate--active .crewg-gate__diamond {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 12%, transparent);
+  }
+  .crewg .react-flow__node { transition: none; }
+  .crewg-card { transition: none; }
+  .crewg-table__glow { animation: none; }
+  .crewg-node--born .crewg-card { animation: crewg-born-static 3s linear both; }
+  .crewg-gate--born { animation: none; }
+  .crewg-edge--born .crewg-edge__line { animation: none !important; }
+  .crewg-node__ring,
+  .crewg-gate__ringlayer { animation: crewg-ring-static 3.24s linear 0ms forwards; }
+  .crewg-inkpath--draw { animation: none; stroke-dashoffset: 0; }
+  /* 就地动作:即时显隐,不滑不淡 */
+  .crewg-act { transition: none; transform: none; }
+  .crewg-node:hover .crewg-act,
+  .crewg-node:focus-within .crewg-act,
+  .crewg-node--selected .crewg-act,
+  .crewg-gate:hover .crewg-act,
+  .crewg-gate:focus-within .crewg-act { transform: none; }
+  .crewg-act--gate,
+  .crewg-gate:hover .crewg-act--gate,
+  .crewg-gate:focus-within .crewg-act--gate { transform: translate(-50%, 0); }
+}
+
+@keyframes crewg-born-static {
+  0%, 99% { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--iris) 60%, transparent); }
+  100% { box-shadow: none; }
+}
+@keyframes crewg-ring-static {
+  0%, 90% { box-shadow: 0 0 0 2px var(--crewg-ring-strong), 0 0 0 9px var(--crewg-ring-halo); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+}

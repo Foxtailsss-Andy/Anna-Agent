@@ -1,0 +1,10 @@
+{
+  "http_status": 200,
+  "body": {
+    "run_id": "chat_run_022",
+    "status": "generating",
+    "accepted": true
+  },
+  "posted_at_offset_s": 0.07,
+  "run_status_when_posted": "generating"
+}

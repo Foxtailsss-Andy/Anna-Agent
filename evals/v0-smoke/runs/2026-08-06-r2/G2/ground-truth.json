@@ -1,0 +1,45 @@
+{
+  "source": "demo-erp REST :8970 + MCP /erp/rpc probe (primary per spec 2.4)",
+  "current_date": "2026-08-06",
+  "上个月_derivation": "2026-08-06 → 上个月 = 2026-07",
+  "rest": {
+    "/api/pnl?period=2026-07": {
+      "error": { "code": "not_found", "message": "无 2026-07 汇总（演示数据）", "retryable": false }
+    },
+    "/api/trend": {
+      "series": [
+        { "period": "2026-04", "revenue": 4120000.0, "expense": 2980000.0, "profit": 1140000.0, "operating_cash_flow": 1040000.0, "ar_balance": 1640000.0, "ap_balance": 1090000.0 },
+        { "period": "2026-05", "revenue": 4455000.0, "expense": 3238000.0, "profit": 1217000.0, "operating_cash_flow": 927000.0, "ar_balance": 1859000.0, "ap_balance": 1135000.0 },
+        { "period": "2026-06", "revenue": 4820000.0, "expense": 3640000.0, "profit": 1180000.0, "operating_cash_flow": 760000.0, "ar_balance": 2150000.0, "ap_balance": 1180000.0 }
+      ],
+      "note": "演示数据"
+    },
+    "/api/pnl?period=2026-06": {
+      "revenue": 4820000.0, "cogs": 980000.0, "opex": 2660000.0,
+      "expense_total": 3640000.0, "profit": 1180000.0
+    }
+  },
+  "no_data_semantics_FIXED_since_r1": {
+    "note": "r1 记录的 zero-stub 已被修掉：越界期间不再返回 0，而是显式 no_data + available_periods。",
+    "erp.finance.query{question:'生意咋样',period:'2026-07'}": {
+      "structuredContent": {
+        "question": "生意咋样",
+        "period": "2026-07",
+        "no_data": true,
+        "available_periods": ["2026-04", "2026-05", "2026-06"],
+        "answer": "【演示数据】2026-07 没有任何业务数据，因此无法给出该期间的收入/费用/利润/应收应付数字。演示账套已入账的期间为 2026-04 ~ 2026-06。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    }
+  },
+  "tool_capability_probe": {
+    "erp.finance.query{question:'费用',period:'2026-06'}": {
+      "structuredContent": {
+        "question": "费用",
+        "period": "2026-06",
+        "answer": "【演示数据】2026-06 本月费用约 364万，其中主营成本、销售费用(含市场/差旅)、管理费用、研发费用按科目归集；市场费用环比上升明显。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    }
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "id": "chat_run_011",
+  "workspace_id": "local-workspace",
+  "actor_user_id": "local-user",
+  "message": "详细分析 2026 年 4、5、6 三个月的收入趋势，逐月解释变化",
+  "thread_id": "chat_run_011",
+  "template_id": null,
+  "model_profile_id": null,
+  "skill_id": null,
+  "agent_id": null,
+  "workdir_id": null,
+  "status": "failed",
+  "assistant_message": null,
+  "saved_memory_id": null,
+  "associate_goal_text": null,
+  "audit_events": [
+    {
+      "type": "chat.run.created",
+      "run_id": "chat_run_011",
+      "payload": {
+        "message_hash": "056fcd5233a0b0595e075924f4c2fcf7d0e196207be072af65d2d54757a6836f",
+        "template_id": null,
+        "model_profile_id": null,
+        "skill_id": null,
+        "agent_id": null,
+        "workdir_id": null
+      },
+      "created_at": "2026-08-06T07:22:02.327555+00:00"
+    },
+    {
+      "type": "skill.loaded",
+      "run_id": "chat_run_011",
+      "payload": {
+        "skill_id": "chat/general-assistant",
+        "skill_name": "general-assistant-chat",
+        "skill_version": "0.1.0",
+        "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff"
+      },
+      "created_at": "2026-08-06T07:22:02.331190+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_011",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 578,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:22:02.346161+00:00"
+    },
+    {
+      "type": "run.interjected",
+      "run_id": "chat_run_011",
+      "payload": {
+        "text_hash": "6573d54a2117ce9498fc12d79ec8cd07538828fd4af6257b76bc0f99b77bb5c0"
+      },
+      "created_at": "2026-08-06T07:22:02.347288+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_011",
+      "payload": {
+        "finish_reason": "tool_calls",
+        "tool_call_count": 1,
+        "requested_tool_names": [
+          "plan.update"
+        ],
+        "input_tokens": 1127,
+        "output_tokens": 214
+      },
+      "created_at": "2026-08-06T07:22:06.379862+00:00"
+    },
+    {
+      "type": "plan.updated",
+      "run_id": "chat_run_011",
+      "payload": {
+        "count": 4,
+        "done_count": 0,
+        "items": [
+          {
+            "id": "1",
+            "title": "查询 2026-04 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "2",
+            "title": "查询 2026-05 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "3",
+            "title": "查询 2026-06 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "4",
+            "title": "汇总分析三个月收入趋势",
+            "status": "pending"
+          }
+        ]
+      },
+      "created_at": "2026-08-06T07:22:06.390688+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_011",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 825,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:22:06.394704+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_011",
+      "payload": {
+        "finish_reason": "tool_calls",
+        "tool_call_count": 5,
+        "requested_tool_names": [
+          "plan.update",
+          "erp.finance.query",
+          "erp.finance.query",
+          "erp.finance.query",
+          "erp.finance.query"
+        ],
+        "input_tokens": 1320,
+        "output_tokens": 496
+      },
+      "created_at": "2026-08-06T07:22:15.605859+00:00"
+    },
+    {
+      "type": "plan.updated",
+      "run_id": "chat_run_011",
+      "payload": {
+        "count": 5,
+        "done_count": 0,
+        "items": [
+          {
+            "id": "1",
+            "title": "查询 2026-04 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "2",
+            "title": "查询 2026-05 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "3",
+            "title": "查询 2026-06 收入数据",
+            "status": "in_progress"
+          },
+          {
+            "id": "4",
+            "title": "汇总分析三个月收入趋势",
+            "status": "pending"
+          },
+          {
+            "id": "5",
+            "title": "查询应付账款金额最大的供应商",
+            "status": "in_progress"
+          }
+        ]
+      },
+      "created_at": "2026-08-06T07:22:15.608913+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_011",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "182ab6723b0afbaee94626ff7511f464926333c3c907b9dccbe2b08ca8ec9f52",
+        "status": "success"
+      },
+      "created_at": "2026-08-06T07:22:15.626717+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_011",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "43c87003e51310b8b391a03d18f954d49084218fc9b4b73a5a722e601cf91241",
+        "status": "success"
+      },
+      "created_at": "2026-08-06T07:22:15.642862+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_011",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "65538e6bdd697983309f9b255e1c03aee4fc8140abc520cb9386007552c76e51",
+        "status": "success"
+      },
+      "created_at": "2026-08-06T07:22:15.658652+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_011",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "9588019f6b80392afe12d0d3dacc1b8935773fc063823fa84b2c3668cb3801ff",
+        "status": "failed",
+        "error": {
+          "error_code": "invalid_arguments",
+          "message": "period 参数非法（应为 YYYY-MM）：None（演示数据）",
+          "retryable": false
+        }
+      },
+      "created_at": "2026-08-06T07:22:15.679960+00:00"
+    },
+    {
+      "type": "chat.run.failed",
+      "run_id": "chat_run_011",
+      "payload": {
+        "error_code": "invalid_arguments"
+      },
+      "created_at": "2026-08-06T07:22:15.679961+00:00"
+    }
+  ],
+  "artifacts": [],
+  "plan": [
+    {
+      "id": "1",
+      "title": "查询 2026-04 收入数据",
+      "status": "in_progress"
+    },
+    {
+      "id": "2",
+      "title": "查询 2026-05 收入数据",
+      "status": "in_progress"
+    },
+    {
+      "id": "3",
+      "title": "查询 2026-06 收入数据",
+      "status": "in_progress"
+    },
+    {
+      "id": "4",
+      "title": "汇总分析三个月收入趋势",
+      "status": "pending"
+    },
+    {
+      "id": "5",
+      "title": "查询应付账款金额最大的供应商",
+      "status": "in_progress"
+    }
+  ],
+  "suspended_messages": null,
+  "evaluation_continuations": 0,
+  "error_code": "invalid_arguments",
+  "error_message": "period 参数非法（应为 YYYY-MM）：None（演示数据）"
+}

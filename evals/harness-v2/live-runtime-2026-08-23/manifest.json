@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "harness-v2-live-runtime-2026-08-23",
+  "generatedAt": "2026-08-22T21:34:14.846Z",
+  "evidenceMode": "live",
+  "provider": "openai-compatible",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "summary.json",
+      "size": 775,
+      "sha256": "3a94fe45b4c3a994d7010274f0fb2eb7677bbef77265d2b67affda1d19382614"
+    }
+  ]
+}

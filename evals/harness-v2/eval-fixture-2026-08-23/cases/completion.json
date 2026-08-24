@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "setId": "smoke",
+  "caseId": "completion",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "productionEvidence": false,
+  "traceId": "smoke:completion",
+  "evidence": {
+    "traceId": "smoke:completion",
+    "events": [
+      {
+        "id": "completion:started",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:completion",
+        "seq": 0,
+        "type": "run.started",
+        "timestamp": "2026-08-20T00:00:00.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      },
+      {
+        "id": "completion:middle:0",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:completion",
+        "seq": 1,
+        "type": "run.progress",
+        "timestamp": "2026-08-20T00:00:01.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "phase": "model_response_started"
+        }
+      },
+      {
+        "id": "completion:middle:1",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:completion",
+        "seq": 2,
+        "type": "run.progress",
+        "timestamp": "2026-08-20T00:00:02.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "phase": "turn_finished",
+          "usage": {
+            "input": 8,
+            "output": 3
+          }
+        }
+      },
+      {
+        "id": "completion:completed",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:completion",
+        "seq": 3,
+        "type": "run.completed",
+        "timestamp": "2026-08-20T00:00:03.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "completion:artifact",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "runId": "smoke:completion",
+        "kind": "smoke_artifact",
+        "uri": "artifact://completion",
+        "hash": "sha256:completion",
+        "version": "1",
+        "validationStatus": "passed",
+        "reviewState": "accepted"
+      }
+    ],
+    "metrics": {
+      "stability": 1,
+      "latencyMs": 1000,
+      "cost": 0
+    }
+  },
+  "contract": {
+    "passed": true,
+    "version": "contract-1",
+    "failedRules": [],
+    "checkedEventIds": [
+      "completion:started",
+      "completion:middle:0",
+      "completion:middle:1",
+      "completion:completed"
+    ]
+  },
+  "quality": {
+    "passed": true,
+    "score": 1,
+    "cacheKey": "quality:ced5b4ffb24e251fb75fff10b26622fcb3cf016e535c1e7ecea5943e78216b7c",
+    "promptVersion": "fixture-prompt-1",
+    "modelVersion": "fixture-model-1",
+    "rubricId": "eval-fixture",
+    "rubricVersion": "1",
+    "failedCriteria": []
+  },
+  "releaseGate": {
+    "passed": true,
+    "blockedBy": []
+  },
+  "toolTrajectory": [],
+  "terminal": "run.completed",
+  "metrics": {
+    "stability": 1,
+    "latencyMs": 1000,
+    "cost": 0,
+    "source": "fixture",
+    "productionComparable": false
+  },
+  "firstTraceDivergence": null
+}

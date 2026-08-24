@@ -1,0 +1,328 @@
+/* ============================================================
+   Cowork 报销 · 页面级样式(R6)
+   审批直办:附件真控件 + LoopCard + 审批卡槽(confirm 嵌槽 / supplement 卡外)
+   + 审计面板 + 历史列表。纪律:色值一律 var(--*),ir- 前缀,禁裸 hex;数据密集区零点缀。
+   ============================================================ */
+
+/* 页面级新 token(报销专用,收敛于此,便于统一调) */
+.ir-r6 {
+  --ir-r6-gap: 14px;
+  --ir-r6-max: 760px;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.ir-r6__scroll {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 28px 48px;
+}
+.ir-r6__col {
+  max-width: var(--ir-r6-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ir-r6-gap);
+}
+
+/* ---- 页头 ---- */
+.ir-r6__head { display: flex; flex-direction: column; gap: 4px; }
+.ir-r6__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-r6__head-row { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.ir-r6__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ir-r6__back {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-btn);
+  cursor: pointer;
+}
+.ir-r6__back:hover { background: var(--tint); }
+
+/* ---- 输入区 ---- */
+.ir-r6__composer-zone { display: flex; flex-direction: column; gap: 8px; }
+.ir-r6__reject-note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--warn-ink);
+  background: var(--warn-soft);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+}
+
+/* ---- 附件真控件 ---- */
+.ir-r6-att { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ir-r6-att__file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ir-r6-att__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: 5px 14px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--iris-deep);
+  cursor: pointer;
+}
+.ir-r6-att__add:hover:not(:disabled) { background: var(--iris-soft); border-color: var(--iris); }
+.ir-r6-att__add:disabled { opacity: 0.55; cursor: default; }
+.ir-r6-att__add:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.ir-r6-att__spin {
+  width: 11px; height: 11px; border-radius: 50%; flex: none;
+  border: 2px solid var(--tint-strong);
+  border-top-color: var(--iris);
+}
+.ir-r6-att__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 4px 6px 4px 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink);
+}
+.ir-r6-att__chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ir-r6-att__chip-x {
+  border: none;
+  background: var(--tint);
+  border-radius: 50%;
+  width: 16px; height: 16px; flex: none;
+  font-size: 9px;
+  color: var(--ink-2);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ir-r6-att__chip-x:hover:not(:disabled) { background: var(--tint-strong); color: var(--ink); }
+
+/* ---- Anna 权威答复(agent_message,模型正文) ---- */
+.ir-r6__agent-msg {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.ir-r6__agent-msg-label {
+  flex: none;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--iris);
+}
+.ir-r6__agent-msg-body {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--ink);
+  min-width: 0;
+  overflow-x: auto;
+}
+.ir-r6__agent-msg-body :is(p, ul, ol, table) { margin: 0 0 6px; }
+.ir-r6__agent-msg-body :is(p, ul, ol, table):last-child { margin-bottom: 0; }
+.ir-r6__agent-msg-body table { border-collapse: collapse; font-size: 12.5px; }
+.ir-r6__agent-msg-body :is(th, td) {
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  text-align: left;
+}
+.ir-r6__agent-msg-body th { color: var(--ink-2); font-weight: 500; background: var(--surface-2); }
+
+/* ---- 审批卡槽 ---- */
+.ir-r6__approval-slot { margin: 6px 0 8px 16px; }
+.ir-r6__skeleton {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-control);
+}
+.ir-r6__supplement { max-width: 620px; }
+
+/* 失败卡:隐藏包内「↻ 从断点续办」(报销无断点续跑通道;保留 查看审计 / 复制错误) */
+.ir-r6__run--fail .loop-fail-actions .loop-btn--filled { display: none; }
+
+/* I-1:调优未接线(仅 ChatPage 接通 onTune)→ CSS 隐藏,不改包源码。
+   附件恒为 .acp__bar 第 1 子元素、调优恒为第 2(AgentComposer.tsx 固定槽位序)。 */
+.ir-r6 .acp__bar > .acp__chip:nth-child(2) {
+  display: none;
+}
+
+.ir-r6__stopped {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* I-2(b):停止 = 主动断流(非 done/error):动效全停(§4 留白),权威帧保留
+   (与 ChatPage .ir-run--stopped 同一 idiom,ChatPage.css:124-137)。 */
+.ir-r6__run--stopped .anna-breath {
+  animation: none !important;
+  box-shadow: none !important;
+}
+.ir-r6__run--stopped .anna-shimmer-text {
+  animation: none !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--iris-deep) !important;
+}
+.ir-r6__run--stopped .anna-spin {
+  animation: none !important;
+}
+
+/* ---- 成功正文 + verify ---- */
+.ir-r6__done-detail { display: flex; flex-direction: column; gap: 8px; }
+.ir-r6__done-line {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+.ir-r6__mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--iris-deep);
+}
+.ir-r6__verify-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ir-r6__verify-btn {
+  border: 1px solid color-mix(in oklab, var(--iris) 30%, transparent);
+  background: var(--iris-soft);
+  border-radius: var(--radius-pill);
+  padding: 6px 16px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--iris-deep);
+  cursor: pointer;
+}
+.ir-r6__verify-btn:hover:not(:disabled) { background: color-mix(in oklab, var(--iris) 16%, transparent); }
+.ir-r6__verify-btn:disabled { opacity: 0.55; cursor: default; }
+.ir-r6__verify-btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- 审计面板 ---- */
+.ir-r6-audit {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.ir-r6-audit__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ir-r6-audit__title { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+.ir-r6-audit__close {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 12px; color: var(--ink-3);
+}
+.ir-r6-audit__close:hover { color: var(--ink); }
+.ir-r6-audit__list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.ir-r6-audit__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-hair);
+}
+.ir-r6-audit__row:last-child { border-bottom: none; }
+.ir-r6-audit__type { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
+.ir-r6-audit__time { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
+.ir-r6-audit__payload {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-2);
+  border: 1px solid var(--line-hair);
+  border-radius: var(--radius-control);
+  padding: 6px 8px;
+  overflow-x: auto;
+}
+
+/* ---- 历史列表 ---- */
+.ir-r6-hist { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.ir-r6-hist__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+.ir-r6-hist__list { display: flex; flex-direction: column; gap: 2px; }
+.ir-r6-hist__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.ir-r6-hist__row:hover { background: var(--tint); }
+.ir-r6-hist__row--on { background: var(--iris-soft); }
+.ir-r6-hist__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.ir-r6-hist__dot--ok { background: var(--ok); }
+.ir-r6-hist__dot--await { background: var(--warn); }
+.ir-r6-hist__dot--fail { background: var(--danger); }
+.ir-r6-hist__dot--run { background: var(--iris); }
+.ir-r6-hist__msg {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ir-r6-hist__status {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}

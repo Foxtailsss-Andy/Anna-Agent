@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1",
+  "command": "better-harness doctor",
+  "status": "partial",
+  "data": {
+    "kind": "better-harness-doctor",
+    "schemaVersion": "1",
+    "status": "partial",
+    "runtime": {
+      "name": "@qoder-ai/better-harness",
+      "version": "0.5.0",
+      "nodeRange": ">=22.20.0 <25.0.0",
+      "npmRange": ">=10.9.3 <12.0.0",
+      "nodeVersion": "v24.16.0",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "privacy": {
+      "network": "none",
+      "writes": "none",
+      "transcripts": "not-read",
+      "pathPolicy": "user-home-redacted"
+    },
+    "targets": [
+      {
+        "hostId": "claude",
+        "hostDiscovery": "present",
+        "authorizedRoots": [
+          "~/.claude",
+          "~/.claude.json"
+        ],
+        "inventory": "available",
+        "lifecycle": [
+          {
+            "surfaceId": "cli",
+            "scope": "user",
+            "hostDiscovery": "present",
+            "installation": "not-installed",
+            "verification": "failed"
+          }
+        ]
+      }
+    ],
+    "diagnostics": [
+      {
+        "code": "PLUGIN_NOT_INSTALLED",
+        "severity": "warning",
+        "message": "Better Harness was not found in local install evidence."
+      }
+    ]
+  },
+  "artifacts": [],
+  "diagnostics": [
+    {
+      "code": "PLUGIN_NOT_INSTALLED",
+      "severity": "warning",
+      "message": "Better Harness was not found in local install evidence."
+    }
+  ],
+  "meta": {
+    "durationMs": 69,
+    "sideEffects": "read-only"
+  }
+}

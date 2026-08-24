@@ -1,0 +1,16 @@
+{
+  "evidence_kind": "desktop_managed_bridge_runtime_boundary",
+  "api_health": "ok",
+  "harness_v2_health": "ok",
+  "harness_v2_enabled": true,
+  "harness_v2_managed": true,
+  "surface_statuses": {
+    "create": "available",
+    "cowork": "available",
+    "hub": "available"
+  },
+  "review_gate_status": "blocked",
+  "web_search_status": "unsupported",
+  "production_task_run": false,
+  "t07_production_gate": false
+}

@@ -1,0 +1,128 @@
+{
+  "id": "chat_run_006",
+  "workspace_id": "local-workspace",
+  "actor_user_id": "local-user",
+  "message": "咱家上个月生意咋样啊",
+  "thread_id": "chat_run_006",
+  "template_id": null,
+  "model_profile_id": null,
+  "skill_id": null,
+  "agent_id": null,
+  "workdir_id": null,
+  "status": "ready",
+  "assistant_message": "根据 ERP 系统（演示账套 demo-erp-2026）的数据，2025年11月的经营情况如下：\n\n**📊 2025年11月经营概况：**\n\n- **费用方面**：本月各项费用（主营成本、销售费用含市场/差旅、管理费用、研发费用）按科目归集，整体费用规模约 **0 万**（演示数据）。\n- **值得关注**：**市场费用环比上升明显**，说明上个月在市场推广上投入加大。\n\n> ⚠️ 目前返回的是演示账套数据，收入、毛利、利润等详细指标未在本次查询中完整返回。如果您需要更精确的实际数据，建议确认是否已切换到正式账套，或者我可以帮您进一步细化查询（比如按收入、成本、利润分项查询）。\n\n需要我深挖某个具体指标吗？比如按科目拆分费用明细？",
+  "saved_memory_id": null,
+  "associate_goal_text": null,
+  "audit_events": [
+    {
+      "type": "chat.run.created",
+      "run_id": "chat_run_006",
+      "payload": {
+        "message_hash": "34eac2dde7c94680a42b26ba4e5ce195d159aa3f7dd4ecf8ee6617532590125e",
+        "template_id": null,
+        "model_profile_id": null,
+        "skill_id": null,
+        "agent_id": null,
+        "workdir_id": null
+      },
+      "created_at": "2026-08-06T07:18:08.216987+00:00"
+    },
+    {
+      "type": "skill.loaded",
+      "run_id": "chat_run_006",
+      "payload": {
+        "skill_id": "chat/general-assistant",
+        "skill_name": "general-assistant-chat",
+        "skill_version": "0.1.0",
+        "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff"
+      },
+      "created_at": "2026-08-06T07:18:08.216988+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_006",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 564,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:18:08.233256+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_006",
+      "payload": {
+        "finish_reason": "tool_calls",
+        "tool_call_count": 1,
+        "requested_tool_names": [
+          "erp.finance.query"
+        ],
+        "input_tokens": 1112,
+        "output_tokens": 160
+      },
+      "created_at": "2026-08-06T07:18:12.402118+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_006",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "919c577b1351c90a58a3620287755d9ac34202b7656f9f67f4c3fecfa959039b",
+        "status": "success"
+      },
+      "created_at": "2026-08-06T07:18:12.415036+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_006",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 834,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:18:12.415037+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_006",
+      "payload": {
+        "finish_reason": "stop",
+        "tool_call_count": 0,
+        "requested_tool_names": [],
+        "input_tokens": 1391,
+        "output_tokens": 289
+      },
+      "created_at": "2026-08-06T07:18:21.558300+00:00"
+    },
+    {
+      "type": "chat.response.generated",
+      "run_id": "chat_run_006",
+      "payload": {
+        "response_hash": "dbb4fcf50c8b5ff31959c97ad5ae5b34f2b8794919d2806cb9a41dd56eb95286"
+      },
+      "created_at": "2026-08-06T07:18:21.558301+00:00"
+    }
+  ],
+  "artifacts": [],
+  "plan": [],
+  "suspended_messages": null,
+  "evaluation_continuations": 0,
+  "error_code": null,
+  "error_message": null
+}

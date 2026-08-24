@@ -1,0 +1,6 @@
+# Normalize line endings to LF for cross-platform (Windows/macOS) collaboration
+* text=auto eol=lf
+*.png binary
+*.icns binary
+*.zip binary
+*.sqlite3 binary

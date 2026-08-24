@@ -1,0 +1,24 @@
+{
+  "case_id": "t07-fixture-001",
+  "evidence_mode": "fixture",
+  "required_terminal": "run.completed",
+  "required_event_types": [
+    "run.started",
+    "t07.test.executed",
+    "run.completed"
+  ],
+  "required_artifact_kinds": [
+    "prd",
+    "ui",
+    "ui-build",
+    "screenshot",
+    "test"
+  ],
+  "required_owner_decision": "fixture-owner",
+  "forbidden_commands": [
+    "git push",
+    "git merge",
+    "deploy"
+  ],
+  "usage_policy": "missing provider usage must remain absent"
+}

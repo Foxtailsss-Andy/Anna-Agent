@@ -1,0 +1,106 @@
+{
+  "kind": "better-harness.harness-analysis-evidence",
+  "schemaVersion": 1,
+  "evidence": "HARNESS ANALYSIS EVIDENCE\n\nThis is a read-only evidence brief, not a report conclusion.\nProjected report conclusions are intentionally excluded; use the observations and boundaries below to make your own evidence-backed decisions.\nWorkspace: <repo-root>\nPlatform: qoder\nLanguage: zh-CN\nBudget: at most 6000 estimated tokens; each evidence domain uses bounded representative rows and reports omissions.\n\nOBSERVATION SCOPE\nSource roots: 0 of 5 enabled roots exist; 7 roots were discovered.\nSession selection: analyzed 0 of 0 eligible sessions with all-eligible selection; confidence Low; representative yes.\nScope: workspace; global capability metadata included no; until 2026-08-06T09:03:34.643Z.\nPrivacy boundary: reader-safe; raw prompts included no; raw commands included no; absolute home paths included no.\nSource warnings: disabled-source-root, missing-optional-root.\n\nREPOSITORY FACTS\nProject label: Anna.\n- Task understanding: 0 observed and 1 connected signal(s). Representative evidence: 4 architecture/readme and 7 spec file(s).\n- Controlled execution: 1 observed and 1 connected signal(s). Representative evidence: 2 workspace manifest(s), 工作区运行、构建或测试脚本.\n- Change validation: 1 observed and 1 connected signal(s). Representative evidence: 183 tracked test file(s), workspace test/check script.\n- Reliable delivery: 0 observed and 0 connected signal(s).\n- Agent practice coverage: Custom Agents has 0 asset(s) in Project.\n- Reusable Skill evidence: scanned-empty; 0 candidate asset(s), 0 observed project Skill(s), and 0 unresolved name match(es).\n- Regression-test evidence: candidates-present; inspected 200 commit(s) and retained 20 source/test co-change candidate(s).\n  - Sources: services/chat/app/evaluator.py. Tests: tests/chat/test_evaluator.py. Path-correlated yes.\n  - Sources: services/chat/app/capability.py. Tests: tests/chat/test_chat_agent.py. Path-correlated no.\n  - Sources: services/chat/app/capability.py, services/runtime/app/trace_assembler.py. Tests: tests/chat/test_chat_agent.py, tests/gates/test_gate_trace.py. Path-correlated no.\n  - 17 additional co-change candidate(s) omitted.\n- Canonical planning evidence: candidates-present; 7 candidate(s); paths: docs/adr/ADR-003-trace-and-terminology.md, docs/superpowers/specs/2026-06-21-crew-design.md, docs/superpowers/specs/2026-06-22-hiker-global-customer-cowork-design.md, docs/superpowers/specs/2026-07-07-anna-code-mode-design.md, docs/superpowers/specs/2026-07-07-anna-refinement-round.md (+2 omitted).\n- Sensitive-config scan coverage: complete; 6 of 6 candidate file(s) scanned, 0 skipped, 0 read error(s), truncated no.\n- Learning observation coverage: 0 episode record(s), 0 recurring candidate(s), 0 scoped Skill observation(s), and 0 unscoped Skill observation(s).\n  - Aggregated friction signals: source-warning:missing-optional-root: 5, source-warning:disabled-source-root: 2.\n  - Coverage boundary: Asset Coverage=not-evaluable-missing-asset-inventory, Capture=not-evaluable-missing-normalized-events, Pattern Detection=insufficient-episodes, Routing=checked-clean, Freshness=checked-clean, Application=not-evaluable-missing-application-events, Evolution=not-evaluable-missing-update-evidence, Effectiveness=pending-no-later-window, Memory Governance=checked-clean.\n- Workflow-demand observation: 0 current handoff(s) and 0 repeated candidate(s); candidate contents are not projected into this brief.\n  - Coverage boundary: Demand Signals=not-evaluable-missing-normalized-events, Current Handoff=checked-clean, Recurrence=insufficient-episodes, Skill Inventory=checked-clean, Skill Activation=checked-clean.\n\nSESSION AND TASK FACTS\nSession packet: 0 selected session(s), 0 retained candidate episode(s), and 0 discarded episode(s).\n\nANALYZER OBSERVATIONS\n- Analyzed 0 of 0 sessions; 0/5 enabled source roots exist. Use this as the current workspace evidence boundary for final insight cards.\n- No validation command category was observed in the analyzed session sample. Inspect more sessions or add explicit validation guidance before claiming validation-after-edit behavior.\n- No edit event was observed in the analyzed sample. Inspect more sessions before making claims about edit or validation habits.\n- No strong execution friction signal in the analyzed sample. Keep friction claims narrow unless additional failed commands, rejected actions, or warnings are inspected.\n\nDELIVERY EVIDENCE\nNo bounded evidence observed.\n\nINTERVENTION HISTORY\nNo bounded evidence observed.\n\nREVIEW BOUNDARIES\n- Source candidate: requires-review.\n- Repository review: requires-review; 2 framework(s), 9 repository check(s), and 5 Software Fluency capability review(s) remain in scope.\n- Score review: requires-review; 5 dimension(s) await AI judgment.\n- Session observation review: candidate; 4 observation card(s) from 0 analyzed session(s).",
+  "summaryFacts": {
+    "evidenceMode": "session-limited",
+    "evidenceBoundary": {
+      "manifest": {
+        "schemaVersion": 2,
+        "sourceFingerprint": "e88322144268fef4",
+        "adapterVersion": "qoder-task-loop-source-v2",
+        "platform": "qoder",
+        "selection": {
+          "strategy": "all-eligible",
+          "eligibleCount": 0,
+          "analyzedCount": 0,
+          "confidence": "Low"
+        }
+      },
+      "episodeCoverage": {
+        "episodeCount": 0,
+        "editedEpisodeCount": 0,
+        "closedEpisodeCount": 0,
+        "recoveredEpisodeCount": 0
+      },
+      "deliveryEvidenceLevels": [],
+      "sourceGaps": []
+    },
+    "semanticFacets": {
+      "schemaVersion": 1,
+      "status": "supplementary",
+      "entries": [
+        {
+          "id": "session-insight:source-coverage",
+          "kind": "redacted-summary",
+          "episodeRef": null,
+          "status": "candidate",
+          "labels": [
+            "source-coverage",
+            "Low"
+          ],
+          "summary": "Analyzed 0 of 0 sessions; 0/5 enabled source roots exist. Use this as the current workspace evidence boundary for final insight cards.",
+          "evidenceRefs": [],
+          "modelVersion": "session-insights-v1"
+        },
+        {
+          "id": "session-insight:validation-behavior",
+          "kind": "redacted-summary",
+          "episodeRef": null,
+          "status": "candidate",
+          "labels": [
+            "validation-behavior",
+            "Low"
+          ],
+          "summary": "No validation command category was observed in the analyzed session sample. Inspect more sessions or add explicit validation guidance before claiming validation-after-edit behavior.",
+          "evidenceRefs": [],
+          "modelVersion": "session-insights-v1"
+        },
+        {
+          "id": "session-insight:post-edit-validation",
+          "kind": "rework-correction",
+          "episodeRef": null,
+          "status": "candidate",
+          "labels": [
+            "post-edit-validation",
+            "Low"
+          ],
+          "summary": "No edit event was observed in the analyzed sample. Inspect more sessions before making claims about edit or validation habits.",
+          "evidenceRefs": [],
+          "modelVersion": "session-insights-v1"
+        },
+        {
+          "id": "session-insight:execution-friction",
+          "kind": "friction-taxonomy",
+          "episodeRef": null,
+          "status": "candidate",
+          "labels": [
+            "execution-friction",
+            "Low"
+          ],
+          "summary": "No strong execution friction signal in the analyzed sample. Keep friction claims narrow unless additional failed commands, rejected actions, or warnings are inspected.",
+          "evidenceRefs": [],
+          "modelVersion": "session-insights-v1"
+        }
+      ]
+    },
+    "learningCapture": {
+      "schemaVersion": 1,
+      "state": "N/A",
+      "summary": "暂不适用——需要两个可比的观察窗口和一次改进对比。",
+      "interventions": []
+    },
+    "aiAgentPractice": {
+      "inspectedSurfaces": [],
+      "coverageRows": [
+        {
+          "surface": "Custom Agents",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        }
+      ]
+    }
+  }
+}

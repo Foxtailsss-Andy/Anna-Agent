@@ -1,0 +1,41 @@
+{
+  "source": "demo-erp REST :8970 + MCP /erp/rpc probe (primary per spec 2.4)",
+  "original_ask_truth": {
+    "/api/trend": {
+      "2026-04": { "revenue": 4120000.0 },
+      "2026-05": { "revenue": 4455000.0 },
+      "2026-06": { "revenue": 4820000.0 }
+    },
+    "derived": {
+      "4→5 环比": "+335000 = +33.5万，+8.13%",
+      "5→6 环比": "+365000 = +36.5万，+8.19%",
+      "三月合计": "13395000 = 1339.5万"
+    },
+    "tool_answers": {
+      "{question:'收入',period:'2026-04'}": "【演示数据】2026-04 本月收入约 412万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。",
+      "{question:'收入',period:'2026-05'}": "【演示数据】2026-05 本月收入约 446万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。",
+      "{question:'收入和净利润',period:'2026-06'}": "【演示数据】2026-06 本月收入约 482万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。"
+    }
+  },
+  "interjection_truth": {
+    "ask": "顺便把应付账款金额最大的供应商也带上",
+    "/api/ap-top": {
+      "period": "2026-06",
+      "top1": { "supplier": "蓝云数据科技有限公司", "supplier_id": "SUP-001", "category": "cloud", "outstanding": 420000.0 },
+      "full_rows": [
+        { "supplier": "蓝云数据科技有限公司", "outstanding": 420000.0 },
+        { "supplier": "智联软件外包服务有限公司", "outstanding": 320000.0 },
+        { "supplier": "盛世国际会展服务有限公司", "outstanding": 240000.0 },
+        { "supplier": "利和办公科技有限公司", "outstanding": 110000.0 },
+        { "supplier": "畅行商旅管理有限公司", "outstanding": 90000.0 }
+      ]
+    },
+    "expected_answer_content": "应付账款金额最大的供应商 = 蓝云数据科技有限公司，420000.0（42万）",
+    "tool_answer": "【演示数据】2026-06 应付约 118万，Top5：蓝云数据科技有限公司42万、智联软件外包服务有限公司32万、盛世国际会展服务有限公司24万、利和办公科技有限公司11万、畅行商旅管理有限公司9万。"
+  },
+  "interject_contract": {
+    "endpoint": "POST /api/chat/runs/{run_id}/interject",
+    "body_schema": "services/api/app/schemas.py:75-78 → InterjectChatRunRequest{ text: str }",
+    "runner_note": "attempt 1 误用字段名 message → 422，插话从未进入引擎，已作废重跑（见 attempt-1-runner-crash/notes.md）"
+  }
+}

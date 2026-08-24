@@ -1,0 +1,147 @@
+/* AgentComposer · Composer 家族(《设计说明 · Iris》§6.3;高保真:设计画布 4b) */
+
+.acp { font-family: var(--font-sans); }
+
+.acp__card {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgb(35 35 40 / 5%), 0 10px 28px rgb(35 35 40 / 6%), var(--inset-top);
+  transition: border-color 160ms ease;
+}
+/* 焦点态:边框转 iris 35% */
+.acp__card:focus-within { border-color: rgb(87 91 196 / 35%); }
+
+.acp__input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px 4px;
+  background: none;
+  border: 0;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  outline: none;
+  min-height: 44px;
+}
+.acp__input::placeholder { color: var(--ink-3); font-weight: 300; }
+
+.acp__bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+/* chips:tinted = 真;dashed = 站位(即将上线) */
+.acp__chip {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-btn);
+  box-shadow: inset 0 0 0 1px rgb(35 35 40 / 3%);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.acp__chip--stub {
+  background: none;
+  color: var(--ink-3);
+  border: 1px dashed var(--line-strong);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.acp__chip--active { background: var(--iris-soft); color: var(--iris-deep); font-weight: 500; box-shadow: inset 0 0 0 1px rgb(87 91 196 / 14%); }
+.acp__chip:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* CTX 环(W5):SVG 弧 + 百分比;>80% 转琥珀 */
+.acp__ctx { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); white-space: nowrap; flex: none; }
+.acp__ctx--warn { color: var(--warn); }
+
+.acp__spacer { flex: 1; }
+
+/* 模型档位(W2):lite / default / craft 文字三选 */
+.acp__tier {
+  display: inline-flex;
+  flex: none;
+  background: var(--tint);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+}
+.acp__tier-opt {
+  border: 0; background: none;
+  font-family: var(--font-mono);
+  font-size: 11px; line-height: 18px;
+  white-space: nowrap;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.acp__tier-opt--on {
+  background: linear-gradient(180deg, var(--surface), var(--surface-loop-2));
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(35 35 40 / 10%);
+}
+
+/* 停止(运行中,tinted + 黑方块) */
+.acp__stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex: none;
+  background: var(--tint);
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgb(35 35 40 / 3%);
+  cursor: pointer;
+}
+.acp__stop::before {
+  content: '';
+  width: 9px; height: 9px;
+  background: var(--ink);
+  border-radius: 2.5px;
+}
+
+/* 发送:34px 鸢尾渐变圆;运行中 35% 不可用 */
+.acp__send {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 0;
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff;
+  font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-button);
+}
+.acp__send:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.acp__send:focus-visible, .acp__stop:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+.acp__foot {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 8px;
+  font-weight: 300;
+}

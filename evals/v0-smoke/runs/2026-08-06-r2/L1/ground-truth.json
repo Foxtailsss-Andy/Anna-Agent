@@ -1,0 +1,52 @@
+{
+  "source": "demo-erp REST :8970 + MCP /erp/rpc probe (primary per spec 2.4)",
+  "rest": {
+    "/api/pnl?period=2026-06": {
+      "period": "2026-06", "revenue": 4820000.0, "cogs": 980000.0, "opex": 2660000.0,
+      "expense_total": 3640000.0, "profit": 1180000.0,
+      "opex_detail": { "6601": 1440000.0, "6602": 620000.0, "6604": 600000.0 },
+      "has_detail": true, "note": "演示数据"
+    },
+    "/api/ap-top": {
+      "period": "2026-06",
+      "rows": [
+        { "supplier": "蓝云数据科技有限公司", "supplier_id": "SUP-001", "category": "cloud", "outstanding": 420000.0 },
+        { "supplier": "智联软件外包服务有限公司", "supplier_id": "SUP-002", "category": "outsourcing", "outstanding": 320000.0 },
+        { "supplier": "盛世国际会展服务有限公司", "supplier_id": "SUP-003", "category": "marketing", "outstanding": 240000.0 },
+        { "supplier": "利和办公科技有限公司", "supplier_id": "SUP-004", "category": "office", "outstanding": 110000.0 },
+        { "supplier": "畅行商旅管理有限公司", "supplier_id": "SUP-005", "category": "travel", "outstanding": 90000.0 }
+      ],
+      "currency": "CNY", "note": "演示数据"
+    },
+    "/api/customers (ar_balance desc)": [
+      { "name": "远东重工集团股份有限公司", "ar_balance": 480000.0 },
+      { "name": "华信新零售连锁有限公司", "ar_balance": 420000.0 },
+      { "name": "江南智能制造有限公司", "ar_balance": 380000.0 },
+      { "name": "恒瑞医药科技有限公司", "ar_balance": 300000.0 },
+      { "name": "中弘供应链集团有限公司", "ar_balance": 260000.0 },
+      { "name": "启明教育科技有限公司", "ar_balance": 190000.0 },
+      { "name": "银河金融信息服务有限公司", "ar_balance": 120000.0 }
+    ],
+    "/api/trend[2026-06]": { "ar_balance": 2150000.0, "ap_balance": 1180000.0, "operating_cash_flow": 760000.0 }
+  },
+  "tool_capability_probe": {
+    "erp.finance.query{question:'应收账款 top 客户',period:'2026-06'}": {
+      "answer": "【演示数据】截至 2026-06，演示租户应收余额约 215万，逾期(>30天)约 98万，集中在 远东重工集团股份有限公司(48万)、江南智能制造有限公司(38万)。建议优先催收。",
+      "rows": [
+        { "customer": "远东重工集团股份有限公司", "customer_id": "CUST-DEMO-A", "overdue_amount": 480000.0, "aging_days": 72, "currency": "CNY" },
+        { "customer": "江南智能制造有限公司", "customer_id": "CUST-DEMO-C", "overdue_amount": 380000.0, "aging_days": 64, "currency": "CNY" },
+        { "customer": "银河金融信息服务有限公司", "customer_id": "CUST-DEMO-F", "overdue_amount": 120000.0, "aging_days": 41, "currency": "CNY" }
+      ]
+    },
+    "erp.finance.query{question:'应付账款最大的供应商',period:'2026-06'}": {
+      "answer": "【演示数据】2026-06 应付约 118万，Top5：蓝云数据科技有限公司42万、智联软件外包服务有限公司32万、盛世国际会展服务有限公司24万、利和办公科技有限公司11万、畅行商旅管理有限公司9万。"
+    },
+    "erp.finance.query{question:'费用',period:'2026-06'}": {
+      "answer": "【演示数据】2026-06 本月费用约 364万，其中主营成本、销售费用(含市场/差旅)、管理费用、研发费用按科目归集；市场费用环比上升明显。"
+    },
+    "erp.finance.query{question:'损益',period:'2026-06'}": {
+      "answer": "【演示数据】未能解析该问题，请尝试询问应收/费用/收入/应付/利润相关内容。",
+      "note": "『损益』本身不是可路由关键词 —— 工具只认 应收/费用/收入/应付/利润。"
+    }
+  }
+}

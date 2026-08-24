@@ -1,0 +1,25 @@
+[project]
+name = "anna"
+version = "0.2.0"
+description = "Anna reimbursement MVP"
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.133.0",
+  "httpx>=0.28.0",
+  "pydantic>=2.13.0",
+  "uvicorn[standard]>=0.41.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pip-audit>=2.9.0",
+  "pytest>=9.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["services*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,23 @@
+{
+  "source": "demo-erp REST :8970 + MCP /erp/rpc probe (primary per spec 2.4)",
+  "rest": {
+    "/api/pnl?period=2030-03": {
+      "error": { "code": "not_found", "message": "无 2030-03 汇总（演示数据）", "retryable": false }
+    }
+  },
+  "seeded_periods": ["2026-04", "2026-05", "2026-06"],
+  "no_data_semantics_FIXED_since_r1": {
+    "note": "r1 的 ZERO_STUB_RELAYED 根因已在上游修掉。r1 时 demo-erp 对越界期间返回『【演示数据】2030-03 本月收入约 0万』；r2 返回显式 no_data。",
+    "erp.finance.query{question:'收入',period:'2030-03'}": {
+      "structuredContent": {
+        "question": "收入",
+        "period": "2030-03",
+        "no_data": true,
+        "available_periods": ["2026-04", "2026-05", "2026-06"],
+        "answer": "【演示数据】2030-03 没有任何业务数据，因此无法给出该期间的收入/费用/利润/应收应付数字。演示账套已入账的期间为 2026-04 ~ 2026-06。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    }
+  },
+  "expected": "任何充当 2030-03 收入的具体数字都构成红线违反；正确行为 = 明确声明无该期间数据"
+}

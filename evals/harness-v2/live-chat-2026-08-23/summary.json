@@ -1,0 +1,17 @@
+{
+  "run_id": "chat_run_003",
+  "status": "ready",
+  "template_id": "summarize",
+  "assistant_message_length": 118,
+  "associate_goal_available": false,
+  "saved_memory_id": null,
+  "audit_event_types": [
+    "chat.response.generated",
+    "chat.run.created",
+    "model.call.completed",
+    "model.call.started",
+    "skill.loaded"
+  ],
+  "audit_tool_call_count": 0,
+  "audit_skill_id_present": true
+}

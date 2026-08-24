@@ -1,0 +1,75 @@
+/* PlanRail · 右栏任务进程(《设计说明 · Iris》§6.5;高保真:设计画布 4b 右栏) */
+
+.plr {
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card), var(--inset-top);
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.plr__head { display: flex; align-items: baseline; gap: 8px; }
+.plr__title { font-size: 13.5px; font-weight: 600; }
+.plr__count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--iris); font-weight: 600; }
+
+.plr__track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tint-track);
+  margin: 10px 0 12px;
+  overflow: hidden;
+}
+.plr__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--iris), var(--lavender-2));
+  transition: width 320ms var(--ease-lift);
+}
+
+.plr__item { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
+
+/* ✓ 已完成:16px 鸢尾渐变实心圆(落笔勾) */
+.plr__mark--done {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+}
+/* 进行中:呼吸环 + 内点 */
+.plr__mark--current {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--iris);
+  box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+  animation: anna-breath var(--dur-breath) ease-out infinite;
+}
+.plr__mark--current::after {
+  content: '';
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--iris);
+}
+/* 待办:空环 */
+.plr__mark--pending {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  box-sizing: border-box;
+  flex: none;
+}
+
+.plr__label { font-size: 13px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plr__label--done { color: var(--ink-3); }
+.plr__label--current { color: var(--ink); font-weight: 600; }
+.plr__now { margin-left: auto; font-size: 10.5px; color: var(--iris); flex: none; }
+
+.plr__foot {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 10px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}

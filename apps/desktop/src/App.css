@@ -1,0 +1,199 @@
+/* App 引导屏(BootScreen)· 装载身份 / 启动失败态(《R3 外壳》Task 2 Step 3)
+   tokens only,ir- 前缀;根容器设 font-family / color(carry-item)。 */
+
+.ir-boot {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--bg-grad-top), var(--bg-grad-bottom));
+}
+
+.ir-boot__card {
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), var(--inset-top);
+  padding: 26px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ir-boot__word {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ir-boot__retry {
+  align-self: flex-start;
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-btn);
+  font-family: inherit;
+  font-size: 12.5px;
+  border-radius: var(--radius-control);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.ir-boot__retry:hover {
+  background: var(--tint-strong);
+}
+.ir-boot__retry:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Trace 轮 · 执行过程瀑布图(工程页,复用 Iris tokens.css 变量,深浅色皆可读)
+   外壳照抄 crew/inspect/TaskDrawer 的 .ir-insp-drawer(head 吸顶 + body 单独滚动);
+   行/tag 语汇照抄 crew/inspect/inspect.css 的 .ir-tl 三级 Trace 容器。
+   ============================================================ */
+
+.trace-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: min(480px, 92vw);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--panel, #faf9f5), var(--panel-2, #f7f6f1));
+  border-inline-start: 1px solid var(--line-strong, rgb(35 35 40 / 14%));
+  box-shadow: -18px 0 44px rgb(35 35 40 / 16%);
+  z-index: 60;
+}
+.trace-drawer__head {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px 14px;
+  border-block-end: 1px solid var(--line, rgb(35 35 40 / 8%));
+  font-weight: 600;
+  color: var(--ink, #232328);
+}
+.trace-drawer__close {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink-2, #6c6c72);
+  background: var(--surface, #fff);
+  border: 1px solid var(--line-strong, rgb(35 35 40 / 14%));
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.trace-drawer__close:hover { color: var(--ink, #232328); background: var(--tint, rgb(120 120 128 / 9%)); }
+.trace-drawer__body { flex: 1; overflow: auto; padding: 16px 22px; }
+
+.trace-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--ink-2, #6c6c72);
+  padding-block-end: 10px;
+  margin-block-end: 10px;
+  border-block-end: 1px solid var(--line, rgb(35 35 40 / 8%));
+}
+.trace-status { font-weight: 600; }
+.trace-status--ok { color: var(--ok, #3e9c82); }
+.trace-status--error { color: var(--danger, #be4a44); }
+.trace-status--unset { color: var(--iris, #575bc4); }
+
+.trace-turn__title {
+  font-size: 12px;
+  color: var(--ink-2, #6c6c72);
+  margin-block: 12px 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.trace-chip {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  border: 1px solid var(--line-strong, rgb(35 35 40 / 14%));
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--ink-2, #6c6c72);
+  background: var(--surface, #fff);
+}
+.trace-row {
+  display: grid;
+  grid-template-columns: 44px minmax(120px, 1fr) 2fr 56px auto;
+  gap: 8px;
+  align-items: center;
+  inline-size: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line, rgb(35 35 40 / 8%));
+  background: var(--panel, #faf9f5);
+  border-radius: 9px;
+  padding: 6px 10px;
+  margin-block-end: 6px;
+  cursor: pointer;
+  text-align: start;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ink, #232328);
+}
+.trace-row:hover { background: var(--tint, rgb(120 120 128 / 9%)); }
+.trace-row__tag {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  color: var(--ink-2, #6c6c72);
+  border: 1px solid var(--line-strong, rgb(35 35 40 / 14%));
+  border-radius: 5px;
+  text-align: center;
+  background: var(--surface, #fff);
+}
+.trace-row__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-row__bar {
+  block-size: 8px;
+  background: var(--tint-track, rgb(120 120 128 / 13%));
+  border-radius: 4px;
+  overflow: hidden;
+  display: block;
+}
+.trace-row__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: 4px;
+  background: var(--iris, #575bc4);
+  min-inline-size: 2px;
+}
+.trace-row__fill--error { background: var(--danger, #be4a44); }
+.trace-row__ms {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  font-size: 11px;
+  color: var(--ink-2, #6c6c72);
+}
+.trace-row__chip { font-family: var(--font-mono, ui-monospace, monospace); font-size: 10.5px; color: var(--ink-2, #6c6c72); }
+.trace-detail {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-2, #6c6c72);
+  background: var(--surface-2, #fdfcf9);
+  border: 1px solid var(--line, rgb(35 35 40 / 8%));
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+  max-block-size: 240px;
+  margin-block-end: 6px;
+}
+.trace-empty { color: var(--ink-3, #a3a3a8); font-size: 12.5px; padding: 24px 0; text-align: center; }

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "suite": "anna-harness-v2",
+  "setId": "dev",
+  "caseId": "dev-13",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "productionEvidence": false,
+  "traceId": "smoke:dev-13",
+  "evidence": {
+    "traceId": "smoke:dev-13",
+    "events": [
+      {
+        "id": "dev-13:started",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-13",
+        "seq": 0,
+        "type": "run.started",
+        "timestamp": "2026-08-20T00:00:00.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      },
+      {
+        "id": "dev-13:middle:0",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-13",
+        "seq": 1,
+        "type": "run.progress",
+        "timestamp": "2026-08-20T00:00:01.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "phase": "model_response_started"
+        }
+      },
+      {
+        "id": "dev-13:middle:1",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-13",
+        "seq": 2,
+        "type": "run.progress",
+        "timestamp": "2026-08-20T00:00:02.500Z",
+        "schemaVersion": 1,
+        "payload": {
+          "phase": "turn_finished",
+          "usage": {
+            "input": 8,
+            "output": 3
+          }
+        }
+      },
+      {
+        "id": "dev-13:completed",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "streamId": "smoke:dev-13",
+        "seq": 3,
+        "type": "run.completed",
+        "timestamp": "2026-08-20T00:00:03.000Z",
+        "schemaVersion": 1,
+        "payload": {}
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "dev-13:artifact",
+        "workspaceId": "workspace-eval-fixture",
+        "channelId": "channel-eval-fixture",
+        "runId": "smoke:dev-13",
+        "kind": "smoke_artifact",
+        "uri": "artifact://dev-13",
+        "hash": "sha256:dev-13",
+        "version": "1",
+        "validationStatus": "passed",
+        "reviewState": "accepted"
+      }
+    ],
+    "metrics": {
+      "stability": 1,
+      "latencyMs": 1000,
+      "cost": 0
+    }
+  },
+  "contract": {
+    "passed": true,
+    "version": "contract-1",
+    "failedRules": [],
+    "checkedEventIds": [
+      "dev-13:started",
+      "dev-13:middle:0",
+      "dev-13:middle:1",
+      "dev-13:completed"
+    ]
+  },
+  "quality": {
+    "passed": true,
+    "score": 1,
+    "cacheKey": "quality:4186763ab171670ac69a76f2ee2d6ecc3c14471bdebc34a6604313ff20d540a0",
+    "promptVersion": "fixture-prompt-1",
+    "modelVersion": "fixture-model-1",
+    "rubricId": "eval-fixture",
+    "rubricVersion": "1",
+    "failedCriteria": []
+  },
+  "releaseGate": {
+    "passed": true,
+    "blockedBy": []
+  },
+  "toolTrajectory": [],
+  "terminal": "run.completed",
+  "metrics": {
+    "stability": 1,
+    "latencyMs": 1000,
+    "cost": 0,
+    "source": "fixture",
+    "productionComparable": false
+  },
+  "firstTraceDivergence": null
+}

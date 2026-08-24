@@ -1,0 +1,28 @@
+/* AgentSessionHeader · 身份头(《设计说明 · Iris》§6.2 共享解剖 ①) */
+
+.ash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+/* 头像:金线描环(全屏两处金线之一)+ 衬线「安」 */
+.ash__avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--surface), var(--panel-2));
+  border: 1px solid var(--gold);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 12px; font-weight: 600;
+  flex: none;
+  box-shadow: 0 1px 3px rgb(35 35 40 / 8%);
+}
+
+.ash__name { font-size: 13px; font-weight: 600; flex: none; }
+
+.ash__status { font-size: 11.5px; color: var(--ink-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ash__status--error { color: var(--danger-deep); }

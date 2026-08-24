@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anna · P1 组件对照预览(浏览器免构建)</title>
+<!-- 预览专用:生产环境字体走 @fontsource 随包,禁 CDN -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#F7F6F2} #boot{font:12px 'JetBrains Mono',monospace;color:#A3A3A8;padding:24px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+</head>
+<body>
+<div id="boot">loading · 转译组件源码(仅预览;生产用 Vite 直接编译同一套 .tsx)…</div>
+<div id="root"></div>
+<script>
+(async () => {
+  // 按依赖顺序加载的源码文件(与交付源码同一份,非复制品)
+  const FILES = [
+    'src/lib/frames.ts',
+    'src/lib/plan.ts',
+    'src/lib/turns.ts',
+    'src/components/anna/IrisPetal.tsx',
+    'src/components/anna/MiniMarkdown.tsx',
+    'src/components/anna/StateNote.tsx',
+    'src/components/agent/ArtifactSandbox.tsx',
+    'src/components/agent/ArtifactCard.tsx',
+    'src/components/agent/ApprovalCard.tsx',
+    'src/components/cowork/DashboardKit.tsx',
+    'src/components/surfaces/SurfaceKit.tsx',
+    'src/components/agent/LoopCard.tsx',
+    'src/components/agent/AgentSessionHeader.tsx',
+    'src/components/agent/AgentComposer.tsx',
+    'src/components/agent/PlanRail.tsx',
+    'src/fixtures/demo-run.ts',
+    'preview/App.tsx',
+  ];
+  const CSS_FILES = [
+    'src/styles/tokens.css',
+    'src/components/agent/LoopCard.css',
+    'src/components/agent/ArtifactSandbox.css',
+    'src/components/agent/ArtifactCard.css',
+    'src/components/agent/ApprovalCard.css',
+    'src/components/cowork/DashboardKit.css',
+    'src/components/surfaces/SurfaceKit.css',
+    'src/components/agent/AgentSessionHeader.css',
+    'src/components/agent/AgentComposer.css',
+    'src/components/agent/PlanRail.css',
+  ];
+
+  const registry = new Map();
+  const R = window.React;
+
+  // react-jsx runtime shim(组件按 jsx: react-jsx 编写,不 import React)
+  const make = (type, props, key) => {
+    props = props || {};
+    const { children, ...rest } = props;
+    if (key !== undefined) rest.key = key;
+    if (children === undefined) return R.createElement(type, rest);
+    return Array.isArray(children)
+      ? R.createElement(type, rest, ...children)
+      : R.createElement(type, rest, children);
+  };
+  registry.set('react', R);
+  registry.set('react/jsx-runtime', { Fragment: R.Fragment, jsx: make, jsxs: make });
+  registry.set('react-dom/client', window.ReactDOM);
+
+  const fetchText = async (path) => {
+    const res = await fetch('../' + path);
+    if (!res.ok) throw new Error('fetch failed: ' + path);
+    return res.text();
+  };
+
+  // 先并行拉取全部 CSS + 源码,再顺序转译执行(缩短首屏空窗)
+  const [cssTexts, srcTexts] = await Promise.all([
+    Promise.all(CSS_FILES.map(fetchText)),
+    Promise.all(FILES.map(fetchText)),
+  ]);
+  CSS_FILES.forEach((css, i) => {
+    const el = document.createElement('style');
+    el.textContent = cssTexts[i];
+    document.head.appendChild(el);
+  });
+  const cssKeys = new Set(CSS_FILES);
+
+  const norm = (p) => {
+    const out = [];
+    for (const seg of p.split('/')) {
+      if (seg === '.' || seg === '') continue;
+      if (seg === '..') out.pop(); else out.push(seg);
+    }
+    return out.join('/');
+  };
+
+  for (let fi = 0; fi < FILES.length; fi++) {
+    const file = FILES[fi];
+    const src = srcTexts[fi];
+    const { code } = Babel.transform(src, {
+      filename: file.split('/').pop(),
+      presets: [
+        ['typescript', { isTSX: file.endsWith('.tsx'), allExtensions: true }],
+        ['react', { runtime: 'automatic' }],
+      ],
+      plugins: ['transform-modules-commonjs'],
+    });
+    const dir = file.split('/').slice(0, -1).join('/');
+    const requireShim = (spec) => {
+      if (registry.has(spec)) return registry.get(spec);
+      const key = norm(dir + '/' + spec);
+      if (spec.endsWith('.css')) {
+        if (!cssKeys.has(key)) console.warn('CSS 未预注入:', key);
+        return {};
+      }
+      for (const cand of [key, key + '.ts', key + '.tsx']) {
+        if (registry.has(cand)) return registry.get(cand);
+      }
+      throw new Error('Unresolved import "' + spec + '" from ' + file);
+    };
+    const module = { exports: {} };
+    new Function('require', 'module', 'exports', code)(requireShim, module, module.exports);
+    registry.set(file, module.exports);
+    registry.set(file.replace(/\.(tsx|ts)$/, ''), module.exports);
+  }
+
+  document.getElementById('boot').remove();
+  const App = registry.get('preview/App').default;
+  window.ReactDOM.createRoot(document.getElementById('root')).render(R.createElement(App));
+})().catch((err) => {
+  const boot = document.getElementById('boot');
+  if (boot) boot.textContent = '预览加载失败:' + err.message;
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'color:#BE4A44;padding:20px;font-size:12px;white-space:pre-wrap';
+  pre.textContent = err.stack || String(err);
+  document.body.appendChild(pre);
+  console.error(err);
+});
+</script>
+</body>
+</html>

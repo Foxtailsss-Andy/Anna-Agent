@@ -1,0 +1,125 @@
+{
+  "name": "anna",
+  "version": "0.2.0",
+  "description": "Anna is a desktop AI agent for Cowork enterprise workflows — a personal research project.",
+  "author": "Anna Project Team",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/harness-service"
+  ],
+  "main": "apps/desktop/electron/main.mjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit && npm run harness:v2:typecheck",
+    "test": "vitest run && npm run harness:v2:test",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "desktop:run": "npm run build && npm run harness:v2:build && electron .",
+    "desktop:prepare-python": "node scripts/prepare-python-runtime.mjs",
+    "desktop:package": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && electron-builder --dir",
+    "desktop:smoke-asar": "electron scripts/smoke-packaged-asar.mjs",
+    "frontend:smoke": "node --test tests/frontend/app_shell_smoke.mjs",
+    "release:verify": "node scripts/verify-public-preview.mjs",
+    "live:e2e": "node scripts/live-reimbursement-e2e.mjs",
+    "live:associate": "node scripts/live-associate-e2e.mjs",
+    "live:create": "node scripts/live-create-e2e.mjs",
+    "live:chat": "node scripts/live-chat-e2e.mjs",
+    "live:t07": "node scripts/live-t07-e2e.mjs",
+    "live:websearch": "node scripts/live-web-search-e2e.mjs",
+    "evidence:manifest": "node scripts/build-evidence-manifest.mjs",
+    "evidence:verify": "node scripts/verify-evidence-manifest.mjs",
+    "evidence:verify:all": "node scripts/verify-evidence-manifests.mjs evals/harness-v2",
+    "harness:v2:test": "npm run test --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
+    "harness:v2:build": "npm run build --workspace=@anna/harness-service",
+    "harness:v2:approval-bridge": "node apps/harness-service/dist/review-approval-main.js",
+    "harness:v2:typecheck": "npm run typecheck --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
+    "harness:v2:test/typecheck": "npm run harness:v2:test && npm run harness:v2:typecheck",
+    "harness:v2:canary": "npm run test --workspace=@anna/pi-loop-kernel -- --testNamePattern=live-canary"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/noto-sans-sc": "^5.2.9",
+    "@fontsource/noto-serif-sc": "^5.2.9",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@xyflow/react": "^12.11.2",
+    "elkjs": "^0.12.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "playwright": "^1.60.0",
+    "png-to-ico": "^3.0.1",
+    "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2",
+    "nanoid": "^3.3.18",
+    "postcss": "^8.5.26"
+  },
+  "build": {
+    "appId": "dev.anna.app",
+    "productName": "Anna",
+    "asar": true,
+    "asarUnpack": [
+      "dist/**",
+      "apps/harness-service/dist/**",
+      "services/**",
+      "skills/**",
+      "build/python-runtime/**",
+      "pyproject.toml",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "apps/desktop/electron/**/*",
+      "apps/harness-service/dist/**/*",
+      "apps/harness-service/package.json",
+      "services/**/*",
+      "skills/**/*",
+      "build/python-runtime/**/*",
+      "pyproject.toml",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dir"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Anna"
+    }
+  }
+}

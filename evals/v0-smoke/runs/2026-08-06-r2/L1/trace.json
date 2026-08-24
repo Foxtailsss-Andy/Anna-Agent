@@ -1,0 +1,450 @@
+{
+  "trace_id": "chat_run_020",
+  "surface": "chat",
+  "spans": [
+    {
+      "span_id": "s1",
+      "parent_span_id": null,
+      "name": "invoke_agent chat",
+      "kind": "agent",
+      "start_time": "2026-08-06T08:17:29.870000",
+      "end_time": "2026-08-06T08:18:02.788000",
+      "duration_ms": 32918,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "anna.chat",
+        "gen_ai.conversation.id": "chat_run_020",
+        "anna.turns": 6
+      },
+      "events": [
+        {
+          "name": "chat.run.created",
+          "time": "2026-08-06T08:17:29.870000",
+          "attributes": {
+            "message_hash": "9ccdd41268478845b7ece429438826eb17aec7f2bc930d1f523e646e95886d0f"
+          }
+        },
+        {
+          "name": "skill.loaded",
+          "time": "2026-08-06T08:17:29.887000",
+          "attributes": {
+            "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff",
+            "skill_id": "chat/general-assistant",
+            "skill_name": "general-assistant-chat",
+            "skill_version": "0.1.0"
+          }
+        },
+        {
+          "name": "frame.done",
+          "time": "2026-08-06T08:18:02.788000",
+          "attributes": {}
+        }
+      ]
+    },
+    {
+      "span_id": "s2",
+      "parent_span_id": "s1",
+      "name": "turn 1",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:29.887000",
+      "end_time": "2026-08-06T08:17:36.692000",
+      "duration_ms": 6805,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "plan.updated",
+          "time": "2026-08-06T08:17:36.692000",
+          "attributes": {
+            "count": 4,
+            "done_count": 0
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s3",
+      "parent_span_id": "s2",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:36.692000",
+      "end_time": "2026-08-06T08:17:36.692000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 642,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 100,
+        "gen_ai.usage.input_tokens": 1181,
+        "gen_ai.usage.output_tokens": 305,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s4",
+      "parent_span_id": "s2",
+      "name": "execute_tool plan.update",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:36.692000",
+      "end_time": "2026-08-06T08:17:36.692000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "plan.update",
+        "anna.step.intent": "正在更新任务计划"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s5",
+      "parent_span_id": "s1",
+      "name": "turn 2",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:36.692000",
+      "end_time": "2026-08-06T08:17:40.197000",
+      "duration_ms": 3505,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "mcp.tool.called",
+          "time": "2026-08-06T08:17:40.167000",
+          "attributes": {
+            "input_hash": "84ae3cd92a0a813448ac3f9cc4ce33597f56bd43df08c85d0dba3a3757cee27d",
+            "status": "success",
+            "tool_name": "erp.finance.query"
+          }
+        },
+        {
+          "name": "mcp.tool.called",
+          "time": "2026-08-06T08:17:40.180000",
+          "attributes": {
+            "input_hash": "3be6f7f14d57193d0edb3d36035e149b61b62dcb8bdf2491573b3d5abfcd72c4",
+            "status": "success",
+            "tool_name": "erp.finance.query"
+          }
+        },
+        {
+          "name": "mcp.tool.called",
+          "time": "2026-08-06T08:17:40.197000",
+          "attributes": {
+            "input_hash": "9584bd17311b7c4630f8659edd3ebf45aaeadb5592861cd7ab928e96ba31f5e6",
+            "status": "success",
+            "tool_name": "erp.finance.query"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s6",
+      "parent_span_id": "s5",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:40.151000",
+      "end_time": "2026-08-06T08:17:40.153000",
+      "duration_ms": 2,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 843,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 99,
+        "gen_ai.usage.input_tokens": 1498,
+        "gen_ai.usage.output_tokens": 204,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s7",
+      "parent_span_id": "s5",
+      "name": "execute_tool erp.finance.query",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:40.154000",
+      "end_time": "2026-08-06T08:17:40.169000",
+      "duration_ms": 15,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "erp.finance.query",
+        "anna.step.intent": "正在查询 ERP 财务数据"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s8",
+      "parent_span_id": "s5",
+      "name": "execute_tool erp.finance.query",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:40.170000",
+      "end_time": "2026-08-06T08:17:40.180000",
+      "duration_ms": 10,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "erp.finance.query",
+        "anna.step.intent": "正在查询 ERP 财务数据"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s9",
+      "parent_span_id": "s5",
+      "name": "execute_tool erp.finance.query",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:40.180000",
+      "end_time": "2026-08-06T08:17:40.197000",
+      "duration_ms": 17,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "erp.finance.query",
+        "anna.step.intent": "正在查询 ERP 财务数据"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s10",
+      "parent_span_id": "s1",
+      "name": "turn 3",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:40.197000",
+      "end_time": "2026-08-06T08:17:45.228000",
+      "duration_ms": 5031,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "plan.updated",
+          "time": "2026-08-06T08:17:45.228000",
+          "attributes": {
+            "count": 4,
+            "done_count": 3
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s11",
+      "parent_span_id": "s10",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:45.222000",
+      "end_time": "2026-08-06T08:17:45.222000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 1674,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 99,
+        "gen_ai.usage.input_tokens": 2250,
+        "gen_ai.usage.output_tokens": 345,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s12",
+      "parent_span_id": "s10",
+      "name": "execute_tool plan.update",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:45.222000",
+      "end_time": "2026-08-06T08:17:45.228000",
+      "duration_ms": 6,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "plan.update",
+        "anna.step.intent": "正在更新任务计划"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s13",
+      "parent_span_id": "s1",
+      "name": "turn 4",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:45.228000",
+      "end_time": "2026-08-06T08:17:56.044000",
+      "duration_ms": 10816,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "chat.artifact.emitted",
+          "time": "2026-08-06T08:17:56.044000",
+          "attributes": {
+            "artifact_id": "art_1",
+            "content_hash": "d8b4495daf7ce415c761f349ce04c7a2315af40db1c09d1bc8efd946d6370a91",
+            "kind": "doc",
+            "title": "2026年6月财务一页汇总"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s14",
+      "parent_span_id": "s13",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:56.044000",
+      "end_time": "2026-08-06T08:17:56.044000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 1871,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 99,
+        "gen_ai.usage.input_tokens": 2627,
+        "gen_ai.usage.output_tokens": 585,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s15",
+      "parent_span_id": "s13",
+      "name": "execute_tool chat.emit_document",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:56.044000",
+      "end_time": "2026-08-06T08:17:56.044000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "chat.emit_document",
+        "anna.step.intent": "正在整理文档产物"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s16",
+      "parent_span_id": "s1",
+      "name": "turn 5",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:56.044000",
+      "end_time": "2026-08-06T08:17:57.758000",
+      "duration_ms": 1714,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "plan.updated",
+          "time": "2026-08-06T08:17:57.758000",
+          "attributes": {
+            "count": 1,
+            "done_count": 1
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s17",
+      "parent_span_id": "s16",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:57.758000",
+      "end_time": "2026-08-06T08:17:57.758000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 2528,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 98,
+        "gen_ai.usage.input_tokens": 3253,
+        "gen_ai.usage.output_tokens": 75,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s18",
+      "parent_span_id": "s16",
+      "name": "execute_tool plan.update",
+      "kind": "tool",
+      "start_time": "2026-08-06T08:17:57.758000",
+      "end_time": "2026-08-06T08:17:57.758000",
+      "duration_ms": 0,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "plan.update",
+        "anna.step.intent": "正在更新任务计划"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s19",
+      "parent_span_id": "s1",
+      "name": "turn 6",
+      "kind": "turn",
+      "start_time": "2026-08-06T08:17:57.758000",
+      "end_time": "2026-08-06T08:18:02.788000",
+      "duration_ms": 5030,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "chat.response.generated",
+          "time": "2026-08-06T08:18:02.788000",
+          "attributes": {
+            "response_hash": "148e8f6a30e250ce1e9fd77637d6a122fc26bb3499333aa8fa1b548f5da29edf"
+          }
+        },
+        {
+          "name": "step.deliver",
+          "time": "2026-08-06T08:18:02.788000",
+          "attributes": {
+            "intent": "正在组织回答"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s20",
+      "parent_span_id": "s19",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T08:17:59.196000",
+      "end_time": "2026-08-06T08:18:02.788000",
+      "duration_ms": 3592,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 2648,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 98,
+        "anna.text_delta_count": 167,
+        "gen_ai.usage.input_tokens": 3360,
+        "gen_ai.usage.output_tokens": 176,
+        "gen_ai.response.finish_reasons": [
+          "stop"
+        ]
+      },
+      "events": []
+    }
+  ]
+}

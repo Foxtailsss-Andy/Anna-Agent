@@ -1,0 +1,79 @@
+{
+  "source": "demo-erp REST :8970 (primary per spec 2.4; seed doc fallback NOT used)",
+  "rest": {
+    "/api/pnl?period=2026-05": {
+      "period": "2026-05",
+      "revenue": 4455000.0,
+      "cogs": 900000.0,
+      "opex": 2338000.0,
+      "expense_total": 3238000.0,
+      "profit": 1217000.0,
+      "opex_detail": {
+        "6601": 0.0,
+        "6602": 0.0,
+        "6604": 0.0
+      },
+      "has_detail": false,
+      "note": "演示数据"
+    },
+    "/api/pnl?period=2026-06": {
+      "period": "2026-06",
+      "revenue": 4820000.0,
+      "cogs": 980000.0,
+      "opex": 2660000.0,
+      "expense_total": 3640000.0,
+      "profit": 1180000.0,
+      "opex_detail": {
+        "6601": 1440000.0,
+        "6602": 620000.0,
+        "6604": 600000.0
+      },
+      "has_detail": true,
+      "note": "演示数据"
+    },
+    "/api/trend": {
+      "series": [
+        {
+          "period": "2026-04",
+          "revenue": 4120000.0,
+          "expense": 2980000.0,
+          "profit": 1140000.0,
+          "operating_cash_flow": 1040000.0,
+          "ar_balance": 1640000.0,
+          "ap_balance": 1090000.0
+        },
+        {
+          "period": "2026-05",
+          "revenue": 4455000.0,
+          "expense": 3238000.0,
+          "profit": 1217000.0,
+          "operating_cash_flow": 927000.0,
+          "ar_balance": 1859000.0,
+          "ap_balance": 1135000.0
+        },
+        {
+          "period": "2026-06",
+          "revenue": 4820000.0,
+          "expense": 3640000.0,
+          "profit": 1180000.0,
+          "operating_cash_flow": 760000.0,
+          "ar_balance": 2150000.0,
+          "ap_balance": 1180000.0
+        }
+      ],
+      "note": "演示数据"
+    }
+  },
+  "expected": {
+    "2026-05": {
+      "revenue": 4455000.0,
+      "profit": 1217000.0,
+      "operating_cash_flow": 927000.0
+    },
+    "2026-06": {
+      "revenue": 4820000.0,
+      "profit": 1180000.0,
+      "operating_cash_flow": 760000.0
+    }
+  }
+}

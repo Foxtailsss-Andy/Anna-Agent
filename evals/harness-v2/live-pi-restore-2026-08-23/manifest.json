@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "t01-live-restore-2026-08-23",
+  "generatedAt": "2026-08-22T23:24:50.646Z",
+  "evidenceMode": "live",
+  "provider": "external-openai-compatible",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "summary.json",
+      "size": 8376,
+      "sha256": "ee0ea75ced28242cf5347e8df6f5c45093fdcf22862710e27b68710ce712a93a"
+    }
+  ]
+}

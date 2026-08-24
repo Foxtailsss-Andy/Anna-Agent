@@ -1,0 +1,319 @@
+/* ============================================================
+   LoopCard · 灵魂组件(五面共用)— 三级下钻版
+   规格:《设计说明 · Iris》§4/§6.1 + 《Runtime 三级下钻 Brief 2026-07-09》
+   高保真:设计画布 4b(卡壳/当下行/计划条)/ 3c(礼成)/ 3d(失败)
+   依赖:styles/tokens.css 已全局引入
+   ============================================================ */
+
+/* ---- 容器(窄容器降级用 container query) ---- */
+.loop-host { container-type: inline-size; min-width: 0; }
+
+/* ---- 卡壳:瓷面 + 左上鸢尾晕 + 书脊 ---- */
+.loop-card {
+  display: flex;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(87 91 196 / 6%), rgb(87 91 196 / 0%) 46%),
+    linear-gradient(180deg, var(--surface), var(--surface-loop-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-loop);
+  box-shadow: var(--shadow-loop), var(--inset-top-loop);
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.loop-card--error { border-color: var(--danger-line); box-shadow: 0 4px 16px rgb(190 74 68 / 5%); }
+
+/* ---- 书脊:3px 状态色 ---- */
+.loop-card__spine { width: 3px; flex: none; background: linear-gradient(180deg, var(--iris), var(--lavender)); }
+.loop-card--awaiting .loop-card__spine { background: var(--warn); }
+.loop-card--error    .loop-card__spine { background: var(--danger); }
+.loop-card--review   .loop-card__spine { background: linear-gradient(180deg, var(--ok), var(--ok-grad-end)); }
+
+.loop-card__body { flex: 1; min-width: 0; padding-bottom: 4px; }
+
+/* ---- 当下行(拟人层:微光文字可装饰;点/成败图标是素的) ---- */
+.loop-now { display: flex; align-items: center; gap: 10px; padding: 15px 20px 11px; }
+.loop-now__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--iris); flex: none; }
+.loop-card--running .loop-now__dot { animation: anna-breath var(--dur-breath) ease-out infinite; }
+.loop-card--error .loop-now__dot { background: var(--danger); animation: none; }
+.loop-now__intent {
+  font-size: 15.5px; line-height: 24px; font-weight: 500;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.loop-card--running .loop-now__intent {
+  background: linear-gradient(90deg, var(--iris-deep), var(--lavender-2), var(--iris-deep));
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: anna-shimmer var(--dur-shimmer) linear infinite;
+}
+.loop-card--awaiting .loop-now__intent { color: var(--iris-deep); }
+.loop-card--error .loop-now__intent { color: var(--danger-deep); }
+.loop-now__clock { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); flex: none; }
+
+/* ============ L1 · 回合折叠行 ============ */
+.run-turns { margin: 0 20px 6px; }
+.run-l1 {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 0;
+  background: none; border: 0; text-align: left;
+  font-family: inherit; font-size: 13px; line-height: 20px;
+  color: var(--ink); cursor: pointer;
+}
+.run-l1:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 6px; }
+.run-l1__caret { width: 12px; color: var(--ink-3); font-size: 10px; flex: none; }
+
+/* 时态图标(素的、真的:皮不盖成败真值) */
+.run-l1__icon { width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+.run-l1__icon--ok { color: var(--ok); font-size: 11px; }
+.run-l1__icon--fail { color: var(--danger); font-size: 11px; }
+.run-l1__icon--waiting { color: var(--warn); font-size: 12px; }
+.run-l1__spinner {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid rgb(87 91 196 / 22%); border-top-color: var(--iris);
+  animation: anna-spin 0.9s linear infinite;
+}
+
+.run-l1__label { font-weight: 500; flex: none; }
+.run-l1__label--fail { color: var(--danger-deep); }
+
+/* 拟人状态标签 = flavor 通道(可关):衬线 + 鸢尾,与权威摘要视觉区分 */
+.run-l1__persona { font-family: var(--font-serif); font-size: 12.5px; color: var(--iris-deep); flex: none; }
+[data-theme="dark"] .run-l1__persona { color: var(--iris); }
+
+/* 聚合摘要(真值聚合) */
+.run-l1__summary { color: var(--ink-2); font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-l1__meta { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); flex: none; }
+
+/* ============ L2 · 回合内步骤(左轨 + 类型点) ============ */
+.run-l2-lift {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-lift) var(--ease-lift), opacity var(--dur-lift) var(--ease-lift);
+  opacity: 0;
+}
+.run-l2-lift.is-open { grid-template-rows: 1fr; opacity: 1; }
+.run-l2-lift > div { overflow: hidden; min-height: 0; }
+
+.run-l2 { margin: 0 0 4px 26px; border-left: 1px solid var(--line-rail); padding: 2px 0; }
+
+.run-step { margin: 0; }
+.run-step__row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 5px 0;
+  background: none; border: 0; text-align: left;
+  font-family: inherit; font-size: 13px; line-height: 20px;
+  color: var(--ink-mute); cursor: default;
+}
+.run-step__row--expandable { cursor: pointer; }
+.run-step__row--expandable:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 6px; }
+.run-step__row--current { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+
+/* 类型点:思考=空心 lavender;工具=实心 iris;系统=空心灰;错误=实心胭脂 */
+.run-step__dot { width: 9px; height: 9px; border-radius: 50%; margin-left: -5px; flex: none; box-sizing: border-box; }
+.run-step__dot--thinking { background: var(--surface); border: 2px solid var(--lavender); }
+.run-step__dot--tool { background: var(--iris); }
+.run-step__dot--system { background: var(--surface); border: 2px solid var(--dot-system-ring); }
+.run-step__dot--error, .run-step__dot--fail { background: var(--danger); }
+.run-step__dot--running { background: var(--iris); animation: anna-breath var(--dur-breath) ease-out infinite; }
+
+.run-step__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-step__label--fail { font-weight: 500; color: var(--danger-deep); }
+.run-step__ok { color: var(--ok); font-size: 11px; flex: none; }
+.run-step__fail { color: var(--danger); font-size: 11px; flex: none; }
+.run-step__wait { color: var(--warn); font-size: 12px; flex: none; }
+.run-step__spinner {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid rgb(87 91 196 / 22%); border-top-color: var(--iris);
+  animation: anna-spin 0.9s linear infinite; flex: none;
+}
+.run-step__meta { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); flex: none; }
+.run-step__meta--fail { color: var(--danger); }
+.run-step__meta--now { color: var(--iris); }
+
+/* ============ L3 · 素颜凭证(mono;persona 不许触碰) ============ */
+.run-l3-lift {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-lift) var(--ease-lift), opacity var(--dur-lift) var(--ease-lift);
+  opacity: 0;
+}
+.run-l3-lift.is-open { grid-template-rows: 1fr; opacity: 1; }
+.run-l3-lift > div { overflow: hidden; min-height: 0; }
+
+.run-l3 {
+  margin: 4px 0 8px 16px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 9px 13px;
+  font-family: var(--font-mono);
+  font-size: 11px; line-height: 1.8;
+  color: var(--ink-2);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+.run-l3--danger { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-deep); box-shadow: none; }
+.run-l3--restricted { border-style: dashed; }
+
+.run-l3__field { display: flex; gap: 10px; }
+.run-l3__key { color: var(--ink-3); flex: none; width: 52px; }
+.run-l3__val { min-width: 0; white-space: pre-wrap; word-break: break-word; }
+.run-l3__exit { color: var(--danger-deep); }
+
+/* 长文本(思考原文):最多 12 行,可展开 */
+.run-l3__text { white-space: pre-wrap; word-break: break-word; }
+.run-l3__text--clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 12; overflow: hidden; }
+
+/* truncated:预览 + 展开更多 / 加载中 */
+.run-l3__more {
+  margin-top: 6px; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--tint); border: 0; border-radius: var(--radius-pill);
+  padding: 3px 11px; font-family: var(--font-sans); font-size: 11px; color: var(--ink-btn);
+  cursor: pointer;
+}
+.run-l3__more:disabled { cursor: wait; opacity: 0.7; }
+.run-l3__more:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.run-l3__more-spin {
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1.5px solid rgb(87 91 196 / 25%); border-top-color: var(--iris);
+  animation: anna-spin 0.9s linear infinite;
+}
+.run-l3__trunc-note { color: var(--ink-3); margin-top: 4px; }
+
+/* 受限视角(脱敏摘要) */
+.run-l3__lock {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-sans); font-size: 11px; color: var(--warn-ink);
+  background: var(--warn-soft); border-radius: 6px; padding: 3px 9px;
+  margin-bottom: 6px; width: fit-content;
+}
+
+/* ---- 回合间叙述(模型正文 = 权威,非 flavor) ---- */
+.run-narration {
+  margin: 2px 0 6px 26px;
+  font-size: 13.5px; line-height: 1.8; color: var(--ink);
+  max-width: 62ch;
+}
+
+/* ---- 发丝线 / 计划条 / 失败动作 / 礼成条(沿用 Iris §6.5)---- */
+.loop-hair { height: 1px; background: var(--line-hair); margin: 0 20px; }
+
+.loop-plan { display: flex; align-items: center; gap: 12px; padding: 10px 20px 13px; }
+.loop-plan__label { font-size: 12px; color: var(--ink-2); font-weight: 500; flex: none; }
+.loop-plan__segs { display: flex; gap: 4px; flex: none; }
+.loop-plan__seg { width: 22px; height: 4px; border-radius: 2px; background: var(--tint-strong); }
+.loop-plan__seg--done { background: linear-gradient(90deg, var(--iris), var(--lavender-2)); }
+.loop-plan__current { font-size: 12px; color: var(--ink-mute); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loop-plan__usage { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); flex: none; }
+
+.loop-fail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 11px 20px 14px; }
+.loop-btn { border: 0; border-radius: var(--radius-pill); font-family: inherit; font-size: 12.5px; padding: 7px 14px; cursor: pointer; line-height: 20px; }
+.loop-btn--filled {
+  background: linear-gradient(180deg, var(--iris-grad-top), var(--iris-grad-bottom));
+  color: #fff; font-weight: 600; padding: 7px 16px;
+  box-shadow: var(--shadow-button);
+}
+.loop-btn--tinted { background: var(--tint); color: var(--ink-btn); box-shadow: inset 0 0 0 1px rgb(35 35 40 / 3%); }
+.loop-btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.loop-fail-actions__consumed { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+
+/* 办妥卡(V2 修订 ④ · H-10):绿脊 3px 渐变 + ✓圆 + 衬线「办妥」+ 安印 + 「▸ 回看 n 个瞬间」;
+   行二 = mono 观测终值(模型与上下文不入行,V2 ①②);全静止零动画。 */
+.loop-done {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(62 156 130 / 6%), rgb(62 156 130 / 0%) 46%),
+    linear-gradient(180deg, #fff, #fcfbf8);
+  border: 1px solid rgb(35 35 40 / 8%);
+  border-radius: 18px;
+  padding: 13px 20px 12px;
+  box-shadow:
+    0 1px 2px rgb(35 35 40 / 5%),
+    0 8px 24px rgb(35 35 40 / 6%),
+    inset 0 1px 0 rgb(255 255 255 / 90%);
+  font-family: var(--font-sans); color: var(--ink);
+}
+.loop-done::before {
+  content: '';
+  position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: linear-gradient(180deg, #3e9c82, #9ed4c3);
+}
+[data-theme="dark"] .loop-done {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(78 180 150 / 7%), rgb(78 180 150 / 0%) 46%),
+    linear-gradient(180deg, #232328, #1e1e22);
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 38%), inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+[data-theme="dark"] .loop-done::before { background: linear-gradient(180deg, #58b79a, #3e6e5d); }
+.loop-ceremony { display: flex; align-items: center; gap: 8px; }
+.loop-ceremony__check {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgb(62 156 130 / 12%); color: var(--ok-deep);
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+[data-theme="dark"] .loop-ceremony__check { background: rgb(78 180 150 / 14%); color: #58b79a; }
+.loop-ceremony__title { font-family: var(--font-serif); font-size: 13.5px; font-weight: 600; flex: none; }
+.loop-ceremony__review { margin-left: auto; background: none; border: 0; padding: 0; color: var(--iris); font-size: 11px; font-family: inherit; cursor: pointer; flex: none; }
+[data-theme="dark"] .loop-ceremony__review { color: #8b8ed9; }
+.loop-ceremony__review:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 4px; }
+.loop-done__facts { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); margin-top: 6px; }
+
+.loop-review-lift {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-settle) var(--ease-lift), opacity var(--dur-settle) var(--ease-lift);
+  opacity: 0;
+}
+.loop-review-lift.is-open { grid-template-rows: 1fr; opacity: 1; }
+.loop-review-lift > div { overflow: hidden; min-height: 0; }
+.loop-review-lift .loop-card { margin-top: 10px; }
+
+/* ---- 落笔:完成勾 stroke 描画 300ms 一次性 ---- */
+.loop-ink-check { display: block; }
+.loop-ink-check path { stroke-dasharray: 14; stroke-dashoffset: 14; animation: anna-ink var(--dur-ink) ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .loop-ink-check path { animation: none; stroke-dashoffset: 0; }
+}
+
+/* ---- 窄容器降级(滑出副驾 420px):默认只显当下行 + 计划条 ---- */
+.loop-fold { display: none; }
+@container (max-width: 559px) {
+  .run-turns:not(.is-forced-open) { display: none; }
+  .loop-fold {
+    display: flex; align-items: center; gap: 8px;
+    width: calc(100% - 40px); margin: 0 20px 8px; padding: 4px 0;
+    background: none; border: 0; text-align: left;
+    font-family: inherit; font-size: 12px; color: var(--ink-3);
+    cursor: pointer;
+  }
+  .loop-fold:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; border-radius: 6px; }
+}
+
+/* ================= C2 · 混合形态(校对基准 P-03) ================= */
+
+/* 类型前缀(启动/思考/调用):比正文轻半档,分隔号同色 */
+.run-step__type {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+/* 扁平时间线:回合边界发丝线(压左轨内侧) */
+.run-l2--flat {
+  padding-top: 2px;
+}
+.run-turn-hair {
+  height: 1px;
+  background: var(--line-hair);
+  margin: 7px 0 7px 18px;
+}
+
+/* L3 载荷缺口说明:琥珀 soft 行内 chip(真实说明,非装饰) */
+.run-l3__pending {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+}

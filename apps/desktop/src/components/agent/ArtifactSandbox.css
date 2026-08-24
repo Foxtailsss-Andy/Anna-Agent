@@ -1,0 +1,220 @@
+/* ============================================================
+   ArtifactSandbox · 沙箱画布(右栏挤压式滑出)
+   规格:《设计说明 · Iris》§6.5 产物卡三形态 + 4b 右栏;
+   交互对齐常规 Coding Agent(Claude Desktop):点产物自动展开、
+   tab 切换、文件夹树、多类型在线预览。
+   沙箱纪律:iframe sandbox 空白名单 = 无脚本 / 无外联(诚实展示)。
+   ============================================================ */
+
+/* ---- 挤压式滑出槽:宿主放进 flex 行即可 ---- */
+.sbx-slot {
+  width: 0;
+  flex: none;
+  overflow: hidden;
+  /* 收起后 visibility hidden:移出 Tab 序(a11y);延迟到宽度动画结束 */
+  visibility: hidden;
+  transition: width var(--dur-lift) var(--ease-lift), visibility 0s var(--dur-lift);
+}
+.sbx-slot.is-open {
+  visibility: visible;
+  transition: width var(--dur-lift) var(--ease-lift);
+}
+
+.sbx {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: rgb(255 255 255 / 35%);
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+[data-theme="dark"] .sbx { background: rgb(255 255 255 / 3%); }
+
+/* ---- 头部 ---- */
+.sbx__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  flex: none;
+}
+.sbx__title { font-size: 13.5px; font-weight: 600; flex: none; }
+.sbx__badge { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--ink-3); flex: none; }
+.sbx__head-btn {
+  background: none; border: 0; padding: 2px 6px;
+  font-family: inherit; font-size: 12px; color: var(--ink-2);
+  border-radius: 7px; cursor: pointer; flex: none;
+}
+.sbx__head-btn:hover { background: var(--tint); }
+.sbx__head-btn--on { background: var(--iris-soft); color: var(--iris-deep); }
+.sbx__head-btn:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.sbx__save {
+  font-size: 11px; color: var(--ink-3);
+  border: 1px dashed var(--line-strong); border-radius: var(--radius-pill);
+  padding: 3px 10px; flex: none;
+}
+.sbx__close {
+  margin-left: auto;
+  background: none; border: 0;
+  color: var(--ink-3); font-size: 13px;
+  cursor: pointer; padding: 2px 6px; border-radius: 7px; flex: none;
+}
+.sbx__close:hover { background: var(--tint); }
+.sbx__close:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- 产物 tab 行(激活 = iris tinted) ---- */
+.sbx__tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 10px;
+  overflow-x: auto;
+  flex: none;
+}
+.sbx__tab {
+  border: 0;
+  background: var(--tint);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+}
+.sbx__tab--on { background: var(--iris-soft); color: var(--iris-deep); font-weight: 600; box-shadow: inset 0 0 0 1px rgb(87 91 196 / 14%); }
+.sbx__tab:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- 主体:可选文件树 + 预览 ---- */
+.sbx__main { flex: 1; min-height: 0; display: flex; padding: 0 14px 10px; gap: 10px; }
+
+/* 文件夹树(coding agent 式) */
+.sbx__tree {
+  width: 168px;
+  flex: none;
+  overflow: auto;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+.sbx__tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink-2);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sbx__tree-row:hover { background: var(--tint); }
+.sbx__tree-row--on { background: var(--iris-soft); color: var(--iris-deep); font-weight: 500; }
+.sbx__tree-row:focus-visible { outline: 2px solid var(--iris); outline-offset: -2px; }
+.sbx__tree-caret { width: 10px; color: var(--ink-3); font-size: 9px; flex: none; }
+.sbx__tree-kind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  background: var(--tint);
+  border-radius: 4px;
+  padding: 0 4px;
+  flex: none;
+}
+.sbx__tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* 预览面 */
+.sbx__view {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sbx__frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.sbx__scroll { flex: 1; overflow: auto; }
+
+/* Markdown / Doc 排版(MiniMarkdown 输出容器) */
+.sbx__md { padding: 18px 20px; font-size: 13.5px; line-height: 1.9; color: var(--ink); max-width: 68ch; }
+.sbx__md h1, .sbx__md h2, .sbx__md h3 { font-family: var(--font-serif); font-weight: 600; line-height: 1.5; margin: 18px 0 8px; }
+.sbx__md h1 { font-size: 20px; margin-top: 4px; }
+.sbx__md h2 { font-size: 16.5px; }
+.sbx__md h3 { font-size: 14.5px; }
+.sbx__md p { margin: 8px 0; }
+.sbx__md ul { margin: 8px 0; padding-left: 20px; }
+.sbx__md li { margin: 3px 0; }
+.sbx__md code { font-family: var(--font-mono); font-size: 12px; background: var(--tint); border-radius: 4px; padding: 1px 5px; }
+.sbx__md pre { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px; overflow: auto; }
+.sbx__md pre code { background: none; padding: 0; font-size: 11.5px; line-height: 1.8; }
+.sbx__md a { color: var(--iris); text-decoration: none; }
+.sbx__md a:hover { text-decoration: underline; }
+
+/* 代码视图(mono + 行号) */
+.sbx__code {
+  margin: 0;
+  padding: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--ink-2);
+  counter-reset: ln;
+  overflow: auto;
+  flex: 1;
+}
+.sbx__code-line { display: block; padding: 0 14px 0 0; white-space: pre; }
+.sbx__code-line::before {
+  counter-increment: ln;
+  content: counter(ln);
+  display: inline-block;
+  width: 34px;
+  margin-right: 12px;
+  text-align: right;
+  color: var(--ink-faint);
+  user-select: none;
+}
+
+/* 纯文本 */
+.sbx__text { padding: 16px 18px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.9; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; }
+
+/* 空态 */
+.sbx__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  margin: 0 14px 10px;
+  padding: 20px;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: center;
+}
+.sbx__empty-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 300; line-height: 1.7; }
+
+/* 底注 */
+.sbx__foot {
+  flex: none;
+  padding: 0 14px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}

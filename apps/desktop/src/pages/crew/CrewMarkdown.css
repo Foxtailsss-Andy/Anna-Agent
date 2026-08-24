@@ -1,0 +1,249 @@
+/**
+ * CrewMarkdown · 内嵌产物正文的 Iris 阅读版式(组件级 `.crew-md`)。
+ * 全部走双主题 token(styles/tokens.css 已 :root / [data-theme=dark] 双份),
+ * 沿 chat 答复排版语汇(cowork ir-copilot__answer / ir-r6__agent-msg-body)。
+ */
+
+.crew-md {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.crew-md > :first-child {
+  margin-top: 0;
+}
+.crew-md > :last-child {
+  margin-bottom: 0;
+}
+
+.crew-md p {
+  margin: 0 0 8px;
+}
+
+.crew-md h1,
+.crew-md h2,
+.crew-md h3,
+.crew-md h4,
+.crew-md h5,
+.crew-md h6 {
+  font-family: var(--font-serif);
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 14px 0 6px;
+}
+.crew-md h1 {
+  font-size: 16px;
+}
+.crew-md h2 {
+  font-size: 14.5px;
+}
+.crew-md h3 {
+  font-size: 13px;
+}
+.crew-md h4,
+.crew-md h5,
+.crew-md h6 {
+  font-size: 12.5px;
+}
+
+.crew-md ul,
+.crew-md ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.crew-md li {
+  margin: 2px 0;
+}
+.crew-md li > ul,
+.crew-md li > ol {
+  margin: 2px 0;
+}
+
+.crew-md a {
+  color: var(--iris);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.crew-md a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.crew-md strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+.crew-md em {
+  font-style: italic;
+}
+
+.crew-md code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.5px 4px;
+}
+.crew-md pre {
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.crew-md pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.crew-md blockquote {
+  margin: 0 0 8px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+.crew-md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 12px 0;
+}
+
+/* GFM 表格(splitMarkdownSegments 结构化;横向溢出自身滚动,页面不横滚) */
+.crew-md__tablewrap {
+  margin: 0 0 8px;
+  overflow-x: auto;
+}
+.crew-md__table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: auto;
+  min-width: 100%;
+}
+.crew-md__table th,
+.crew-md__table td {
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.crew-md__table th {
+  color: var(--ink-2);
+  font-weight: 600;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   .crew-reader · R1 产物阅读器排版扩展段(§3e;仅在阅读器内放大 CrewMarkdown)
+   —— 不改默认 .crew-md 尺度(chip/抽屉沿用原版);仅覆盖 .crew-reader 作用域内
+   ============================================================ */
+.crew-reader {
+  /* 阅读器正文墨(§3e p:#3E3E44 / 深 #C4C4CC —— 无精确 token,scope 内双主题字面) */
+  --reader-body: #3e3e44;
+}
+[data-theme="dark"] .crew-reader {
+  --reader-body: #c4c4cc;
+}
+
+.crew-reader .crew-md {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--reader-body);
+}
+.crew-reader .crew-md h1 {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.4;
+  margin: 10px 0 0;
+  color: var(--ink);
+}
+.crew-reader .crew-md h2 {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 24px 0 8px;
+  color: var(--ink);
+}
+.crew-reader .crew-md h3 {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 20px 0 6px;
+  color: var(--ink);
+}
+.crew-reader .crew-md h4,
+.crew-reader .crew-md h5,
+.crew-reader .crew-md h6 {
+  font-size: 14px;
+  margin: 16px 0 6px;
+  color: var(--ink);
+}
+.crew-reader .crew-md p {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--reader-body);
+  text-wrap: pretty;
+}
+.crew-reader .crew-md ul,
+.crew-reader .crew-md ol {
+  margin: 0 0 12px 20px;
+  padding-left: 0;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--reader-body);
+}
+.crew-reader .crew-md li {
+  margin: 3px 0;
+}
+.crew-reader .crew-md strong {
+  color: var(--ink);
+}
+/* 表格:圆角外框 + mono 11.5(§3e) */
+.crew-reader .crew-md__tablewrap {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0 0 14px;
+}
+.crew-reader .crew-md__table {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.crew-reader .crew-md__table th,
+.crew-reader .crew-md__table td {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 10px;
+}
+.crew-reader .crew-md__table tr:last-child td {
+  border-bottom: 0;
+}
+.crew-reader .crew-md__table th {
+  background: var(--panel);
+  color: var(--ink-2);
+}
+/* 代码/口径块:mono 12.5 · panel 底(§3e) */
+.crew-reader .crew-md pre {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+.crew-reader .crew-md pre code {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--reader-body);
+}

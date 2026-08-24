@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "caseId": "t07-fixture-001",
+  "generatedAt": "2026-08-22T00:00:00.000Z",
+  "evidenceMode": "fixture",
+  "provider": "fixture",
+  "gitHead": "5aecdac8fc4f8bac1cfaa54a4f2b57a0fac2c936",
+  "files": [
+    {
+      "path": "fixtures/connector-response.json",
+      "size": 161,
+      "sha256": "ac7722c16986ea85810b42a6b7e6cfb4bf694eb2352cec659c9b7954be83ba77"
+    },
+    {
+      "path": "fixtures/provider-response.json",
+      "size": 133,
+      "sha256": "493931d37285950308f7aebb8e9fef691fb565d39161e18230bae03f7a9b152c"
+    },
+    {
+      "path": "ground-truth.json",
+      "size": 490,
+      "sha256": "2e606b4b0ad49ce2942e4d999b076a636c079be1e405c54f110ec64bb00d28d8"
+    },
+    {
+      "path": "prompts/review.json",
+      "size": 359,
+      "sha256": "587cb492b785ee00ca81826aaa390f96e821b2a962f6abb444320fb40e9ba67b"
+    }
+  ]
+}

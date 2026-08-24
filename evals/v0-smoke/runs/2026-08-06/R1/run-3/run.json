@@ -1,0 +1,128 @@
+{
+  "id": "chat_run_014",
+  "workspace_id": "local-workspace",
+  "actor_user_id": "local-user",
+  "message": "帮我查一下 2026 年 6 月的损益情况，收入和净利润分别是多少？",
+  "thread_id": "chat_run_014",
+  "template_id": null,
+  "model_profile_id": null,
+  "skill_id": null,
+  "agent_id": null,
+  "workdir_id": null,
+  "status": "ready",
+  "assistant_message": "根据 ERP 系统查询结果（演示租户账套），**2026 年 6 月**的损益情况如下：\n\n- **收入**：约 **482 万元**，主要由三条业务线构成：软件订阅（SaaS）、实施服务、运维服务。\n- **净利润**：当前演示数据中未返回净利润的具体金额，如需获取净利润数据，可能需要进一步查询成本与费用的分项明细。\n\n如果您需要更详细的利润表分析或其他月份的数据，请随时告诉我！",
+  "saved_memory_id": null,
+  "associate_goal_text": null,
+  "audit_events": [
+    {
+      "type": "chat.run.created",
+      "run_id": "chat_run_014",
+      "payload": {
+        "message_hash": "fb1b886687c12648118196dc729b12f4e5d4699b8418937ccf6838d12924dc27",
+        "template_id": null,
+        "model_profile_id": null,
+        "skill_id": null,
+        "agent_id": null,
+        "workdir_id": null
+      },
+      "created_at": "2026-08-06T07:23:27.451242+00:00"
+    },
+    {
+      "type": "skill.loaded",
+      "run_id": "chat_run_014",
+      "payload": {
+        "skill_id": "chat/general-assistant",
+        "skill_name": "general-assistant-chat",
+        "skill_version": "0.1.0",
+        "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff"
+      },
+      "created_at": "2026-08-06T07:23:27.452266+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_014",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 581,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:23:27.467031+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_014",
+      "payload": {
+        "finish_reason": "tool_calls",
+        "tool_call_count": 1,
+        "requested_tool_names": [
+          "erp.finance.query"
+        ],
+        "input_tokens": 1124,
+        "output_tokens": 127
+      },
+      "created_at": "2026-08-06T07:23:30.630097+00:00"
+    },
+    {
+      "type": "mcp.tool.called",
+      "run_id": "chat_run_014",
+      "payload": {
+        "tool_name": "erp.finance.query",
+        "input_hash": "2297aa135ac696cd46104cd3e4603f41b964882da4d53e91ad5b3ebfc79cbe46",
+        "status": "success"
+      },
+      "created_at": "2026-08-06T07:23:30.646842+00:00"
+    },
+    {
+      "type": "model.call.started",
+      "run_id": "chat_run_014",
+      "payload": {
+        "model_name": "deepseek-v4-pro",
+        "tool_names": [
+          "chat.emit_document",
+          "chat.emit_page",
+          "erp.finance.query",
+          "plan.update"
+        ],
+        "tool_contract_hash": "c2b309f73f893c1fdab8eae2528d865cc3938d9f50373ae4451b75fe33c6bb77",
+        "context_token_count": 805,
+        "context_window": 200000,
+        "context_percent_left": 100
+      },
+      "created_at": "2026-08-06T07:23:30.646843+00:00"
+    },
+    {
+      "type": "model.call.completed",
+      "run_id": "chat_run_014",
+      "payload": {
+        "finish_reason": "stop",
+        "tool_call_count": 0,
+        "requested_tool_names": [],
+        "input_tokens": 1350,
+        "output_tokens": 156
+      },
+      "created_at": "2026-08-06T07:23:36.929488+00:00"
+    },
+    {
+      "type": "chat.response.generated",
+      "run_id": "chat_run_014",
+      "payload": {
+        "response_hash": "608126b18980726bcd77b684ca56e9c6d226c7317690e0100e60aca03e126160"
+      },
+      "created_at": "2026-08-06T07:23:36.929489+00:00"
+    }
+  ],
+  "artifacts": [],
+  "plan": [],
+  "suspended_messages": null,
+  "evaluation_continuations": 0,
+  "error_code": null,
+  "error_message": null
+}

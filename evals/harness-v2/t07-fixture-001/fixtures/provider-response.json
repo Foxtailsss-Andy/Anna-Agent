@@ -1,0 +1,7 @@
+{
+  "provider": "fixture",
+  "model": "fixture-model",
+  "response": "Review approved",
+  "finish_reason": "stop",
+  "usage": null
+}

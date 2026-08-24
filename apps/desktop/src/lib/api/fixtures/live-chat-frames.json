@@ -1,0 +1,93 @@
+[
+  {
+    "type": "event",
+    "event": {
+      "type": "chat.run.created",
+      "run_id": "chat_run_001",
+      "payload": {
+        "message_hash": "21c545abdb99b4529a8309ae5fab26eba02e843d3f79e94d7188d851d2e182af",
+        "template_id": null,
+        "model_profile_id": null,
+        "skill_id": null
+      },
+      "created_at": "2026-07-09T15:38:40.060858+00:00"
+    }
+  },
+  {
+    "type": "event",
+    "event": {
+      "type": "skill.loaded",
+      "run_id": "chat_run_001",
+      "payload": {
+        "skill_id": "chat/general-assistant",
+        "skill_name": "general-assistant-chat",
+        "skill_version": "0.1.0",
+        "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff"
+      },
+      "created_at": "2026-07-09T15:38:40.060859+00:00"
+    }
+  },
+  {
+    "type": "event",
+    "event": {
+      "type": "chat.run.failed",
+      "run_id": "chat_run_001",
+      "payload": {
+        "error_code": "model_not_configured"
+      },
+      "created_at": "2026-07-09T15:38:40.060860+00:00"
+    }
+  },
+  {
+    "type": "error",
+    "run": {
+      "id": "chat_run_001",
+      "workspace_id": "local-workspace",
+      "actor_user_id": "local-user",
+      "message": "请用 plan.update 规划并生成一个简单页面",
+      "template_id": null,
+      "model_profile_id": null,
+      "skill_id": null,
+      "status": "failed",
+      "assistant_message": null,
+      "saved_memory_id": null,
+      "associate_goal_text": null,
+      "audit_events": [
+        {
+          "type": "chat.run.created",
+          "run_id": "chat_run_001",
+          "payload": {
+            "message_hash": "21c545abdb99b4529a8309ae5fab26eba02e843d3f79e94d7188d851d2e182af",
+            "template_id": null,
+            "model_profile_id": null,
+            "skill_id": null
+          },
+          "created_at": "2026-07-09T15:38:40.060858+00:00"
+        },
+        {
+          "type": "skill.loaded",
+          "run_id": "chat_run_001",
+          "payload": {
+            "skill_id": "chat/general-assistant",
+            "skill_name": "general-assistant-chat",
+            "skill_version": "0.1.0",
+            "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff"
+          },
+          "created_at": "2026-07-09T15:38:40.060859+00:00"
+        },
+        {
+          "type": "chat.run.failed",
+          "run_id": "chat_run_001",
+          "payload": {
+            "error_code": "model_not_configured"
+          },
+          "created_at": "2026-07-09T15:38:40.060860+00:00"
+        }
+      ],
+      "artifacts": [],
+      "plan": [],
+      "error_code": "model_not_configured",
+      "error_message": "model endpoint and API key are required before running Anna Chat"
+    }
+  }
+]

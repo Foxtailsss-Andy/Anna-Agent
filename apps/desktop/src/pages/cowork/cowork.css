@@ -1,0 +1,217 @@
+/* ============================================================
+   Cowork 看板 · 页面级样式(财务 / Hiker 共用)— R5
+   五段式容器 + 挤压式副驾布局 + ir-table 宽表。
+   纪律:数据密集区零光晕零点缀;色值一律 var(--*),ir- 前缀,禁裸 hex。
+   ============================================================ */
+
+/* ---- 页根:自管滚动 + 副驾定位上下文 ---- */
+.ir-cowork {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+.ir-cowork__scroll {
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 28px 40px;
+  transition: padding-right var(--dur-lift) var(--ease-lift);
+}
+/* 副驾开启:内容右侧留白挤压(副驾 420 + 间隙) */
+.ir-cowork--squeeze .ir-cowork__scroll {
+  padding-right: 452px;
+}
+
+/* 内容纵列(段序不动) */
+.ir-cowork__stack {
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 全屏态(加载 / 未连接 / 失败):居中呈现,零演示数字 */
+.ir-cowork__state {
+  min-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+}
+.ir-cowork__state-card {
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---- 页头 ---- */
+.ir-cwk-head { display: flex; flex-direction: column; gap: 4px; }
+.ir-cwk-head__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+}
+.ir-cwk-head__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.ir-cwk-head__title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ir-cwk-head__refreshing {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* 刷新 spinner(Fix 3:iris 字面量 rgb(87 91 196 / 22%) → token 化) */
+.ir-cwk-spinner {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--iris) 22%, transparent);
+  border-top-color: var(--iris);
+}
+
+/* 刷新失败但保留旧快照:紧凑页头提示(Fix 2) */
+.ir-cwk-head__refresh-err {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.ir-cwk-head__refresh-err--warn { color: var(--warn-ink); }
+.ir-cwk-head__refresh-err--danger { color: var(--danger-deep); }
+
+/* 刷新按钮(财务 / Hiker 共用) */
+.ir-cwk-refresh {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 4px 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-btn);
+  cursor: pointer;
+}
+.ir-cwk-refresh:hover:not(:disabled) { background: var(--tint); }
+.ir-cwk-refresh:disabled { opacity: 0.5; cursor: default; }
+.ir-cwk-refresh:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+
+/* ---- 通用行(KPI 带 / 图表行 / 洞察行);窄窗自动换行 ---- */
+.ir-cwk-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.ir-cwk-row > * { min-width: 0; }
+
+/* KPI 带:hero 更大 basis(全屏唯一强调),其余 1 份;窄窗换行 */
+.ir-cwk-kpis { display: flex; gap: 12px; flex-wrap: wrap; }
+.ir-cwk-kpis__cell { flex: 1 1 168px; min-width: 0; }
+.ir-cwk-kpis__cell--hero { flex: 2 1 260px; }
+
+/* 图表行两列:趋势 1.5 / 侧栏 1 */
+.ir-cwk-charts { display: flex; gap: 12px; flex-wrap: wrap; }
+.ir-cwk-charts__wide { flex: 1.5 1 340px; display: flex; min-width: 0; }
+.ir-cwk-charts__side { flex: 1 1 260px; display: flex; min-width: 0; }
+.ir-cwk-charts__wide > *, .ir-cwk-charts__side > * { flex: 1; }
+
+/* MetricBar 竖列(账龄 / 回款进度) */
+.ir-cwk-bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+}
+
+/* 洞察 / 建议行(两列) */
+.ir-cwk-insights { display: flex; gap: 12px; flex-wrap: wrap; }
+.ir-cwk-insights > * { flex: 1 1 280px; min-width: 0; }
+
+/* 建议动作:一行一条 */
+.ir-cwk-suggests { display: flex; flex-direction: column; gap: 8px; }
+.ir-cwk-suggest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.ir-cwk-suggest__label { min-width: 0; }
+.ir-cwk-suggest__ask { margin-left: auto; flex: none; }
+
+/* 多条洞察:标题 + 说明堆叠 */
+.ir-cwk-insight-list { display: flex; flex-direction: column; gap: 10px; }
+.ir-cwk-insight-item { display: flex; flex-direction: column; gap: 2px; }
+.ir-cwk-insight-item__title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.ir-cwk-insight-item__title--high { color: var(--danger-deep); }
+.ir-cwk-insight-item__title--medium { color: var(--warn-ink); }
+.ir-cwk-insight-item__body { font-size: 12px; line-height: 1.7; color: var(--ink-2); }
+
+/* AlertBand 内容:标题(bold)+ 说明 */
+.ir-cwk-alert__title { font-weight: 600; color: var(--ink); }
+.ir-cwk-alert__exp { color: var(--ink-2); }
+
+/* ---- ir-table 宽表(top_customers):自身横向滚动 ---- */
+.ir-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  box-shadow: var(--shadow-card);
+}
+.ir-table__el {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.ir-table__el thead th {
+  text-align: right;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  position: sticky;
+  top: 0;
+}
+.ir-table__el thead th:first-child { text-align: left; }
+.ir-table__el tbody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-hair);
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.ir-table__el tbody td:first-child {
+  text-align: left;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.ir-table__el tbody tr:last-child td { border-bottom: 0; }
+.ir-table__el tbody tr:hover td { background: var(--tint); }
+
+/* ---- 段标题(小节眉题) ---- */
+.ir-cwk-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}

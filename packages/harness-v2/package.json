@@ -1,0 +1,25 @@
+{
+  "name": "@anna/harness-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "playwright": "^1.60.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.2.7"
+  },
+  "devDependencies": {
+    "@anna/eval": "0.0.0",
+    "@anna/event-store": "0.0.0",
+    "@anna/trace": "0.0.0"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Noto+Serif+SC:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:linear-gradient(180deg,#F9F8F4,#F6F5F0);color:#232328;font-family:'Noto Sans SC','PingFang SC','Microsoft YaHei UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#575BC4;text-decoration:none}a:hover{text-decoration:underline}
+@keyframes pulseI{0%{box-shadow:0 0 0 0 rgba(87,91,196,.35)}70%{box-shadow:0 0 0 7px rgba(87,91,196,0)}100%{box-shadow:0 0 0 0 rgba(87,91,196,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<div style="max-width:920px;margin:0 auto;padding:56px 32px 120px">
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;color:#575BC4;font-weight:500">ANNA · DESIGN SPEC · V1.0 · 2026-07-09</div>
+  <h1 style="font-family:'Noto Serif SC',serif;font-size:34px;font-weight:600;margin:10px 0 6px">Anna 设计说明 · 鸢尾 Iris</h1>
+  <p style="font-size:15px;color:#6C6C72;line-height:1.9;max-width:72ch;margin:0 0 6px">面向实现(React 19 + Tailwind v4 + 少量 shadcn)的开发说明。配套高保真稿见 <a href="Anna 重设计 · 墨与信号.dc.html">设计画布</a> 第 4 轮(4a-4f)与第 5 轮(5a-5f:鸢尾绽放装饰套件 v2 + 问候页 / 看板 / 报销 / Create / 产物中心与设置的高保真;§5 点缀规范以 5a 的纪律更新为准——新增绽放鸢尾、金线鸢尾、花瓣飘散、鸢尾光晕、花窗玻璃三档材质)。本文可直接抄:tokens、CSS 配方、组件解剖、帧→UI 映射、W2-W9 预留位。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0;font-size:12px">
+    <span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§1 Tokens</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§2 字体与文案</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§3 动效</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§4 质感配方</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§5 点缀</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§6 组件规格</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§7 页面指引</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§8 W2-W9 预留</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§9 工程需求</span><span style="background:#EFEFFA;color:#44479F;border-radius:999px;padding:3px 12px">§10 落地顺序</span>
+  </div>
+
+  <!-- 0 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§0 性格与三条纪律</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:20px 24px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05),inset 0 1px 0 rgba(255,255,255,.85)">
+    <p style="font-size:14px;line-height:1.9;margin:0 0 10px"><b>Anna 是一位端庄、周正、活泼的大小姐</b>:对您恭敬,但办事有自己的严格章法。设计语言「鸢尾 Iris」= 瓷白的秩序 + 鸢尾的活泼 + 金线的讲究。一句话:<b style="font-family:'Noto Serif SC',serif">恭敬地把事办得漂亮。</b></p>
+    <ul style="font-size:13.5px;line-height:1.9;color:#4A4A50;margin:0;padding-left:20px">
+      <li><b>色彩纪律</b> — 鸢尾 #575BC4 是全产品唯一主色(思考/进行中/可点按);金线 #CBBB8E 只做滚边、每屏至多两处;其余全靠瓷白与墨字。</li>
+      <li><b>诚实纪律</b>(沿用产品红线)— 只渲染真实数据;站位=虚线禁用+「即将上线」;空态就是空态;过程文案全部来自引擎权威帧(ADR-002)。</li>
+      <li><b>透明纪律</b> — Live Loop 不分轮次、思维(step.intent)原样示人、每个瞬间可掀开第二级调用详情。她不藏心事,账本经得起查。</li>
+    </ul>
+  </div>
+
+  <!-- 1 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§1 Design Tokens(浅色主 / 深色补齐)</h2>
+  <p style="font-size:13px;color:#6C6C72;margin:0 0 12px">建议以 Tailwind v4 <span style="font-family:'JetBrains Mono',monospace;font-size:12px">@theme</span> 声明,替换 styles.css :root 现值;命名保持语义(accent → iris)。深色以 <span style="font-family:'JetBrains Mono',monospace;font-size:12px">[data-theme="dark"]</span> 覆写,<b>不是反相</b>:瓷变墨、您的话语变纸、鸢尾提亮。</p>
+  <div style="background:#232328;border-radius:14px;padding:18px 22px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.9;color:#C9CED8;overflow-x:auto">
+    <div style="color:#8B8ED9">@theme &#123; /* light */</div>
+    <div>--color-bg: #F7F6F2; --color-bg-grad-top: #F9F8F4; /* 页面纵向微渐变 */</div>
+    <div>--color-surface: #FFFFFF; --color-surface-2: #FDFCF9; /* 卡面渐变的两端 */</div>
+    <div>--color-ink: #232328; --color-ink-2: #6C6C72; --color-ink-3: #A3A3A8;</div>
+    <div>--color-line: rgb(35 35 40 / 8%); --color-line-strong: rgb(35 35 40 / 14%);</div>
+    <div>--color-iris: #575BC4; --color-iris-deep: #44479F; --color-iris-soft: #EFEFFA;</div>
+    <div>--color-lavender: #B7B9E8; /* 思考点描边 / 书脊渐变末端 */</div>
+    <div>--color-gold: #CBBB8E; /* 滚边专用,禁作底色/文字主体 */</div>
+    <div>--color-user: #55589E; --color-user-grad: #5E62AC → #4F5296;</div>
+    <div>--color-ok: #3E9C82; --color-ok-deep: #2E7A65; --color-warn: #B98A2F; --color-warn-soft: #F8F1E2;</div>
+    <div>--color-danger: #BE4A44; --color-danger-deep: #A93B36; --color-danger-soft: #FBEFEE;</div>
+    <div>--color-delegate: #9C56B8; /* 托付/SubAgent 身份色 */</div>
+    <div>--radius-control: 10px; --radius-card: 16px; --radius-loop: 18px; --radius-pill: 999px;</div>
+    <div>--shadow-card: 0 1px 2px rgb(35 35 40/4%), 0 8px 24px rgb(35 35 40/5%);</div>
+    <div>--shadow-loop: 0 1px 2px rgb(35 35 40/5%), 0 12px 32px rgb(35 35 40/7%);</div>
+    <div style="color:#8B8ED9">&#125;</div>
+    <div style="color:#8B8ED9;margin-top:10px">[data-theme="dark"] &#123;</div>
+    <div>--color-bg: #17171A(渐变顶 #1B1B1F); --color-surface: #232328 → #1E1E22;</div>
+    <div>--color-ink: #ECECF0; --color-ink-2: #A8A8B0; --color-ink-3: #74747C; --color-line: rgb(255 255 255/8%);</div>
+    <div>--color-iris: #8B8ED9(实底按钮渐变 #6A6ED6 → #5155BE); --color-gold: #A6996F;</div>
+    <div>--color-user: 米白纸 #EFEDE5 → #E4E2D9(墨字 #232328); --color-ok: #58B79A; --color-danger: #D96A63;</div>
+    <div style="color:#8B8ED9">&#125;</div>
+  </div>
+
+  <!-- 2 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§2 字体、字阶与文案规范</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:#A3A3A8;margin-bottom:10px">字体栈</div>
+      <div style="font-size:13px;line-height:2;color:#4A4A50">
+        <div><b>衬线(仪式)</b>:Noto Serif SC 500/600 — 问候、空态标题、金句引用、「礼成」、看板报告标题</div>
+        <div><b>黑体(做事)</b>:PingFang SC / MiSans / Noto Sans SC,300/400/500/600 — 一切 UI 与正文</div>
+        <div><b>等宽(账本)</b>:JetBrains Mono 400/500 — 第二级调用详情、run ID、tokens、时长、hash</div>
+        <div style="color:#8F6B24;background:#F8F1E2;border-radius:8px;padding:6px 10px;font-size:12px;margin-top:6px">工程需求:Windows 随包 MiSans 或 HarmonyOS Sans(YaHei 无 300 档,细字重会假粗)</div>
+      </div>
+    </div>
+    <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:#A3A3A8;margin-bottom:10px">字阶(px/行高·字重)</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2.1;color:#4A4A50">
+        <div>display 30/42·serif500 — 问候/空态</div>
+        <div>title 20/30·600 — 页面标题</div>
+        <div>heading 15.5/24·500 — Loop「当下」行</div>
+        <div>body 15/28·400 — 回答正文,max 68ch</div>
+        <div>ui 13/20·400 — 控件/导航/时间线</div>
+        <div>caption 11.5/18·300 — 辅助说明</div>
+        <div>mono-detail 11/19·400 — 第二级详情</div>
+        <div>mono-micro 10.5/16·400 — ID/耗时/消耗</div>
+      </div>
+    </div>
+  </div>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:16px 22px;margin-top:14px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:#A3A3A8;margin-bottom:8px">文案规范(大小姐语体)</div>
+    <div style="font-size:13px;line-height:2;color:#4A4A50">敬称一律「您」;进行中「正在为您办理」;完成「都办妥了。」「请您过目。」;失败先致歉再归因:「抱歉,这一步没有办成——是模型服务超时,并非您的任务有误。」;审批「提交前需要您确认」「等您示下」。禁用:波浪号、颜文字、emoji、卖萌语气词。step.intent 引擎文案照登,不改写。</div>
+  </div>
+
+  <!-- 3 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§3 动效四则</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05)">
+    <div style="font-size:13.5px;line-height:2;color:#4A4A50">
+      <div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#575BC4;animation:pulseI 2.4s ease-out infinite;vertical-align:-1px;margin-right:8px"></span><b>呼吸</b> — 当前瞬间的点:box-shadow 光环 0→7px 透明,2.4s ease-out 循环。<b>全屏唯一常驻动效</b>(历史列表运行点共用)。</div>
+      <div><b>掀开</b> — 第二级详情展开:height + opacity,240ms cubic-bezier(0.2,0,0,1);实现用 grid-template-rows 0fr→1fr 过渡,避免测高。</div>
+      <div><b>落笔</b> — 完成勾:SVG stroke-dashoffset 描画 300ms,一次性;计划项勾选同款。</div>
+      <div><b>留白</b> — 同一时刻至多一处在动:运行中=呼吸点+「当下」行微光(同色系 iris↔lavender 文字渐变 5s);完成/失败=全部静止。</div>
+      <div style="font-size:12px;color:#A3A3A8;margin-top:4px">prefers-reduced-motion: 呼吸降为静态实心点,微光降为纯色,掀开保留(功能性)。</div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§4 质感配方(直接抄)</h2>
+  <div style="background:#232328;border-radius:14px;padding:18px 22px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.9;color:#C9CED8;overflow-x:auto">
+    <div style="color:#8B8ED9">/* 瓷面卡(一切白卡) */</div>
+    <div>background: linear-gradient(180deg,#FFF,#FDFCF9);</div>
+    <div>border: 1px solid rgb(35 35 40/8%); border-radius: 16px;</div>
+    <div>box-shadow: 0 1px 2px rgb(35 35 40/4%), 0 8px 24px rgb(35 35 40/5%), inset 0 1px 0 rgb(255 255 255/85%);</div>
+    <div style="color:#8B8ED9;margin-top:8px">/* Loop 卡追加:左上鸢尾晕 + 书脊 */</div>
+    <div>background: radial-gradient(120% 90% at 0% 0%, rgb(87 91 196/6%), transparent 46%), linear-gradient(180deg,#FFF,#FCFBF8);</div>
+    <div>spine: 3px 纵条 linear-gradient(180deg,#575BC4,#B7B9E8);状态换色:琥珀(审批暂停)/ 胭脂(失败)/ 青瓷(礼成后回看)</div>
+    <div style="color:#8B8ED9;margin-top:8px">/* 主按钮 filled */</div>
+    <div>background: linear-gradient(180deg,#6165CF,#4B4FB2); color:#fff; border-radius:999px;</div>
+    <div>box-shadow: 0 2px 8px rgb(87 91 196/30%), inset 0 1px 0 rgb(255 255 255/25%);</div>
+    <div style="color:#8B8ED9;margin-top:8px">/* tinted 按钮 */ background: rgb(120 120 128/9%); + inset 0 0 0 1px rgb(35 35 40/3%);</div>
+    <div style="color:#8B8ED9;margin-top:8px">/* 您的话语气泡 */</div>
+    <div>background: linear-gradient(180deg,#5E62AC,#4F5296); border-radius:16px 16px 5px 16px;</div>
+    <div>box-shadow: 0 2px 10px rgb(85 88 158/22%), inset 0 1px 0 rgb(255 255 255/16%);</div>
+    <div style="color:#8B8ED9;margin-top:8px">/* 第二级详情面板 */ background: linear-gradient(180deg,#FAF9F5,#F7F6F1); border:1px solid rgb(35 35 40/7%); radius:10px; inset 顶高光;</div>
+  </div>
+
+  <!-- 5 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§5 点缀规范(鸢尾瓣 · 「安」印 · 瓣饰分隔线)</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05)">
+    <div style="display:flex;gap:18px;align-items:center;margin-bottom:10px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2.8c2.3 2.6 2.3 6 0 8.6-2.3-2.6-2.3-6 0-8.6Z" fill="#8B8ED9"/><path d="M4.6 9.6c3.4-.4 6 1.2 7.1 4.5-3.4.4-6-1.2-7.1-4.5Z" fill="#B7B9E8"/><path d="M19.4 9.6c-1.1 3.3-3.7 4.9-7.1 4.5 1.1-3.3 3.7-4.9 7.1-4.5Z" fill="#CBBB8E"/><circle cx="12" cy="12.6" r="1.2" fill="#575BC4"/></svg>
+      <span style="width:18px;height:18px;border:1px solid #C99B95;border-radius:4px;color:#BE4A44;font-family:'Noto Serif SC',serif;font-size:10px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;transform:rotate(-4deg)">安</span>
+      <span style="font-size:13px;color:#6C6C72">SVG 源码见设计画布 4a;三色固定 lavender/iris/gold,禁改色。</span>
+    </div>
+    <div style="font-size:13.5px;line-height:2;color:#4A4A50"><b>出现位置白名单</b>:① 侧栏品牌行(瓣,13px)② 空态插图位(瓣,26px)③「礼成」条(「安」印,18px,-4°)④ 长文档/设置页章节分隔(瓣饰线)⑤ 问候页标题旁(瓣,16px)。<br><b>禁区</b>:运行时间线、数据行、按钮、表格。<b>硬上限:每屏 2 处;永不动画。</b></div>
+  </div>
+
+  <!-- 6 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§6 组件规格</h2>
+
+  <h3 style="font-size:16px;font-weight:600;margin:22px 0 8px">6.1 LoopCard(灵魂组件,五面共用)</h3>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04),0 8px 24px rgba(35,35,40,.05)">
+    <div style="font-size:13px;line-height:1.9;color:#4A4A50;margin-bottom:12px"><b>解剖(自上而下)</b>:书脊(状态色)→ 当下行(呼吸点 + step.intent 微光文字 + 计时)→ 瞬间时间线(左轨 + 可掀开第二级)→ 发丝线 → 计划条(n/m + 分段进度 + 当前项)→(footer 并入计划条右侧:模型 · tokens)。<b>无轮次分组</b>:turn 作为瞬间的 hover 元数据与审计索引保留,不做视觉分组。</div>
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px">
+      <tr><th style="text-align:left;padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.10);color:#6C6C72;font-weight:600;white-space:nowrap">帧 / 事件</th><th style="text-align:left;padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.10);color:#6C6C72;font-weight:600">瞬间(第一级)</th><th style="text-align:left;padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.10);color:#6C6C72;font-weight:600">掀开(第二级)</th></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap">step(analyze)</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">空心 lavender 点 ·「思考 · {intent}」</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">model.call:模型、in/out tokens、起止时刻、可见工具清单</td></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">tool_start/done</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">实心 iris 点 ·「调用 · {工具中文名}」+ ✓/✕/转圈</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">合同版本+hash、起止/耗时、入参与回执预览(待 D8 扩审计载荷)</td></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">event(系统)</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">灰点 ·「启动 · 装载 Skill」等</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">事件原文 + 时间戳</td></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">plan.updated</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">计划条即时刷新(不占时间线行)</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">—(整表见 PlanRail)</td></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">awaiting_approval</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">书脊转琥珀,卡内嵌审批卡(6.4)</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">原始 payload JSON</td></tr>
+      <tr><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">sub_run.*(W7)</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">青莲块「托付 · {Agent}」缩进嵌套</td><td style="padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.06)">子时间线 + 独立 usage;仅一层可见</td></tr>
+      <tr><td style="padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px">done / error</td><td style="padding:7px 12px">礼成条(6.6)/ 失败态(书脊胭脂+错误面板+从断点续办)</td><td style="padding:7px 12px">error 帧原文 + run/turn/provider</td></tr>
+    </table></div>
+    <div style="font-size:13px;line-height:1.9;color:#4A4A50;margin-top:12px"><b>三时态</b>:运行中=呼吸+微光;完成=整卡收拢为「礼成」单行(✓ · 瞬间数 · 计划 · 消耗 · 时长 · ▸ 回看);失败=书脊胭脂、动效全停、失败瞬间默认掀开、动作「从断点续办 / 查看审计 / 复制错误」+ 已产生消耗如实展示。<b>窄容器降级</b>(滑出副驾):默认只显「当下」行+计划条,时间线整体折叠为「▸ 过程 N 个瞬间」。</div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:22px 0 8px">6.2 会话容器三变体(回应 D3)</h3>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-size:13px;line-height:2;color:#4A4A50">共享解剖 <b>① 身份头</b>(头像/名/ProvenanceLine)+ <b>② LoopCard</b> + <b>③ Composer</b>。变体只改容器与裁剪:<br><b>A 整页</b>(Chat):820px 阅读列,画布/计划轨右栏挤压式。<br><b>B 滑出</b>(财务/Hiker):420px 面板,LoopCard 用窄容器降级,建议问题 chips 在身份头下。<br><b>C 双栏</b>(报销):左会话右单据,审批卡出现在会话流内(= LoopCard 暂停形态)。<br>停止键、CTX 指示、权限 pill 三处同位;组件目录建议:<span style="font-family:'JetBrains Mono',monospace;font-size:11.5px">components/agent/&#123;AgentSessionHeader, LoopCard, AgentComposer&#125;</span>,SlideOverQa 与 AgentWorkspace 改为纯容器。</div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:22px 0 8px">6.3 Composer 家族(槽位从此固定)</h3>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-size:13px;line-height:2;color:#4A4A50">底条槽位(左→右):<b>附件</b>(站位,随上传通道)· <b>调优</b>(真)· <b>权限 pill</b>(W4:默认/只读/bypass,激活=iris tinted)· <b>CTX 环</b>(W5:SVG 弧 + 百分比,>80% 转琥珀)· 弹性 · <b>模型档位</b>(W2:lite/default/craft 文字三选)· <b>停止(运行中)/ 发送</b>。<br>输入区:<b>/</b> 上浮命令浮层(W8:技能/动作,mono 前缀)· <b>@</b> 引用胶囊进输入流(iris tinted chip)。运行中发送键 35% 不可用;站位一律虚线。焦点态:边框转 iris 35%。</div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:22px 0 8px">6.4 通用审批卡(W4 通用化)</h3>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-size:13px;line-height:2;color:#4A4A50">= LoopCard 暂停形态:琥珀书脊 + 标题「提交前需要您确认」+ 风险 chip(低=青瓷/中=琥珀/高=胭脂)+ 字段网格(2-3 列,值用 mono)+「▸ 原始 payload」折叠 + 动作对(tinted「返回修改」/ filled「确认提交」)+ 右下「运行已暂停,等您示下」。确认门禁沿用逐字段对账;缺信息变体=同壳换「请您补充」表单(金额=number / 日期=date / 附件=file)。数据源:awaiting_approval 帧 reason+detail。</div>
+  </div>
+
+  <h3 style="font-size:16px;font-weight:600;margin:22px 0 8px">6.5 产物卡三形态 + 6.6 礼成条 / PlanRail + 6.7 状态语法</h3>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-size:13px;line-height:2;color:#4A4A50">
+      <b>产物卡</b>:行内(icon tile 38px iris-soft + 名 + 类型/时间/run + 「在画布打开↗」)/ 画布 tab(iris tinted 激活;「存入产物中心」虚线站位)/ 中心网格卡(icon+名+类型·版本·状态+来源;动作「引用到对话/在 Chat 使用」)。数据源:run.artifacts,产物是一等公民。<br>
+      <b>礼成条</b>:✓(青瓷 tinted)+ 衬线「礼成」+ 瞬间数/计划 + mono 消耗/时长 + ▸ 回看 + 左侧 2px 金线 +「安」印。收拢动画:LoopCard 高度过渡 320ms。<br>
+      <b>PlanRail</b>(右栏):标题+n/m(mono iris)+ 渐变进度条 + 项(✓ filled 渐变圆 / 呼吸环进行中 / 空环待办)+ 底注「plan.updated · 引擎权威帧驱动」。无计划=整个组件不渲染。<br>
+      <b>状态语法</b>(全产品五态):空=留白+一句将发生什么(可配鸢尾瓣)/ 加载=iris 细环+mono 一句 / 错误=danger-soft 圆角块+error 原文 mono / 未连接=warn-soft 块+等待真实数据 / 站位=虚线+「即将上线」。禁止裸 error_code 横幅。</div>
+  </div>
+
+  <!-- 7 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§7 页面指引</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="font-size:13px;line-height:2.1;color:#4A4A50">
+      <b>壳</b>:侧栏 248px(白 55% 面),Apple 式分段控件三模式,CTA 鸢尾渐变胶囊;运行状态徽标沿用真实自检(青瓷/琥珀/灰)。<br>
+      <b>Chat 问候页</b>:衬线 display 问候 + 鸢尾瓣点缀 + composer 为王(瓷面配方),灵感 chips=tinted。<br>
+      <b>财务/Hiker 看板</b>:五段式不动;警示带琥珀书脊、Hero KPI 鸢尾描边、追问/建议=iris tinted;ProvenanceLine 必在;未连 ERP 走状态语法。<br>
+      <b>报销</b>:双栏容器 C;右栏单据卡全部瓷面化;审计证据折叠保留 mono。<br>
+      <b>Create</b>:hero 衬线「描述,即构建」;workshop 五标签(4 虚线等 W9);draft 预览 mono 面板。<br>
+      <b>产物中心</b>:增加「来源」过滤(Create 真 / Chat·Code 虚线),网格卡 6.5;瓣饰分隔线可用于分组。<br>
+      <b>设置分层</b>:默认 Boss 视角=5 张卡(连接 / 模型档案 / 记忆(W6) / 外观 / 关于);「开发者模式」开关后整屏接管现 RuntimeStatusPage 全部面板(2205 行内容不删,只是分层)——D4 密度两极的解法。
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§8 W2-W9 预留位映射</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:14px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px">
+      <tr><th style="text-align:left;padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.10);color:#6C6C72;font-weight:600">批次</th><th style="text-align:left;padding:7px 12px;border-bottom:1px solid rgba(35,35,40,.10);color:#6C6C72;font-weight:600">设计已预留的位置</th></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W2</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">Composer 右侧模型三档 lite/default/craft;历史列表 AI 标题直接替换现名</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W3</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">对话流原生多 turn:每 turn 一张 LoopCard,礼成条即 turn 分隔;历史侧栏变会话列表</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W4</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">权限 pill 槽位(默认虚线→激活 iris tinted);审批卡已通用化(6.4)</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W5</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">CTX 环槽位;时间线灰点新增「压缩 · 上下文已整理」瞬间(event)</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W6</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">时间线灰点「记忆 · 命中 2 条业务记忆 ▸」,掀开列条目;设置 Boss 视角「记忆」卡</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W7</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">青莲托付子块(6.1);Crew 任务卡点开 = 同一 LoopCard 复用</td></tr>
+      <tr><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06);font-family:'JetBrains Mono',monospace;font-size:11.5px">W8</td><td style="padding:6px 12px;border-bottom:1px solid rgba(35,35,40,.06)">/ 命令浮层 + @ 引用胶囊(6.3);调优抽屉内容逐步上浮至浮层</td></tr>
+      <tr><td style="padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px">W9</td><td style="padding:6px 12px">Create 四标签点亮;diff/终端沿用第二级详情的 mono 面板语言</td></tr>
+    </table></div>
+  </div>
+
+  <!-- 9 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§9 对工程的需求清单</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <ol style="font-size:13.5px;line-height:2.1;color:#4A4A50;margin:0;padding-left:20px">
+      <li><b>审计载荷扩展(D8)</b>:tool 事件带入参/回执预览(截断即可)+ 工具合同版本/hash → 第二级详情的核心。</li>
+      <li><b>model.call.completed 细化</b>:in/out tokens 分列、可见工具清单 → 思考瞬间的第二级。</li>
+      <li><b>step/tool 帧带毫秒时间戳</b>(或沿用审计事件差值)→ 每瞬间耗时。</li>
+      <li><b>error 帧字段</b>:turn、provider、可重试标记 → 失败卡与「从断点续办」。</li>
+      <li><b>sub_run.started/done 嵌套帧</b>(W7):父 turn、子 agent id、子 run id、独立 usage,并转发子 step/tool 帧。</li>
+      <li><b>Windows CJK 细字重</b>:随包 MiSans / HarmonyOS Sans。</li>
+      <li><b>Chat 停止按钮接线</b>:signal 已有,补 UI 事件(本设计已画)。</li>
+    </ol>
+  </div>
+
+  <!-- 10 -->
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:22px;font-weight:600;margin:44px 0 10px">§10 落地顺序建议(渐进,不整站重写)</h2>
+  <div style="background:linear-gradient(180deg,#FFFFFF,#FDFCF9);border:1px solid rgba(35,35,40,.08);border-radius:16px;padding:18px 22px;box-shadow:0 1px 2px rgba(35,35,40,.04)">
+    <ol style="font-size:13.5px;line-height:2.1;color:#4A4A50;margin:0;padding-left:20px">
+      <li><b>换血</b>:styles.css :root 替换为 §1 tokens(#2970ff → iris 全局一次到位),字体栈+字阶落地。低风险、全局见效。</li>
+      <li><b>灵魂</b>:新建 LoopCard 组件替换 agchat-* 轨迹(数据源 agentTraceModel.ts 不动,视图重写);Chat 先上,礼成条+失败态+停止键随行。</li>
+      <li><b>统一</b>:AgentSessionHeader / AgentComposer 抽出,SlideOverQa、AgentWorkspace、FinanceQaColumn 换用;审批卡通用化。</li>
+      <li><b>铺面</b>:看板/报销/Create/产物中心换装瓷面配方与状态语法;点缀按 §5 白名单落位。</li>
+      <li><b>深色</b>:data-theme 覆写层 + 设置外观卡;验收对比度(iris 文字在深色一律用 #8B8ED9 以上亮度)。</li>
+      <li><b>分层</b>:设置页 Boss/开发者双视角重组(不删功能,只分层)。</li>
+    </ol>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px"><span style="flex:1;height:1px;background:rgba(35,35,40,.08)"></span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" opacity=".6"><path d="M12 2.8c2.3 2.6 2.3 6 0 8.6-2.3-2.6-2.3-6 0-8.6Z" fill="#8B8ED9"/><path d="M4.6 9.6c3.4-.4 6 1.2 7.1 4.5-3.4.4-6-1.2-7.1-4.5Z" fill="#B7B9E8"/><path d="M19.4 9.6c-1.1 3.3-3.7 4.9-7.1 4.5 1.1-3.3 3.7-4.9 7.1-4.5Z" fill="#CBBB8E"/></svg><span style="flex:1;height:1px;background:rgba(35,35,40,.08)"></span></div>
+    <div style="text-align:center;font-size:12px;color:#A3A3A8;margin-top:10px">Anna 设计说明 · 鸢尾 Iris · 2026-07-09 · 配套画布:Anna 重设计 · 墨与信号.dc.html(第 4 轮)</div>
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>

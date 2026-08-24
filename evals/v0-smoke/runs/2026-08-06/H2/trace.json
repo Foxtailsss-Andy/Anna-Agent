@@ -1,0 +1,97 @@
+{
+  "trace_id": "chat_run_008",
+  "surface": "chat",
+  "spans": [
+    {
+      "span_id": "s1",
+      "parent_span_id": null,
+      "name": "invoke_agent chat",
+      "kind": "agent",
+      "start_time": "2026-08-06T07:19:44.849000",
+      "end_time": "2026-08-06T07:19:53.931000",
+      "duration_ms": 9082,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "anna.chat",
+        "gen_ai.conversation.id": "chat_run_008",
+        "anna.turns": 1
+      },
+      "events": [
+        {
+          "name": "chat.run.created",
+          "time": "2026-08-06T07:19:44.849000",
+          "attributes": {
+            "message_hash": "b48eb72f3c9618c0740acca2a794ccb4ea0b55d0d968d05b61cdf63c6fc79fee"
+          }
+        },
+        {
+          "name": "skill.loaded",
+          "time": "2026-08-06T07:19:44.865000",
+          "attributes": {
+            "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff",
+            "skill_id": "chat/general-assistant",
+            "skill_name": "general-assistant-chat",
+            "skill_version": "0.1.0"
+          }
+        },
+        {
+          "name": "frame.done",
+          "time": "2026-08-06T07:19:53.931000",
+          "attributes": {}
+        }
+      ]
+    },
+    {
+      "span_id": "s2",
+      "parent_span_id": "s1",
+      "name": "turn 1",
+      "kind": "turn",
+      "start_time": "2026-08-06T07:19:44.865000",
+      "end_time": "2026-08-06T07:19:53.931000",
+      "duration_ms": 9066,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "chat.response.generated",
+          "time": "2026-08-06T07:19:53.931000",
+          "attributes": {
+            "response_hash": "cb02ce7690e05774d1505509bc03b3d6c787d10812214d1203c569cb443717be"
+          }
+        },
+        {
+          "name": "step.deliver",
+          "time": "2026-08-06T07:19:53.931000",
+          "attributes": {
+            "intent": "正在组织回答"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s3",
+      "parent_span_id": "s2",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T07:19:48.472000",
+      "end_time": "2026-08-06T07:19:53.931000",
+      "duration_ms": 5459,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 572,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 100,
+        "anna.text_delta_count": 172,
+        "gen_ai.usage.input_tokens": 1115,
+        "gen_ai.usage.output_tokens": 279,
+        "gen_ai.response.finish_reasons": [
+          "stop"
+        ]
+      },
+      "events": []
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+/* AnnaShell · 外壳布局(《R3 外壳》Task 2 Step 2)
+   左 Sidebar + 右 main(页面纵向微渐变背景);各 section visited-mounted 保活。
+   carry-item(R1):壳根设 font-family / color,禁 body 回落 Times New Roman。 */
+
+.ir-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.ir-shell__main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: linear-gradient(180deg, var(--bg-grad-top), var(--bg-grad-bottom));
+}
+
+/* 单个 section 保活容器:非当前 display:none(不卸载,免流中断) */
+.ir-shell__page {
+  height: 100%;
+}
+.ir-shell__page--hidden {
+  display: none;
+}
+
+/* ---- 区占位屏(本切片:瓷面卡 + StateNote stub;R4-R8 逐个替换真页面) ---- */
+.ir-placeholder {
+  min-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 36px;
+}
+.ir-placeholder__card {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), var(--inset-top);
+  padding: 26px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ir-placeholder__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--iris);
+  font-weight: 500;
+}
+.ir-placeholder__title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}

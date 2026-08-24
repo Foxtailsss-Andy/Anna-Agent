@@ -1,0 +1,56 @@
+{
+  "source": "demo-erp REST :8970 (primary per spec 2.4; seed doc fallback NOT used)",
+  "rest": {
+    "/api/pnl?period=2026-06": {
+      "period": "2026-06",
+      "revenue": 4820000.0,
+      "cogs": 980000.0,
+      "opex": 2660000.0,
+      "expense_total": 3640000.0,
+      "profit": 1180000.0,
+      "opex_detail": { "6601": 1440000.0, "6602": 620000.0, "6604": 600000.0 },
+      "has_detail": true,
+      "note": "演示数据"
+    }
+  },
+  "expected": {
+    "revenue": 4820000.0,
+    "profit": 1180000.0
+  },
+  "tool_contract_change_since_r1": {
+    "note": "erp.finance.query now REQUIRES an explicit `period` (YYYY-MM). Calling with question-only now returns error invalid_arguments 'period 参数非法（应为 YYYY-MM）：None（演示数据）'. This is the same error that killed r1's S1 run; it is now a normal, recoverable observation (F1).",
+    "probe_question_only": {
+      "erp.finance.query{question:'2026年6月的收入和净利润'}": {
+        "jsonrpc": "2.0", "id": "gt",
+        "error": { "code": "invalid_arguments", "message": "period 参数非法（应为 YYYY-MM）：None（演示数据）", "retryable": false }
+      }
+    }
+  },
+  "tool_capability_probe": {
+    "note": "Confirms every figure Anna emitted in G1 is a relayed tool string, not an invention.",
+    "erp.finance.query{question:'收入和净利润',period:'2026-06'}": {
+      "structuredContent": {
+        "question": "收入和净利润",
+        "period": "2026-06",
+        "answer": "【演示数据】2026-06 本月收入约 482万，由软件订阅(SaaS)、实施服务、运维服务三条线构成。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    },
+    "erp.finance.query{question:'净利润是多少',period:'2026-06'}": {
+      "structuredContent": {
+        "question": "净利润是多少",
+        "period": "2026-06",
+        "answer": "【演示数据】2026-06 利润约 118万，经营现金流约 76万；现金流低于利润主要因回款放缓。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    },
+    "erp.finance.query{question:'成本费用',period:'2026-06'}": {
+      "structuredContent": {
+        "question": "成本费用",
+        "period": "2026-06",
+        "answer": "【演示数据】2026-06 本月费用约 364万，其中主营成本、销售费用(含市场/差旅)、管理费用、研发费用按科目归集；市场费用环比上升明显。",
+        "sources": ["erp.finance.query", "演示租户账套 demo-erp-2026"]
+      }
+    }
+  }
+}

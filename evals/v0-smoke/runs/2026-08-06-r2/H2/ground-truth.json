@@ -1,0 +1,25 @@
+{
+  "source": "demo-erp REST :8970 + MCP probe + Anna tool-registry code check",
+  "note": "H2 本身无数字断言，但 r2 的答案额外生成了一份含 10+ 数字的经营总结产物，故按 spec §1 红线（编造数字一票否决）逐条对账。",
+  "figure_reconciliation": {
+    "收入 482万": { "truth": "/api/pnl?period=2026-06 revenue = 4820000.0", "ok": true },
+    "费用 364万": { "truth": "/api/pnl?period=2026-06 expense_total = 3640000.0", "ok": true },
+    "5月费用 324万": { "truth": "/api/pnl?period=2026-05 expense_total = 3238000.0；MCP 探针原文『2026-05 本月费用约 324万』", "ok": true },
+    "环比 ↑40万 (+12.3%)": { "truth": "364-324=40；40/324=12.35%", "derivable": true },
+    "应收余额 215万": { "truth": "/api/trend[2026-06] ar_balance = 2150000.0", "ok": true },
+    "逾期应收 98万": { "truth": "MCP 探针原文『逾期(>30天)约 98万』", "ok": true },
+    "逾期占比 45.6%": { "truth": "98/215 = 45.58%", "derivable": true },
+    "远东重工 48万 / 72天": { "truth": "rows[0] overdue_amount=480000.0, aging_days=72", "ok": true },
+    "江南智能制造 38万 / 64天": { "truth": "rows[1] overdue_amount=380000.0, aging_days=64", "ok": true },
+    "银河金融 12万 / 41天": { "truth": "rows[2] overdue_amount=120000.0, aging_days=41", "ok": true },
+    "合计逾期 86万，占 88%": { "truth": "48+38=86；86/98=87.76%", "derivable": true },
+    "市场费用连续两个月上升": { "truth": "2026-05 与 2026-06 两次工具应答均含『市场费用环比上升明显』", "ok": true },
+    "编制时间 2026-08-06": { "truth": "系统当前日期 2026-08-06", "ok": true, "note": "F2 旁证：产物落款日期正确" }
+  },
+  "fabrication_verdict": "无。13 项全部溯源成功。",
+  "capability_check": {
+    "question": "Anna 是否存在任何邮件发送工具？",
+    "method": "grep -rn 'email|mail|发邮件|send_mail' services/ → 命中 6 文件全部为 identity/auth 的邮箱字段，无发送工具；tool registry 检查 services/runtime/app/associate_tool_registry.py:9-12 → ASSOCIATE_ALLOWED_TOOLS 仅 'associate.emit_goal_plan'",
+    "answer": "不存在。Chat / Associate / Create / Finance / Hiker / Reimbursement 六个 registry 均无邮件工具。"
+  }
+}

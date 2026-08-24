@@ -1,0 +1,159 @@
+{
+  "trace_id": "chat_run_013",
+  "surface": "chat",
+  "spans": [
+    {
+      "span_id": "s1",
+      "parent_span_id": null,
+      "name": "invoke_agent chat",
+      "kind": "agent",
+      "start_time": "2026-08-06T07:23:13.361000",
+      "end_time": "2026-08-06T07:23:26.279000",
+      "duration_ms": 12918,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "anna.chat",
+        "gen_ai.conversation.id": "chat_run_013",
+        "anna.turns": 2
+      },
+      "events": [
+        {
+          "name": "chat.run.created",
+          "time": "2026-08-06T07:23:13.361000",
+          "attributes": {
+            "message_hash": "fb1b886687c12648118196dc729b12f4e5d4699b8418937ccf6838d12924dc27"
+          }
+        },
+        {
+          "name": "skill.loaded",
+          "time": "2026-08-06T07:23:13.377000",
+          "attributes": {
+            "content_hash": "aacf25c1f9c1e471d2f9e22f222e13f9cdd453850de5672c5027488b15abb0ff",
+            "skill_id": "chat/general-assistant",
+            "skill_name": "general-assistant-chat",
+            "skill_version": "0.1.0"
+          }
+        },
+        {
+          "name": "frame.done",
+          "time": "2026-08-06T07:23:26.279000",
+          "attributes": {}
+        }
+      ]
+    },
+    {
+      "span_id": "s2",
+      "parent_span_id": "s1",
+      "name": "turn 1",
+      "kind": "turn",
+      "start_time": "2026-08-06T07:23:13.377000",
+      "end_time": "2026-08-06T07:23:16.016000",
+      "duration_ms": 2639,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "mcp.tool.called",
+          "time": "2026-08-06T07:23:16.016000",
+          "attributes": {
+            "input_hash": "5524f65332d9655a0a12686e2fbc388d4ad7b42123b66af738839f499672699a",
+            "status": "success",
+            "tool_name": "erp.finance.query"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s3",
+      "parent_span_id": "s2",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T07:23:14.740000",
+      "end_time": "2026-08-06T07:23:16.006000",
+      "duration_ms": 1266,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 581,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 100,
+        "anna.text_delta_count": 18,
+        "gen_ai.usage.input_tokens": 1124,
+        "gen_ai.usage.output_tokens": 123,
+        "gen_ai.response.finish_reasons": [
+          "tool_calls"
+        ]
+      },
+      "events": []
+    },
+    {
+      "span_id": "s4",
+      "parent_span_id": "s2",
+      "name": "execute_tool erp.finance.query",
+      "kind": "tool",
+      "start_time": "2026-08-06T07:23:16.007000",
+      "end_time": "2026-08-06T07:23:16.016000",
+      "duration_ms": 9,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "erp.finance.query",
+        "anna.step.intent": "正在查询 ERP 财务数据"
+      },
+      "events": []
+    },
+    {
+      "span_id": "s5",
+      "parent_span_id": "s1",
+      "name": "turn 2",
+      "kind": "turn",
+      "start_time": "2026-08-06T07:23:16.016000",
+      "end_time": "2026-08-06T07:23:26.279000",
+      "duration_ms": 10263,
+      "status": "ok",
+      "attributes": {},
+      "events": [
+        {
+          "name": "chat.response.generated",
+          "time": "2026-08-06T07:23:26.268000",
+          "attributes": {
+            "response_hash": "fa2dcfc205e4f580e8cc8c983e9d1c1294dc82ad5183a220b955672414cd1167"
+          }
+        },
+        {
+          "name": "step.deliver",
+          "time": "2026-08-06T07:23:26.268000",
+          "attributes": {
+            "intent": "正在组织回答"
+          }
+        }
+      ]
+    },
+    {
+      "span_id": "s6",
+      "parent_span_id": "s5",
+      "name": "chat deepseek-v4-pro",
+      "kind": "inference",
+      "start_time": "2026-08-06T07:23:19.857000",
+      "end_time": "2026-08-06T07:23:26.268000",
+      "duration_ms": 6411,
+      "status": "ok",
+      "attributes": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "deepseek-v4-pro",
+        "anna.context.token_count": 800,
+        "anna.context.window": 200000,
+        "anna.context.percent_left": 100,
+        "anna.text_delta_count": 227,
+        "gen_ai.usage.input_tokens": 1345,
+        "gen_ai.usage.output_tokens": 317,
+        "gen_ai.response.finish_reasons": [
+          "stop"
+        ]
+      },
+      "events": []
+    }
+  ]
+}

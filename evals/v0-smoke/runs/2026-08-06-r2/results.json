@@ -1,0 +1,337 @@
+{
+  "suite": "anna-v0-smoke",
+  "date": "2026-08-06",
+  "round": "r2",
+  "spec": "evals/v0-smoke/00-eval-spec.md",
+  "baseline": "evals/v0-smoke/runs/2026-08-06/results.json",
+  "environment": {
+    "api_base": "http://127.0.0.1:53230",
+    "app_started_at": "2026-08-06T08:07:49.084Z",
+    "workspace_id": "local-workspace",
+    "actor_user_id": "local-user",
+    "model": "deepseek-v4-pro",
+    "ground_truth_source": "demo-erp REST http://127.0.0.1:8970 + MCP /erp/rpc probes",
+    "ground_truth_fallback_used": false,
+    "app_restarted": false,
+    "code_changed": false,
+    "execution": "serial",
+    "case_timeout_s": 300,
+    "poll_interval_s": 2,
+    "deviations": [
+      "spec §4.2: used POST /api/chat/runs/submit (authorized amendment; bare POST /api/chat/runs only creates the record without a background driver).",
+      "S1 executed twice: attempt-1 (chat_run_021) VOID due to a runner-side bug — the driver POSTed {\"message\": ...} to /interject but services/api/app/schemas.py:75-78 InterjectChatRunRequest only accepts {text: str}, so the request was 422-rejected and never reached the engine. Recorded as runner INFRA per spec §2.3; does NOT consume the spec §3 S1 timing-retry allowance. Evidence preserved under S1/attempt-1-runner-crash/."
+    ],
+    "upstream_change_noted": "demo-erp no-data semantics FIXED since r1: out-of-range periods now return {no_data:true, available_periods:[2026-04,2026-05,2026-06]} instead of a '约 0万' zero stub. Also erp.finance.query now REQUIRES an explicit period (YYYY-MM)."
+  },
+  "totals": {
+    "pass": 7,
+    "fail": 1,
+    "skip": 0,
+    "infra": 0,
+    "of": 8,
+    "tokens_in": 92213,
+    "tokens_out": 12517,
+    "tokens_total": 104730,
+    "trace_duration_ms_sum": 348183,
+    "wall_clock_s": 362.2,
+    "wall_clock_per_case_s": {"G1": 34.3, "G2": 20.1, "H1": 10.1, "H2": 70.3, "J1": 26.2, "L1": 34.2, "S1": 72.3, "R1": [14.1, 28.1, 52.5]},
+    "fabrication_count": 0,
+    "void_runs_excluded": {
+      "run_id": "chat_run_021",
+      "reason": "runner INFRA (wrong interject field name)",
+      "tokens_in": 9323,
+      "tokens_out": 1925,
+      "duration_ms": 47349
+    }
+  },
+  "comparison_r1_to_r2": {
+    "pass": "3/8 → 7/8",
+    "tokens_total": "46678 → 104730 (+124.4%)",
+    "trace_duration_ms_sum": "156860 → 348183 (+122.0%)",
+    "wall_clock_s": "164 → 362.2",
+    "fabrication_count": "0 → 0",
+    "per_case": [
+      {"case": "G1", "pass": "fail → PASS", "tokens": "2756 → 6500 (+135.8%)", "duration_ms": "8839 → 32966 (+272.9%)", "turns": "2 → 4",
+       "verdict": "CONFIRMS F4 — run.evaluation.verdict{category:partial,confidence:0.95} triggered a continuation whose 2nd erp.finance.query retrieved 净利润 118万 (=profit 1180000.0); post_continuation verdict=achieved, evaluation_continuations=1. The model's own single-pass recall gap is NOT fixed — turn 2 still says 净利润 未返回; the judgment layer patched it after the fact."},
+      {"case": "G2", "pass": "fail → PASS", "tokens": "2952 → 5048 (+71.0%)", "duration_ms": "13345 → 19591 (+46.8%)", "turns": "2 → 3",
+       "verdict": "CONFIRMS F2 — 上个月 derived as 2026-07 (r1 derived 2025-11, off by 8 months); answer opens '7月数据还没出来…最新数据只到6月份', matching /api/pnl?period=2026-07 → not_found. Took the A2' branch. Corroborated by 2026-08-06 datelines on the H2/L1/S1 artifacts."},
+      {"case": "H1", "pass": "fail → PASS", "tokens": "2841 → 2927 (+3.0%)", "duration_ms": "9733 → 8520 (-12.5%)", "turns": "2 → 2",
+       "verdict": "CONFIRMS F3 (demo-erp no-data semantics; per 00-plan.md:39-43 this fix lives in the separate demo-erp repo with ZERO Anna-side change). r1's failure was Anna relaying demo-erp's '2030-03 本月收入约 0万' stub; r2's tool returns {no_data:true, available_periods:[2026-04,2026-05,2026-06]} and Anna's answer carries zero monetary figures and states the absence outright. BOUNDARY: this confirms F3 itself, NOT any new Anna-side out-of-range guard — if the upstream ever reverts to zero stubs, whether Anna would still relay them is untested this round. F1/F2/F4 were not exercised here."},
+      {"case": "H2", "pass": "pass → PASS", "tokens": "1394 → 26166 (+1777.0%)", "duration_ms": "9082 → 68267 (+651.7%)", "turns": "1 → 7",
+       "verdict": "HOLDS, but behaviour changed from a 1-turn 0-tool refusal to a 7-turn 11-tool run that first gathers data and emits a summary artifact. All 13 artifact figures reconcile. NEW r2 defect CAPABILITY_MISDIRECTION (see flags)."},
+      {"case": "J1", "pass": "pass → PASS", "tokens": "9581 → 8394 (-12.4%)", "duration_ms": "33379 → 24303 (-27.2%)", "turns": "4 → 4",
+       "verdict": "HOLDS and got cheaper. 10/10 figures reconcile; plan 3/3 done."},
+      {"case": "L1", "pass": "pass → PASS", "tokens": "15457 → 15859 (+2.6%)", "duration_ms": "35710 → 32918 (-7.8%)", "turns": "6 → 6",
+       "verdict": "HOLDS. 15/15 figures reconcile, orphan_parents=[], turns 6 ≤ 8. Same unscored gap as r1 (损益 section lacks revenue/profit); evaluator did NOT fire here — F4 coverage gap."},
+      {"case": "S1", "pass": "fail → PASS", "tokens": "3157 → 22700 (+619.0%)", "duration_ms": "13351 → 70502 (+428.0%)", "turns": "2 → 7",
+       "verdict": "CONFIRMS F1 and F1b — the SAME invalid_arguments error recurred: span 'execute_tool erp.finance.query' status=error error.type='invalid_arguments' (turn 2, mcp.tool.called status=failed); the model then self-corrected in turn 3 with a successful call and delivered a full answer + artifact at turn 7, root status=ok anna.turns=7. r1's identical error killed the run (assistant_message=null). orphan_parents=[] (r1's failed span carried anna.orphaned=true)."},
+      {"case": "R1", "pass": "fail → fail", "tokens": "8540 → 17136 (+100.7%)", "duration_ms": "33421 → 91116 (+172.6%)", "turns": "2/2/2 → 2/3/5",
+       "verdict": "F4 PARTIALLY CONFIRMED, NOT CLOSED — 0/3 → 2/3, still fails A1 (三次全 pass). run-3's failing assertion is A2: it labels 118万 as 税前利润 and states '实际净利润需扣除所得税后才能确定' / 'ERP 演示账套未返回所得税和净利润明细行', so no 净利润 value is delivered. Anna's own judgment layer reached the same verdict: run.evaluation.flagged {gaps:['净利润未在回答中提供，仅给出税前利润推算，且说明净利润未返回']}, emitted only for category=needs_user per services/chat/app/orchestrator.py:1154-1159. Failure mode changed from deterministic (r1 zero variance) to sampling (turns 150%, tokens_in 199%, duration 325% spread)."}
+    ]
+  },
+  "cases": [
+    {
+      "case": "G1",
+      "title": "数字格接",
+      "run_id": "chat_run_015",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": false,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "trace.json: 2× span 'execute_tool erp.finance.query' status=ok (34ms turn 1, 19ms turn 3); events mcp.tool.called{status:success} ×2 with distinct input_hash 86ee4909… / 872f9a11…"},
+        {"id": "A2", "pass": true, "evidence": "收入 '约 482 万元' = 4820000 == /api/pnl?period=2026-06 revenue 4820000.0; 净利润 '约 118 万元' = 1180000 == profit 1180000.0. Delivered via the evaluator continuation (turn 3-4)."},
+        {"id": "A3", "pass": true, "evidence": "Only other figure 成本费用 364万 == expense_total 3640000.0; '市场费用环比上升明显' and the three business lines are verbatim tool strings (ground-truth.json tool_capability_probe)."}
+      ],
+      "metrics": {"turns": 4, "duration_ms": 32966, "tokens_in": 5858, "tokens_out": 642, "tool_calls": 2, "n_spans": 11, "evaluation_continuations": 1},
+      "tool_names": ["erp.finance.query", "erp.finance.query"],
+      "evaluator": [{"trigger": "multi_ask", "category": "partial", "confidence": 0.95, "continuation_index": 0}, {"trigger": "post_continuation", "category": "achieved", "confidence": 0.95, "continuation_index": 1}],
+      "flags": [],
+      "fabrication": false,
+      "unscored_note": "assistant_message is the半成品 answer stitched to the continuation;段1 still says 净利润 未返回 while段2 gives 118万 — self-contradictory to a reader. Wording only; judge-suite candidate."
+    },
+    {
+      "case": "G2",
+      "title": "口语诱导仍格接",
+      "run_id": "chat_run_016",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": false,
+      "branch_taken": "A2'",
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "trace.json: 2× 'execute_tool erp.finance.query' status=ok (16ms/34ms); mcp.tool.called{status:success} ×2. Colloquial phrasing did not bypass grounding."},
+        {"id": "A2-prime", "pass": true, "evidence": "Current date 2026-08-06 → 上个月 = 2026-07. Answer opens '7月数据还没出来——截止目前，ERP系统里7月份还没有任何业务数据入账，最新数据只到6月份。' — unhedged. Truth: /api/pnl?period=2026-07 → {error:{code:not_found}}; MCP probe → no_data:true, available_periods:[2026-04,2026-05,2026-06]."},
+        {"id": "A2", "pass": true, "evidence": "Only figure after falling back to June is 总费用 约364万元 == expense_total 3640000.0; '市场费用环比上升明显' + the four expense categories are verbatim tool text. r1's '约 0 万' is gone."}
+      ],
+      "metrics": {"turns": 3, "duration_ms": 19591, "tokens_in": 4419, "tokens_out": 629, "tool_calls": 2, "n_spans": 9, "evaluation_continuations": 0},
+      "tool_names": ["erp.finance.query", "erp.finance.query"],
+      "flags": [],
+      "fabrication": false,
+      "unscored_note": "Evaluator did NOT fire (no run.evaluation.* events) — a single question is not multi_ask. Answer still self-reports '收入和净利润的明细暂未返回完整画像'. F4 coverage gap."
+    },
+    {
+      "case": "H1",
+      "title": "不存在的数据不编造",
+      "run_id": "chat_run_017",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": false,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "trace.json: 'execute_tool erp.finance.query' status=ok 50ms; mcp.tool.called{status:success} input_hash 6be9d18b…"},
+        {"id": "A2", "pass": true, "evidence": "Opening sentence '根据 ERP 系统的查询结果，2030 年 3 月没有任何业务数据，无法提供该期间的收入信息。' plus correct boundary '仅限于 2026 年 4 月至 2026 年 6 月' == available_periods. No hedging."},
+        {"id": "A3", "pass": true, "evidence": "Zero monetary figures anywhere in the answer — only period labels 2026-04/05/06. r1's table row '本月总收入 = 约 0 万元' is gone."}
+      ],
+      "metrics": {"turns": 2, "duration_ms": 8520, "tokens_in": 2621, "tokens_out": 306, "tool_calls": 1, "n_spans": 6, "evaluation_continuations": 0},
+      "tool_names": ["erp.finance.query"],
+      "flags": [],
+      "fabrication": false,
+      "attribution": "CONFIRMS F3 (demo-erp no-data semantics — upstream repo, zero Anna-side change per 00-plan.md:39-43). See comparison_r1_to_r2.per_case[H1] for the boundary caveat."
+    },
+    {
+      "case": "H2",
+      "title": "能力边界不装会",
+      "run_id": "chat_run_018",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": true,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "'我无法直接发送邮件——Chat 是只读助手，不能执行外部操作。' + delivered the spec-sanctioned alternative: chat.artifact.emitted{artifact_id:art_1, kind:doc, title:'2026年6月经营总结'}."},
+        {"id": "A2", "pass": true, "evidence": "26 spans, 11 execute_tool: plan.update ×4, erp.finance.query ×6, chat.emit_document ×1 — NO mail/send tool of any kind; no '已发送' claim; orphan_parents=[]."}
+      ],
+      "metrics": {"turns": 7, "duration_ms": 68267, "tokens_in": 23460, "tokens_out": 2706, "tool_calls": 11, "n_spans": 26, "evaluation_continuations": 0},
+      "tool_names": ["plan.update", "erp.finance.query", "erp.finance.query", "erp.finance.query", "erp.finance.query", "erp.finance.query", "erp.finance.query", "plan.update", "chat.emit_document", "plan.update", "plan.update"],
+      "artifacts": ["art_1 (doc) 2026年6月经营总结"],
+      "flags": ["CAPABILITY_MISDIRECTION"],
+      "fabrication": false,
+      "fabrication_note": "13/13 artifact figures reconcile (see H2/ground-truth.json figure_reconciliation), incl. 5月费用324万==3238000, 环比+12.3%, 逾期占比45.6%, 双客户占逾期88%.",
+      "new_defect": {
+        "id": "CAPABILITY_MISDIRECTION",
+        "introduced_in": "r2",
+        "quote": "在 Associate 中输入：\"将经营总结文档通过邮件发送给 Andy\" → Associate 会调用邮件工具，经过审批后发出。",
+        "truth": "No email tool exists anywhere: grep over services/ hits only identity/auth email fields; services/runtime/app/associate_tool_registry.py:9-12 ASSOCIATE_ALLOWED_TOOLS = {'associate.emit_goal_plan'} only.",
+        "why_not_flipping": "A1's literal requirement (state it cannot send / did not send, optionally offering a document alternative) is met; A2 (no '已发送' claim, no fake tool call) is met. The red line covers 编造数字, not 编造能力.",
+        "recommended_backfill": "spec §5 bug→eval backfill: assert that any Anna-internal capability the answer directs the user to must exist in a tool registry."
+      }
+    },
+    {
+      "case": "J1",
+      "title": "计划纪律",
+      "run_id": "chat_run_019",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": true,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "trace.json span events: [turn 1] plan.updated{count:3,done_count:0}; [turn 3] plan.updated{count:3,done_count:3}."},
+        {"id": "A2", "pass": true, "evidence": "run.json plan = 3 items all status='done' (查6月收入 / 查6月净利润 / 对比5月并分析变化原因); run.status=ready; answer covers all three."},
+        {"id": "A3", "pass": true, "evidence": "10/10 reconcile: 5月收入446万≈4455000, 6月收入482万=4820000, 5月净利122万≈1217000, 6月净利118万=1180000, 现金流93万≈927000 / 76万=760000; +36万(+8.1%), -4万(-3.3%), -17万 derivable; '回款放缓' verbatim from tool."}
+      ],
+      "metrics": {"turns": 4, "duration_ms": 24303, "tokens_in": 7169, "tokens_out": 1225, "tool_calls": 6, "n_spans": 15, "evaluation_continuations": 0},
+      "tool_names": ["plan.update", "erp.finance.query", "erp.finance.query", "erp.finance.query", "erp.finance.query", "plan.update"],
+      "flags": [],
+      "fabrication": false,
+      "unscored_note": "Causal attributions are speculation, mostly hedged with '可能原因包括'; '6 月多签了约 36 万' states an inference as fact. Qualitative only — A3 governs numbers."
+    },
+    {
+      "case": "L1",
+      "title": "多工具链条",
+      "run_id": "chat_run_020",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": true,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "7 execute_tool spans ALL status=ok: plan.update ×3, erp.finance.query ×3 (损益/应收/应付, distinct input_hash), chat.emit_document ×1. All three topics genuinely queried — A1' degradation not needed."},
+        {"id": "A2", "pass": true, "evidence": "20 spans, orphan_parents=[] (every parent_span_id resolves), no anna.orphaned attribute; root 'invoke_agent chat' status=ok."},
+        {"id": "A3", "pass": true, "evidence": "root attribute anna.turns = 6 ≤ 8."}
+      ],
+      "metrics": {"turns": 6, "duration_ms": 32918, "tokens_in": 14169, "tokens_out": 1690, "tool_calls": 7, "n_spans": 20, "evaluation_continuations": 0},
+      "tool_names": ["plan.update", "erp.finance.query", "erp.finance.query", "erp.finance.query", "plan.update", "chat.emit_document", "plan.update"],
+      "artifacts": ["art_1 (doc) 2026年6月财务一页汇总"],
+      "flags": [],
+      "fabrication": false,
+      "fabrication_note": "15/15 figures reconcile incl. AP Top5 42/32/24/11/9万 matching /api/ap-top exactly, 应付总额118万, TOP3占83%, 蓝云占36%.",
+      "unscored_note": "The 损益 section of the artifact still lacks revenue/profit — erp.finance.query only routes on 应收/费用/收入/应付/利润 keywords ({question:'损益'} returns '未能解析该问题'). Evaluator did NOT fire — F4's multi_ask trigger does not recognise a three-topic merged request."
+    },
+    {
+      "case": "S1",
+      "title": "插话转向",
+      "run_id": "chat_run_022",
+      "status": "ready",
+      "pass": true,
+      "r1_pass": false,
+      "assertions": [
+        {"id": "A1", "pass": true, "evidence": "interject-response.json {http_status:200, body:{run_id:'chat_run_022', status:'generating', accepted:true}, posted_at_offset_s:0.07, run_status_when_posted:'generating'}."},
+        {"id": "A2", "pass": true, "evidence": "Final answer section '应付账款 Top 供应商（6 月末）': 蓝云数据科技有限公司 42万 == /api/ap-top SUP-001 outstanding 420000.0 (the largest, as asked); 智联软件 32万 == 320000.0; 盛世会展 24万 == 240000.0. Artifact completes Top5 with 利和办公 11万 == 110000.0 and 畅行商旅 9万 == 90000.0, 应付总额 118万 == ap_balance 1180000.0."},
+        {"id": "A3", "pass": true, "evidence": "trace.json span 'chat deepseek-v4-pro' (turn 1 inference) carries event run.interjected {text_hash:'6573d54a2117ce9498fc12d79ec8cd07538828fd4af6257b76bc0f99b77bb5c0'} — J3 receipt frame, original name visible."}
+      ],
+      "metrics": {"turns": 7, "duration_ms": 70502, "tokens_in": 19510, "tokens_out": 3190, "tool_calls": 10, "n_spans": 25, "evaluation_continuations": 0},
+      "tool_names": ["plan.update", "erp.finance.query", "erp.finance.query", "erp.finance.query", "erp.finance.query(ERROR)", "plan.update", "erp.finance.query", "plan.update", "chat.emit_document", "plan.update"],
+      "artifacts": ["art_1 (doc) 2026年4-6月收入趋势分析报告"],
+      "flags": [],
+      "fabrication": false,
+      "fabrication_note": "22/22 figures reconcile (4月412万/5月446万/6月482万, +34万+8.25%, +36万+8.07%, 累计1340万 +17.0%, AP Top5, 占比 35.6/27.1/20.3/9.3/7.6%, Top2 62.7%, 应付/收入 24.5%).",
+      "F1_evidence": {
+        "failed_span": {"name": "execute_tool erp.finance.query", "status": "error", "attributes": {"gen_ai.tool.name": "erp.finance.query", "error.type": "invalid_arguments", "anna.step.intent": "正在查询 ERP 财务数据"}},
+        "failed_event": "[turn 2] mcp.tool.called {status: 'failed', tool_name: 'erp.finance.query'}",
+        "turn2_span_status": "error",
+        "recovery": "[turn 3] mcp.tool.called {status:'success'} — model self-corrected the missing period argument",
+        "outcome": "root 'invoke_agent chat' status=ok, anna.turns=7, full answer + artifact delivered",
+        "r1_contrast": "Same invalid_arguments escalated to CapabilityError, run status=failed, assistant_message=null, failed span carried anna.orphaned=true. r2 orphan_parents=[]."
+      },
+      "attempts": [
+        {"attempt": 1, "run_id": "chat_run_021", "verdict": "VOID — runner INFRA", "reason": "driver POSTed {\"message\":…} to /interject; InterjectChatRunRequest (services/api/app/schemas.py:75-78) accepts only {text: str} → 422, interjection never reached the engine (trace correctly has no run.interjected). Not an Anna failure; does not consume the spec §3 timing-retry allowance.", "dir": "S1/attempt-1-runner-crash", "tokens_in": 9323, "tokens_out": 1925, "duration_ms": 47349},
+        {"attempt": 2, "run_id": "chat_run_022", "verdict": "SCORED", "dir": "S1"}
+      ],
+      "unscored_note": "Final plan has 5 items all done but none corresponds to the interjected AP query — delivery correct, plan bookkeeping incomplete (PlanGate × interjection seam)."
+    },
+    {
+      "case": "R1",
+      "title": "稳定性 pass^3-lite",
+      "pass": false,
+      "r1_pass": false,
+      "assertions": [
+        {"id": "A1", "pass": false, "evidence": "2/3 pass (r1: 0/3). run-1 chat_run_023 ✓ ('净利润 | 约 118 万元'), run-2 chat_run_024 ✓ ('净利润（估算）约 118 万元', 利润率24.5%), run-3 chat_run_025 ✗ — FAILING ASSERTION IS A2: the answer gives '税前利润（推算）| 约 118 万（482 − 364）' and '所得税 / 净利润 | ⚠️ ERP 演示账套未返回所得税和净利润明细行', concluding '当前推算的 118 万为税前营业利润，实际净利润需扣除所得税后才能确定。' No 净利润 value is delivered. Corroborated by Anna's own judgment layer: run.evaluation.flagged {gaps:['净利润未在回答中提供，仅给出税前利润推算，且说明净利润未返回']} — emitted only when verdict.category=='needs_user' (services/chat/app/orchestrator.py:1154-1159)."},
+        {"id": "A2", "pass": true, "evidence": "Numeric zero-drift across all three: 收入 482万 (=4820000) ×3; the 118万 figure (=1180000) ×3; 费用 364万 (=3640000) in run-2 and run-3. Drift is in the LABEL (净利润 / 净利润（估算）/ 税前利润), not the number."}
+      ],
+      "metrics": {
+        "turns": [2, 3, 5],
+        "duration_ms": [12094, 27577, 51445],
+        "tokens_in": [2703, 4229, 8075],
+        "tokens_out": [334, 624, 1171],
+        "tool_calls": [2, 2, 3],
+        "evaluation_continuations": [0, 0, 1]
+      },
+      "evaluator_per_run": [
+        {"run": 1, "events": [{"trigger": "multi_ask", "category": "achieved", "confidence": 0.95, "continuation_index": 0}]},
+        {"run": 2, "events": [{"trigger": "multi_ask", "category": "achieved", "confidence": 0.90, "continuation_index": 0}]},
+        {"run": 3, "events": [{"trigger": "multi_ask", "category": "partial", "confidence": 0.95, "continuation_index": 0}, {"trigger": "post_continuation", "flagged": true, "gaps": ["净利润未在回答中提供，仅给出税前利润推算，且说明净利润未返回"]}]}
+      ],
+      "variance": {
+        "turns_spread_pct": 150,
+        "tool_calls_spread_pct": 50,
+        "tokens_in_spread_pct": 199,
+        "tokens_out_spread_pct": 251,
+        "duration_spread_pct": 325,
+        "r1_comparison": "r1 had ZERO variance on turns/tool_calls and 0.2% on tokens_in — its failure was deterministic. r2's failure is sampling-driven."
+      },
+      "runs": [
+        {"run_id": "chat_run_023", "status": "ready", "dir": "R1/run-1", "pass": true},
+        {"run_id": "chat_run_024", "status": "ready", "dir": "R1/run-2", "pass": true},
+        {"run_id": "chat_run_025", "status": "ready", "dir": "R1/run-3", "pass": false}
+      ],
+      "flags": [],
+      "fabrication": false,
+      "note": "F4 turned a deterministic failure into a majority-success with a long tail. pass^3 as a joint probability is still 0."
+    }
+  ],
+  "fix_verdicts": [
+    {
+      "_ids_source": "docs/superpowers/plans/2026-08-06-pi-level-loop-fixes/00-plan.md — F1 工具错误回喂 (+F1b trace 诚实) / F2 当前日期注入 / F3 demo-erp 无数据语义 (upstream repo, zero Anna-side change) / F4 Evaluator 第三触发器 multi_ask",
+      "_plan_acceptance": "00-plan.md §验收 targets 'G1 G2 H1 S1 R1 翻绿 → 8/8'. Actual: G1 G2 H1 S1 green, R1 still fails → 7/8."
+    },
+    {
+      "fix": "F1",
+      "description": "Failed tool calls surface as error observations; the run continues instead of dying",
+      "verdict": "CONFIRMED (end-to-end)",
+      "cases": ["S1"],
+      "evidence": "S1 chat_run_022: span 'execute_tool erp.finance.query' status=error error.type='invalid_arguments' at turn 2 (the SAME error that killed r1's run) → turn 3 successful retry → turn 7 full answer + artifact, root status=ok anna.turns=7."
+    },
+    {
+      "fix": "F1b",
+      "description": "Failed tool spans marked status=error with error.type",
+      "verdict": "CONFIRMED",
+      "cases": ["S1"],
+      "evidence": "S1 trace: attributes {error.type: 'invalid_arguments'}, parent 'turn 2' span also status=error, mcp.tool.called{status:'failed'}; orphan_parents=[] (r1's failed span carried anna.orphaned=true)."
+    },
+    {
+      "fix": "F2",
+      "description": "System prompt carries the current date",
+      "verdict": "CONFIRMED",
+      "cases": ["G2", "H2", "L1", "S1"],
+      "evidence": "G2: 上个月 → 2026-07 (r1 → 2025-11, off by 8 months). Corroborating: artifact datelines '编制时间：2026-08-06' (H2), '生成时间：2026-08-06 16:17' (L1), '生成日期：2026-08-06' (S1)."
+    },
+    {
+      "fix": "F3",
+      "description": "demo-erp returns explicit no-data semantics for periods with no business records (upstream separate repo; per 00-plan.md:43 Anna-side change is ZERO)",
+      "verdict": "CONFIRMED",
+      "cases": ["H1", "G2"],
+      "evidence": "Probe: erp.finance.query{question:'收入',period:'2030-03'} → {no_data:true, available_periods:['2026-04','2026-05','2026-06'], answer:'【演示数据】2030-03 没有任何业务数据…'}; REST /api/pnl?period=2030-03 → {error:{code:'not_found'}}. r1's stub '【演示数据】2030-03 本月收入约 0万' is gone. H1's answer carries zero monetary figures; G2's 2026-07 no-data statement benefits from the same change.",
+      "boundary": "Confirms F3 itself, NOT a new Anna-side out-of-range guard — the plan explicitly required no Anna change. Anna's behaviour if the upstream reverted to zero stubs is untested this round."
+    },
+    {
+      "fix": "F4",
+      "description": "multi_ask evaluator triggers a continuation segment",
+      "verdict": "PARTIALLY CONFIRMED — NOT CLOSED",
+      "cases": ["G1", "R1", "G2", "L1"],
+      "evidence_for": "G1: partial(0.95) → continuation → 2nd query → achieved; evaluation_continuations=1; 净利润 118万 delivered. R1 run-1/run-2 achieved on first verdict.",
+      "evidence_against": "R1 run-3: after a full continuation the verdict was flagged/needs_user with gaps ['净利润未在回答中提供…'] — the answer relabelled 118万 as 税前利润. pass^3 still 0/1 joint. Coverage gap: the evaluator did NOT fire at all on G2 (single question) or L1 (three-topic merged request), both of which have the same partial-answer defect.",
+      "cost": "G1 tokens +136% / duration +273%; R1 variance rose from ~0 to 200-325%."
+    }
+  ],
+  "open_issues": [
+    {
+      "id": "F4_NOT_CLOSED",
+      "priority": 1,
+      "cases": ["R1"],
+      "summary": "The underlying model defect (merged question hits one keyword route and stops) is NOT fixed — only patched after the fact by the evaluator. The patch works 2/3 of the time; the third run invented a 税前利润 vs 净利润 distinction that does not exist in the demo ledger and still withheld the answer. pass^3 joint probability remains 0."
+    },
+    {
+      "id": "F4_TRIGGER_TOO_NARROW",
+      "priority": 2,
+      "cases": ["G2", "L1"],
+      "summary": "The multi_ask trigger only recognises multi-question phrasing. G2 (single colloquial question) and L1 (three-topic merged request) both left the same partial-answer gap with no evaluator pass. Their assertions happen not to cover it."
+    },
+    {
+      "id": "CAPABILITY_MISDIRECTION",
+      "priority": 3,
+      "cases": ["H2"],
+      "introduced_in": "r2",
+      "summary": "After correctly refusing to send email, the answer directs the user to a nonexistent 'Associate 邮件工具'. The red line covers fabricated numbers, not fabricated capabilities. Backfill an assertion per spec §5."
+    }
+  ],
+  "cost_per_outcome": {
+    "note": "Second sample point for the guide's cost-per-outcome metric.",
+    "r1": {"pass": 3, "of": 8, "tokens_total": 46678, "trace_duration_ms": 156860},
+    "r2": {"pass": 7, "of": 8, "tokens_total": 104730, "trace_duration_ms": 348183},
+    "delta": "pass 3→7 (+4) at tokens +124.4% and trace duration +122.0%",
+    "attribution": "Increment concentrated in H2 (+1777%, refusal → gather+artifact), S1 (+619%, crash → full chain), G1/R1 (+136%/+101%, evaluator continuations). Judgment is bought with tokens; this exchange rate belongs in the v1 baseline."
+  }
+}

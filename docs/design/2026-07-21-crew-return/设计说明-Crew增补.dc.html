@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F6F2;color:#232328;-webkit-font-smoothing:antialiased;}
+a{color:#575BC4;text-decoration:none;}
+a:hover{color:#43478F;}
+</style>
+</helmet>
+<div style="font-family:'Noto Sans SC','PingFang SC',sans-serif;max-width:880px;margin:0 auto;padding:72px 32px 120px;">
+  <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.22em;color:#A3A3A8;">ANNA 设计说明 · CREW 增补 · 2026-07-17 → 07-21(第三轮)</div>
+  <h1 style="font-family:'Noto Serif SC',serif;font-size:34px;font-weight:900;line-height:1.4;margin:14px 0 8px;">Crew 增补:token · 组件规格 · 动效 · 命题裁决</h1>
+  <p style="font-size:14px;color:#6C6C72;line-height:1.9;margin:8px 0 0;">承《Anna 设计说明 · Iris》(2026-07-09),本文只记增量。设计稿见 <a href="Crew-组织协同-设计稿 v2.dc.html">Crew 组织协同 · 设计稿 v2</a>(v1 同名存档)。基准 1440×900,最窄 1200(频道折叠为条)。</p>
+  <div style="background:#EFEFFA;border:1px solid rgba(87,91,196,.25);border-radius:14px;padding:14px 18px;margin:18px 0 0;font-size:13.5px;color:#3E4192;line-height:1.85;"><b>第三轮增补(2026-07-21 · 高可用与存在感)</b>见 §七–§九,对应设计稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3a">3a</a>–<a href="Crew-组织协同-设计稿 v2.dc.html#3k">3k</a>:R1 产物阅读器 · R2 运行时存在感 · R3 三级 Trace · R4 频道指挥部 · R5 画布强化 · R6 Enter 发送。§一–§六为第二轮基线,原样保留。</div>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">一 · 设计立场(第一性)</h2>
+  <p style="font-size:14px;line-height:2;margin:8px 0;">协同工具的原罪是「被推着走」:红点轰炸、任务像债。Crew 的反命题——<b>工作是一株看得见生长的活物,人是照料者不是欠债人</b>。落成四条可验的机制:</p>
+  <ul style="font-size:14px;line-height:2;padding-left:1.4em;margin:8px 0;">
+    <li><b>动静即事实</b>:界面上任何动效都对应一个真事件(状态机 transition + audit),无事件则界面静止。安静=真的没事,于是安静可信,人才能安心离开屏幕。</li>
+    <li><b>生长有仪式</b>:图长新枝是 money-shot,四幕收在 1.1s 内——克制的仪式感让「组织在推进」成为愉悦而非噪音。</li>
+    <li><b>通知会归位</b>:弹卡驻留 6s 后「收进铃里」,徽标 +1。通知不消失、不催促,只是归位等你——铃替你记着,你不必替系统记着。</li>
+    <li><b>零就是零</b>:空态短句、计数为零则隐藏 chip、无执行则无呼吸。不装忙,是对注意力的礼貌。</li>
+  </ul>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">二 · 新增 token(双值,均由既有色派生,无新主色)</h2>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2.1;background:#FFFFFF;border:1px solid rgba(35,35,40,.10);border-radius:16px;padding:18px 22px;overflow-x:auto;">
+    <div>--delegate-soft&nbsp;&nbsp;&nbsp;&nbsp;浅 rgb(156 86 184/10%) · 深 rgb(184 127 212/16%)&nbsp;&nbsp;Agent 头像底/技能 chip</div>
+    <div>--delegate-ink&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;浅 #7A3F93 · 深 #CDA3E0&nbsp;&nbsp;delegate 底上的可读文字</div>
+    <div>--delegate(深)&nbsp;&nbsp;&nbsp;&nbsp;微调亮 #B87FD4(浅色沿用 #9C56B8)</div>
+    <div>--edge&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;浅 ink 30% · 深 white 30%&nbsp;&nbsp;已通电依赖边</div>
+    <div>--edge-dormant&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;浅 ink 18% · 深 white 16%&nbsp;&nbsp;休眠边(dash 5 4)</div>
+    <div>--radius-node&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14px&nbsp;&nbsp;图节点 · 端口点 8px 着自身状态色 · 职能点 4px(产品/设计/工程/验收)</div>
+    <div>--danger-soft&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;浅 rgb(190 74 68/6%) · 深 rgb(217 106 99/12%)&nbsp;&nbsp;阻塞洗色/批注引文底</div>
+    <div>--ok-soft / --warn-soft&nbsp;&nbsp;同法派生 10% / 13%&nbsp;&nbsp;评审按钮底、等我处理 chip</div>
+  </div>
+  <p style="font-size:12.5px;color:#6C6C72;line-height:1.9;margin:10px 0 0;">金 --gold 不新增用法之外的场合:每屏至多两处=①活跃评审门描边(常驻,通常同屏仅一门活跃)②生长第四幕金线一周(瞬时)。频道内评审卡滚边与门共用预算——评审卡出现时,画布活跃门与它指同一事实,视为同一处。</p>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">三 · 组件规格(可直接工程化)</h2>
+  <div style="font-size:14px;line-height:2;">
+    <p style="margin:10px 0;"><b>任务节点</b>(React Flow 自定义节点=HTML 卡):宽 188,min-h 66,r14,padding 11/13/10。标题 13.5/600 单行省略 + 职能点(4px 色点 + mono 词:产品 #55589E / 设计 #9C56B8 / 工程 #3E9C82 / 验收 #B98A2F);卡缘端口点 8px 着自身状态色(边由此进出),执行中节点底部 2.5px 供电微光条;署名行:头像 16(人=圆 999,Agent=方圆角 r5)+ 名 11 + 状态词 mono 9.5 + 右侧「章」16px。七态=卡面(氛围)×章(精确)双通道,色盲安全靠形状(虚/空/实/菱/叹/环/勾),详见设计稿 <a href="Crew-组织协同-设计稿 v2.dc.html#1c">1c</a>。阻塞卡随卡直陈卡点原因一行;新生节点带 mono 溯源行「由频道生长 · #audit」。</p>
+    <p style="margin:10px 0;"><b>门节点</b>:44×44 r8 rotate45,serif「审」13px;三态=待就绪(虚线+ink-3)/ 活跃(金线 1.5px+金晕 4px/8%,「审」金字)/ 已通过(ok 描边+勾)。标签与评审人微头像置于菱形下方。</p>
+    <p style="margin:10px 0;"><b>边</b>:SVG 1.5px;已通电=实线 --edge,休眠=dash 5 4;终点 2.5px 港点着目标状态色;返工回路=danger 1.3px dash 3 3 上弧回流+箭头,通过后消隐(不留疤);新生长边=iris 落笔后 3s 归常规。缩放 0.5–1.5,节点 ≤50。布局=elkjs 分层 DAG:并行任务纵向展开,主链过评审门后可折返第二行,视觉长度减半;全图唯一流动=供电边(iris dash 5 7 · 1.1s)流向执行中节点。画布=制图桌五层:①纸面纵向渐变(浅 #FCFBF8→#F2F0E9 / 深 #1B1B20→#121215)②110px 主格线(iris 5%)×22px 微点(错位 11px)双尺网格,径向 mask 向四缘羽化——与工具栏/频道无硬接缝 ③双辉光(见动效表)④顶部 90px 灯下白纱 ⑤inset 10px 工作框+四角规矩线(iris 35%)——一张摊在灯下的精密图纸,节点卡浮于纸上。</p>
+    <p style="margin:10px 0;"><b>频道</b>:列宽 328(卡 296),编年脊线 1px 通栏;结=鸢尾瓣(Anna)/圆头像(人)/方圆角(Agent);事件行=serif 署名 12.5 + 时间 mono 9.5 + 事实一行 12.3/1.7 + @pill(soft 底 r999)+ 锚点 chip(准星 icon);产物/评审/命令卡 r12 surface 渐变 + hairline;评审卡按钮=ok/danger soft-tint pill 高 26;命令卡=勾选行(15px 框)×N + 「确认下推 · n 项」iris 实心 pill。自己的话=--user 纸面(深色米白纸+墨字)。composer:输入条 r12 高 38 + 显式 chips「＋任务」+ <b>Enter 发送 / Shift+Enter 换行</b>(R6 修订,原 Ctrl+Enter);键入 <code>@</code> 即弹拾取器(R4a),不再只认「@ 成员」按钮。</p>
+    <p style="margin:10px 0;"><b>任务抽屉</b>:480 宽右滑,--panel 渐变,背景画布压暗 6%;区块=头(标题+状态章+回频道)/ 署名行(+改派)/ 验收标准 / 产物(版本 mono 章)/ 执行 trace(复用 StageStepTrace,含「注入共识 n 条」chips=溯源)/ 操作组随状态(就绪:认领·开始 / 执行:提交·没空 / 待审:去评审·改派)。</p>
+    <p style="margin:10px 0;"><b>收件箱</b>:三组「待我做 / 待我审 / @我」,行卡 r12;驳回理由前置(danger-soft 引文条);排队任务写明解锁条件;报销投影卡=四步 stepper(14px 步点:done=ok 实/current=warn 实+晕/todo=虚空)+「去审批」深链;空态=虚线框短句。</p>
+    <p style="margin:10px 0;"><b>通知铃</b>:32px 圆钮,外壳右上;未读徽标=iris 实底 mono 白字;弹卡 340 r16 shadow-loop;面板 224–320 按项目分组,未读=iris 点。花名册卡、模板卡规格见稿 <a href="Crew-组织协同-设计稿 v2.dc.html#1g">1g</a> 标注。</p>
+    <p style="margin:10px 0;"><b>轻检视 Popover</b>(<a href="Crew-组织协同-设计稿 v2.dc.html#2a">2a</a> · 单击节点,双击开抽屉):372 宽 r18,锚节点上方(近缘自动翻转),caret 12px。Agent 执行态=目标一句话(带 PRD 来源章)/ 执行者+改派 / 进度(回合·步骤·耗时+估算,标注「按同类均值,非承诺」)/ 正在做(live 步骤行 shimmer)/ 输入(PRD·共识)/ 自检 n/3 / 产出待产章 / 操作(全档案·去频道·暂停)+ audit 号。人任务待就绪态=依赖链 chips 讲清「为什么没开始·还差几道门」/ 排队位与在手 / 「解锁时提醒我」/ 届时自动注入的准备物 / 提前认领·改派。字段全部来自状态机与 trace——白盒即信任。</p>
+    <p style="margin:10px 0;"><b>折叠导轨</b>(<a href="Crew-组织协同-设计稿 v2.dc.html#2b">2b</a>):64px icon rail;Home=房 · Cowork=双泡 · Crew=节点图,竖排 segmented 与展开态同语法(激活=白底 pill+iris 图标);导航项激活=soft 底+左缘 2px 指示;徽标保留;项目子列表收进 hover 飞出层(240ms,mono 进度);自检 chip 缩为绿点;断点 &lt;1280 自动折叠,手动优先;通知铃属外壳,不随侧栏折叠。</p>
+  </div>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">四 · 动效规格(全部功能性,reduced-motion 有降级)</h2>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2.1;background:#FFFFFF;border:1px solid rgba(35,35,40,.10);border-radius:16px;padding:18px 22px;overflow-x:auto;">
+    <div>呼吸 anna-breath&nbsp;&nbsp;&nbsp;光环 0→7px 收透明 · 2.4s ease-out 循环 · 仅焦点执行节点(全屏唯一)</div>
+    <div>微光 anna-shimmer&nbsp;&nbsp;焦点节点状态词 iris↔lavender · 5s · 其余执行中节点=静态 iris 章</div>
+    <div>生长 · 让位&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;elk 重算,节点滑移 240ms (0.2,0,0,1) 错峰 30ms</div>
+    <div>生长 · 画入&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新边 dashoffset 落笔 300ms · iris → 3s 归常</div>
+    <div>生长 · 显形&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;节点掀开 240ms:y+8 · scale .96→1 · opacity 0→1</div>
+    <div>生长 · 定名&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;金线一周 320ms + iris 晕 3s 淡出 · 全程 ≈1.1s</div>
+    <div>点名环 ring-call&nbsp;&nbsp;平移 320ms → 环入场 240ms(iris 2px+晕 9px)→ 驻留 2.4s → 淡出 600ms · 单次</div>
+    <div>抽屉滑出&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;240ms (0.2,0,0,1) · 画布压暗 6%</div>
+    <div>弹卡&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;入场 240ms 错峰 60ms · 驻留 6s · 收进铃 320ms + 徽标 pop 240ms</div>
+    <div>铃摆动&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;跨段新通知单次 ±9° 240ms · 永不循环</div>
+    <div>供电流 dashFlow&nbsp;&nbsp;&nbsp;&nbsp;iris 虚线流向执行节点 · 1.1s 线性循环 · 全图唯一一条</div>
+    <div>执行微光条&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;节点底 2.5px 渐变扫过 · 2.2s · 仅执行中节点</div>
+    <div>金门缓脉&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;活跃评审门光晕 4→8px · 4s · 评审时刻唯一动静</div>
+    <div>画布双辉&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;iris 顶辉 + gold 底辉(≤10%)blur 64px · 30/40s 漂移 · GPU,不参与交互层</div>
+    <div>轻检视浮层&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;单击节点 240ms 掀开(y+6 · .97→1)· 节点呼吸暂歇,选中环接管 · Esc/点空白关闭</div>
+    <div>侧栏折叠&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;232⇄64 · 240ms · 文字 120ms 先淡出 · 图标 30ms 错峰归位 · 快捷键 [</div>
+    <div>节点 hover&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;浮起 2px + 投影加深 · 180ms</div>
+    <div>状态跳变&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;轮询 3-5s 的跳变统一由 240ms 掀开缓动吸收 · 完成勾=落笔 300ms 一次</div>
+    <div>reduced-motion&nbsp;&nbsp;&nbsp;&nbsp;呼吸→静态章 · 生长→直接出现+静态描边 3s · 平移→瞬时 · 弹卡→无动画直列</div>
+  </div>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">五 · 六命题裁决</h2>
+  <div style="font-size:14px;line-height:2;">
+    <p style="margin:10px 0;"><b>P1 呼吸唯一性</b>——呼吸跟随「当下」:最近一次真 transition 的执行中节点获得呼吸,全画布唯一;其余执行中节点=静态 iris 实心章+描边;<b>无执行则无呼吸</b>(1b 深色屏即此态:评审时刻,画布全静,唯一的动是等待人的金门)。焦点让渡在下一次 transition 时切换,不抢。理由:呼吸是 Anna 的心跳,不是繁忙指示器;多处呼吸=噪音,零呼吸=诚实。</p>
+    <p style="margin:10px 0;"><b>P2 生长时刻</b>——四幕:让位(elk 重算滑移)→ 画入(边落笔)→ 显形(节点掀开)→ 定名(金线一周,礼成)。1.1s 收场,强调晕 3s 淡尽;节点留 mono 溯源行「由频道生长 · #audit」作为永久的、安静的出生证明。仪式感给足一次,不重播。</p>
+    <p style="margin:10px 0;"><b>P3 Anna 的口吻与版式</b>——裁决:<b>事件不是卡,是编年史的一行</b>。频道立一条脊线,Anna 以鸢尾瓣为结、serif 署名记事:一行事实+@人+锚点+audit 编号,无容器不抢眼;产物/评审/命令才是「放上桌的东西」,以卡呈现。轻拟人=Anna 只陈述事实与下一步,永不用感叹号、永不催。</p>
+    <p style="margin:10px 0;"><b>P4 人机同构身份</b>——第一通道是形状:人=正圆,Agent=方圆角(40px 头像 r13 / 16px r5),圆与方在 12px 下仍可辨,不依赖色觉。第二通道 delegate 紫:Agent 头像底/名字色/AGENT mono 章。第三通道图元:Scribe=三横 · Design=圆叠方 · Check=对勾,1.5-2px 描边,永不用人脸。五处(头像/名牌/频道结/花名册/节点署名)同一套。Anna 自己=鸢尾瓣+serif,既非人也非 Agent 成员——她是主持。</p>
+    <p style="margin:10px 0;"><b>P5 铃的秩序</b>——铃=外壳右上唯一常驻入口(32px),与侧栏底自检 chip、UserChip 三角分立:铃管「别人找我」,自检管「系统健康」,UserChip 管「我是谁」。登录时刻弹卡≤3、6s 后收进铃(通知归位);会话中跨段通知=徽标+单次摆动,不弹卡不打断;同段事件优先落在频道/画布现场,铃只记账。</p>
+    <p style="margin:10px 0;"><b>P6 三向锚点</b>——统一「点名环」:平移居中 320ms → iris 环单脉冲 → 驻留 2.4s → 淡出。频道卡、图节点、抽屉、收件箱行共用同一语言;被指认的对象只被「点名」一次,绝不循环闪烁。与呼吸(常驻、属于执行)在语义与波形上都分开(单脉冲、属于指认)。</p>
+  </div>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">六 · 真数据边界与站位</h2>
+  <p style="font-size:14px;line-height:2;margin:8px 0;">P0 全真:图/频道/通知/收件箱/花名册/模板/健康条/报销投影,事件卡右缘一律带 audit 编号(mono 9px ink-3,可由 Tweaks 关闭显示)。站位(虚线+「P1 即将上线」+disabled):看板视图 · 就地审批 · 模板编辑器 · 负载视图 · pin 节点。<b>不画的东西</b>:在场绿点 / 已读回执 / 子线程 / 表情回应——P0 不存在,稿中亦无。健康条计数为零的 chip 直接隐藏。</p>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:56px 0 6px;padding-top:24px;border-top:1px solid rgba(35,35,40,.14);">七 · 第三轮立场 · 动效双层制(红线修订)</h2>
+  <p style="font-size:14px;line-height:2;margin:8px 0;">立场延续:Crew 已「能用」,本轮把它变得<b>「好用且有存在感」</b>。四条主动脉——读产物 / 看运行 / @协作 / 画布存在感。不是重设计:外壳 · 三区 · 卡片族血缘全部沿用第二轮,未提及的屏一律以 v2 为准。</p>
+  <ul style="font-size:14px;line-height:2;padding-left:1.4em;margin:8px 0;">
+    <li><b>红线第 5 条修订 · 动效双层制</b>:动效分两层。<b>注意力层</b>=呼吸 anna-breath,全屏唯一常驻,只属当下焦点;<b>状态层</b>=「执行中」流光(R2),允许多节点同时存在,但视觉强度必须<b>低于</b>焦点呼吸,reduced-motion 下降级为静态标识。除这两层外不新增常驻动效。</li>
+    <li><b>红线新增第 7 条 · 动效不撒谎</b>:任何「正在运行」的视觉必须绑定后端真实 running 状态,状态一变动效即撤;不设计装饰性忙碌。故 R2 选「描边流光」而非「进度环」——后端只给「在飞」信号(run 状态 + 起跑时刻),并无确定进度%,进度环会撒谎。</li>
+    <li><b>无新增主色</b>:R1–R6 全部由既有 token 派生(iris 唯一主色、金线每屏至多两处、--delegate 属 Agent 不变);本轮新增的是<b>结构与动效规格</b>,不是颜色。</li>
+  </ul>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">八 · 第三轮组件规格增补(可直接工程化)</h2>
+  <div style="font-size:14px;line-height:2;">
+    <p style="margin:10px 0;"><b>产物阅读器</b>(R1 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3e">3e</a>/<a href="Crew-组织协同-设计稿 v2.dc.html#3f">3f</a>):点「全幅阅读」→ 左侧画布区整体切换为阅读器,<b>频道栏保持在右</b>(对照评审关键姿势:左读全文、右侧就地通过/驳回)。顶部条=面包屑(项目·任务·产物 vN)+ 版本切换 + 下载 + 回到图(ESC 亦可);正文沿 Iris 答复排版(标题/表格/代码块),阅读宽 720–820 居中;mono 页脚=版本·字数·产出者·时刻(审计血统);双主题。</p>
+    <p style="margin:10px 0;"><b>附件 chip 家族</b>(R1 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3g">3g</a>):产物 chip=文档图标 + 名 + 版本 + 字数 + 三动作(展开 / 全幅阅读 / 下载,全幅=iris 主动作,余中性);链接卡变体=站点图标 + 标题 + 域名 + 外链;say 内联引用 chip。产物卡 / 评审卡 / Agent 交付事件卡统一嵌用同一 chip 语法;窄频道(328)动作收敛为「全幅阅读 + …」溢出菜单。字数/版本/时刻均来自真实元数据,无产物则无 chip。</p>
+    <p style="margin:10px 0;"><b>执行流光 + 活动行</b>(R2 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3d">3d</a>):执行中节点边框 1.5px iris→lavender 慢流(<code>strokeFlow</code> 4.5s linear ∞,遮罩渐变边),强度 &lt; 呼吸,可多节点同屏。频道「正在执行」活动行=脉点(<code>runPulse</code> 2s)+「正在执行『任务』· 已运行 mm:ss」(elapsed 真值),完成后消隐、由产物卡接棒。健康条「活跃 Agent n」在有 running 时点亮——图 / 频道 / 健康条三处同订阅「在飞」信号,同源同拍。reduced-motion=静态 iris 描边 + 徽记。</p>
+    <p style="margin:10px 0;"><b>节点状态语汇升级</b>(R5 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3a">3a</a>–<a href="Crew-组织协同-设计稿 v2.dc.html#3c">3c</a>):由「状态靠读字」升级为三层「状态即形色」——<b>左缘 5px 状态色条</b>(远读层,r 14/0/0/14)+ <b>卡面轻染</b>(氛围层)+ <b>20px 章</b>(近读层,色盲靠形状)。七态色条取色:待就绪 ink 12%(退后)/ 就绪 iris / 执行中 iris + 流光 / 已提交待审 lavender / 阻塞 danger + 洗色(最刺眼)/ 返工 danger 细边无洗色 / 完成 ok + 沉入面板色。门三态更重:待就绪(虚线退后)/ 活跃(44→48 + 金线 + 金脉,关卡仪式)/ 已通过(ok 勾 + 落章)。边四型对比拉大:已通电(实 ink 32%)/ 休眠(dash 5-4 淡)/ 焦点流动(iris dash 5-7 dashFlow)/ 返工回路(danger dash 3-3 上弧,通过后消隐不留疤)。三米可读:投影会议室大屏也能一眼看出谁在跑 / 谁卡住 / 谁在等。</p>
+    <p style="margin:10px 0;"><b>三级 Trace + 抽屉信息序</b>(R3 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3j">3j</a>):对齐产品统一件 StageStepTrace——一级 执行摘要一行(模型·帧数·耗时·结果,默认折叠)→ 二级 步骤列表(每帧一行:类型 + 首行摘要)→ 三级 点开某帧见原文(markdown 渲染后展示或等宽降噪,长文内滚)。<b>即点即关</b>:展开与收起控件同位吸顶,任何滚动深度一键收起。抽屉信息序改为<b>产出先行</b>:①产物(最新版,默认展开)②验收标准 ③执行过程(折叠)④元信息。</p>
+    <p style="margin:10px 0;"><b>@拾取器 + mention token</b>(R4a · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3h">3h</a>):composer 键入 <code>@</code> 弹成员浮层(出现在 composer <b>上方</b>,避让 IME 候选窗)——头像 + 姓名 + 职能 + 人/Agent 徽记(--delegate);继续输入过滤、↑↓ 选择、Enter 确认;选中后 @名 成 mention token(人=iris-soft pill / Agent=delegate-soft pill)。中文 IME 组词过程不误触发/误发送;空 @(无匹配)不弹硬错,@名留作死文本(不通知不派单)。纯前端增补,通知/重跑走既有选择器链路。</p>
+    <p style="margin:10px 0;"><b>任务确认卡(Anna 监察)</b>(R4b · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3i">3i</a>):自由发言命中派活意图(@某成员 + 任务性祈使句)→ Anna 跟一张<b>草稿态</b>确认卡:任务名 + 负责人(发言中 @ 指定)+ 依赖(建议可改)+ 验收(草稿可改)+ [采纳上图][调整][忽略]。<b>未采纳不进图、不进审计</b>(零捏造);采纳后节点走生长动画,事件卡带「由频道生长 · #aN」溯源。被派者是 Agent 时,卡上预告「采纳后 Agent·x 将立即执行」(auto-pilot),主按钮=采纳并开跑。忽略=200ms 淡出下沉,安静消隐不留痕。口吻轻:「听出一项新任务」而非「已为你创建」。这是图生长的<b>第四来源</b>(前三:驳回返工 / ＋任务 / 阻塞上报),与「＋任务」共用起草卡语法。</p>
+    <p style="margin:10px 0;"><b>composer 微提示</b>(R6 · 稿 <a href="Crew-组织协同-设计稿 v2.dc.html#3k">3k</a>):右下常驻 mono 9px「Enter 发送 · Shift+Enter 换行」,ink-3 级,聚焦时提亮 ink-2(习惯迁移期需持续但安静的提醒)。三处对话 composer(Home Chat / Cowork·问 Anna / Create / Crew·频道)一次改键;组词中显式「组词中·Enter 不发送」warn 提示。<b>表单类多行框</b>(提交说明 / 共识 / 驳回批注)不改,仍按钮提交,避免误发长文。</p>
+  </div>
+
+  <h2 style="font-family:'Noto Serif SC',serif;font-size:21px;font-weight:700;margin:48px 0 6px;">九 · R1–R6 裁决与理由</h2>
+  <div style="font-size:14px;line-height:2;">
+    <p style="margin:10px 0;"><b>R1 产物是一等公民</b>——三档阅读逐级放大(chip → 内嵌展开 → 全幅阅读器),不强跳。对照评审=左读右裁,故阅读器占画布、频道留右。解「产物太小、PRD 没法读」的病根:产物从「频道里一行小字」升为可展开/可全幅/可下载。</p>
+    <p style="margin:10px 0;"><b>R2 执行看得见,但不撒谎</b>——选描边流光不选进度环:后端只有「在飞」信号无确定进度,进度环会谎报百分比(红线 7)。强度阶梯 呼吸 &gt; 流光 &gt; 脉点,保证焦点恒唯一。短跑任务由「在飞」信号直通快照,两拍之间跑完也可见。</p>
+    <p style="margin:10px 0;"><b>R3 产出先行</b>——Boss 要的是结果不是过程。抽屉信息序把产物提到第一(默认展开),过程默认折叠、即点即关;原文渲染不再裸奔,长文内滚不贪占滚动区。</p>
+    <p style="margin:10px 0;"><b>R4 频道即指挥部</b>——@拾取器补齐「输 @ 拉人」;Anna 监察把自由发言里的派活意图拟成<b>草稿卡</b>,人落章才进图(ADR-002:模型起草,人决策)。口吻轻——她在建议不在代办;误听点忽略即无痕。这是本轮的灵魂。</p>
+    <p style="margin:10px 0;"><b>R5 状态即形色</b>——三层(色条/轻染/章)同源、任一层独立成立。阻塞必刺眼(danger 洗色)、执行显活性(iris 流光)、完成沉稳(沉入面板)、待就绪退后;门更重、金线只给门与生长第四幕。约束不破:暖底不换、iris 唯一、金线每屏至多两处、不做彩虹满屏。</p>
+    <p style="margin:10px 0;"><b>R6 Enter 发送</b>——顺手(Boss 习惯),Shift+Enter 换行;IME 守卫防组词误发;表单多行框不改防误提交长文。微提示常驻而非仅聚焦现身——迁移期需要持续提醒。</p>
+  </div>
+
+  <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#A3A3A8;line-height:2;margin:56px 0 0;border-top:1px solid rgba(35,35,40,.10);padding-top:16px;">字体三栈随包(Noto Serif SC / Noto Sans SC / JetBrains Mono),禁 CDN;本稿预览用 Google Fonts 仅为设计期便利。图标=内联 SVG 1.5px 描边 currentColor。画布=React Flow + elkjs,节点即本稿 HTML 卡,边=SVG 可定制。第三轮 R1–R6:阅读器 / 流光 / 三级 Trace / 拾取器 / 确认卡 / 微提示,均沿此栈与红线。—— Claude Design,2026-07-17 · 增补 07-21</p>
+</div>
+</x-dc>
+</body>
+</html>

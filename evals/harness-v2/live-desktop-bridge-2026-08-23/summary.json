@@ -1,0 +1,17 @@
+{
+  "evidence_kind": "desktop_managed_bridge_live_run",
+  "start_status": 202,
+  "terminal_types": [
+    "run.completed"
+  ],
+  "event_count": 76,
+  "sequence_contiguous": true,
+  "resume_from_seq": 0,
+  "resume_first_seq": 1,
+  "resume_event_count": 75,
+  "usage_present": true,
+  "tool_call_count": 1,
+  "eval_passed": true,
+  "provider_task_completed": true,
+  "t07_production_gate": false
+}
