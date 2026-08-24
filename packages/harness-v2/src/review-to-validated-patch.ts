@@ -837,6 +837,7 @@ async function executeAllowedCommand(
     ? join(root, "dist", ".t07-process")
     : tmpdir();
   const nodeDirectory = dirname(realpathSync(process.execPath));
+  const nodeInstallationRoot = resolve(nodeDirectory, "..");
   const npmPackageRoot = npmCliPath === undefined ? undefined : resolve(dirname(npmCliPath), "..");
   const fixtureNetworkGuardPath = fileURLToPath(new URL("./review-test-fixture-runner.cjs", import.meta.url));
   if (requiresProcessContainment) {
@@ -847,7 +848,7 @@ async function executeAllowedCommand(
     `--allow-fs-read=${root}`,
     `--allow-fs-read=${processDirectory}`,
     `--allow-fs-read=${dirname(fixtureNetworkGuardPath)}`,
-    `--allow-fs-read=${nodeDirectory}`,
+    `--allow-fs-read=${nodeInstallationRoot}`,
     ...(npmPackageRoot === undefined ? [] : [`--allow-fs-read=${npmPackageRoot}`]),
     "--allow-fs-read=/dev",
     `--allow-fs-write=${root}`,
@@ -872,14 +873,14 @@ async function executeAllowedCommand(
     "(deny network*)",
     denyHostHomeReadsExcept([
       root,
-      nodeDirectory,
+      nodeInstallationRoot,
       ...(npmPackageRoot === undefined ? [] : [npmPackageRoot]),
       ...(dependencyBridge === undefined
         ? []
         : [dependencyBridge.sourceRoot, dependencyBridge.dependencyRoot]),
     ]),
     `(allow file-read* (subpath ${JSON.stringify(root)}))`,
-    `(allow file-read* (subpath ${JSON.stringify(nodeDirectory)}))`,
+    `(allow file-read* (subpath ${JSON.stringify(nodeInstallationRoot)}))`,
     ...(npmPackageRoot === undefined
       ? []
       : [`(allow file-read* (subpath ${JSON.stringify(npmPackageRoot)}))`]),

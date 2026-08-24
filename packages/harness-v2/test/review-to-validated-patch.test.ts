@@ -429,7 +429,7 @@ test.skipIf(process.platform !== "darwin")("approved test processes cannot inher
 
       const result = await scenario.runTests(development);
 
-      expect(result.evidence.exitCode).toBe(7);
+      expect(result.evidence.exitCode, result.evidence.stderr).toBe(7);
       expect(result.evidence.stdout).not.toContain("must-not-cross-process-boundary");
     });
   } finally {
@@ -716,7 +716,7 @@ test("development changes an approved test source and executes it", async () => 
     const result = await createReviewToValidatedPatch(configured.options).run();
 
     expect(result.git.diff).toContain(sourceTestInput.testPath);
-    expect(result.testEvidence.stdout).toContain("tests 2");
+    expect(result.testEvidence.stdout, result.testEvidence.stderr).toContain("tests 2");
     expect(result.artifacts).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: sourceTestInput.testPath, validationStatus: "passed" }),
     ]));
