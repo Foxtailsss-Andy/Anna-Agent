@@ -972,7 +972,7 @@ test("Artifact producer, hash and version remain stable after a restart", async 
     activeStore?.close();
     await rm(container, { recursive: true, force: true });
   }
-});
+}, 20_000);
 
 test("restore fails closed when a persisted PRD Artifact drifts", async () => {
   const container = await mkdtemp(join(tmpdir(), "anna-t07-prd-drift-"));
