@@ -14,7 +14,7 @@ Anna 是一个面向企业工作的受治理、local-first 桌面 AI Agent。它
 
 **当前版本：[`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)** | macOS 源码预览 | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
-[English](README.md) | [产品演示](#产品演示) | [快速开始](#快速开始) | [可以体验什么](#可以体验什么) | [架构](#anna-如何推进工作)
+[English](README.md) | [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary) | [产品演示](#产品演示) | [快速开始](#快速开始) | [可以体验什么](#可以体验什么) | [架构](#anna-如何推进工作)
 
 ## 产品演示
 
