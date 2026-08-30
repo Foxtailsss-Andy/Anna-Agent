@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 
 import {
   createChannelMemoryRepository,
+  memoryQueryTokens,
   parseCanonicalEvent,
   parseStartRun,
   type CanonicalEvent,
@@ -136,6 +137,51 @@ test("only explicit Channel Owner acceptance promotes a MemoryCandidate into fut
       acceptedAt: "2026-08-19T00:00:00.000Z",
     },
   ]);
+});
+
+test("Memory retrieval fails closed for empty, punctuation-only, and stopword-only queries", async () => {
+  const eventStore = new InMemoryEventStore();
+  const events = eventStore.scope(scope);
+  const sourceRun = command(scope, "run-memory-query-guards", "event-memory-query-guards");
+  await events.claimStart(sourceRun);
+  await events.append(parseCanonicalEvent({
+    id: "event-memory-query-guards",
+    workspaceId: scope.workspaceId,
+    channelId: scope.channelId,
+    streamId: sourceRun.runId,
+    seq: 0,
+    type: "run.completed",
+    timestamp: "2026-08-19T00:30:00.000Z",
+    schemaVersion: 1,
+    payload: {},
+  }));
+  let nextEventId = 0;
+  const repository = createChannelMemoryRepository({
+    eventStore,
+    scope,
+    authorization: ownerAuthorization("actor-channel-owner"),
+    runProfileSnapshot: memoryEnabledRunProfileSnapshot,
+    now: () => "2026-08-19T00:30:00.000Z",
+    createEventId: () => `event-memory-query-guards-${++nextEventId}`,
+  });
+  await repository.propose({
+    id: "memory-query-guards",
+    content: "Release notes require owner review before publication.",
+    sourceRunId: sourceRun.runId,
+    sourceEventIds: ["event-memory-query-guards"],
+  });
+  await repository.accept({
+    candidateId: "memory-query-guards",
+    actorId: "actor-channel-owner",
+  });
+
+  await expect(repository.retrieve({ query: "", limit: 10 })).resolves.toEqual([]);
+  await expect(repository.retrieve({ query: "!!!", limit: 10 })).resolves.toEqual([]);
+  await expect(repository.retrieve({ query: "the and to", limit: 10 })).resolves.toEqual([]);
+  await expect(repository.retrieve({ query: "release-notes", limit: 10 })).resolves.toHaveLength(1);
+  await expect(repository.retrieve({ query: "release notes", limit: 0 }))
+    .rejects.toThrow("Memory retrieval limit");
+  expect(memoryQueryTokens("X")).toEqual(["x"]);
 });
 
 test("the claimed RunProfile cannot be bypassed for Memory writes or retrieval", async () => {

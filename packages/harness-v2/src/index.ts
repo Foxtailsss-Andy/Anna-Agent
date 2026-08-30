@@ -137,6 +137,9 @@ export {
   type WorkerProfile,
 } from "./run-profile";
 export {
+  memoryQueryTokens,
+} from "./memory-projection";
+export {
   createChannelMemoryRepository,
 } from "./memory-repository";
 export {

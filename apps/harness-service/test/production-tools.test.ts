@@ -865,7 +865,7 @@ test("production Runtime drives the actual Pi adapter through SQLite and ToolGat
     eventStorePath,
     workspaceRoot: directory,
     surfaces: ["cowork"],
-    createKernel: ({ toolGatewayFor, workerProfileId }) => new PiLoopKernel({
+    createKernel: ({ toolGatewayFor, prepareContext, workerProfileId }) => new PiLoopKernel({
       model: {
         ...provider.getModel(),
         id: "fixture-model",
@@ -873,6 +873,7 @@ test("production Runtime drives the actual Pi adapter through SQLite and ToolGat
         provider: "anna-openai-compatible",
       },
       createToolGateway: toolGatewayFor,
+      prepareContext,
       workerProfileId,
       getApiKey: () => "fixture-key",
       streamFn: () => {
@@ -1000,7 +1001,7 @@ test("production Create drives Pi through one durable Artifact effect", async ()
     eventStorePath,
     workspaceRoot: directory,
     surfaces: ["create"],
-    createKernel: ({ toolGatewayFor, workerProfileId }) => new PiLoopKernel({
+    createKernel: ({ toolGatewayFor, prepareContext, workerProfileId }) => new PiLoopKernel({
       model: {
         ...provider.getModel(),
         id: "fixture-model",
@@ -1008,6 +1009,7 @@ test("production Create drives Pi through one durable Artifact effect", async ()
         provider: "anna-openai-compatible",
       },
       createToolGateway: toolGatewayFor,
+      prepareContext,
       workerProfileId,
       getApiKey: () => "fixture-key",
       streamFn: () => {

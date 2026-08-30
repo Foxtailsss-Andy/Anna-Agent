@@ -16,10 +16,12 @@ export function resolvedRunProfileFixture(
     version?: string;
     budget?: Budget;
     allowedTools?: readonly string[];
+    memoryPolicy?: { read: "none" | "channel"; write: "disabled" | "propose" };
   } = {},
 ): ResolvedRunProfile {
   const allowedTools = [...(options.allowedTools ?? ["read_workspace", "fixture_read"])] as string[];
   const budget = options.budget ?? { turns: 1 };
+  const memoryPolicy = options.memoryPolicy ?? { read: "none" as const, write: "disabled" as const };
   const catalog: SkillCatalogEntry[] = [{
     id: "fixture-skill",
     name: "Fixture skill",
@@ -35,7 +37,10 @@ export function resolvedRunProfileFixture(
     allowedSkillIds: ["fixture-skill"],
     allowedModels: [{ provider: "test", name: "fixture-model", reasoning: "low" }],
     budgetLimits: budget,
-    memoryPolicy: { allowedReadModes: ["none"], allowedWriteModes: ["disabled"] },
+    memoryPolicy: {
+      allowedReadModes: [memoryPolicy.read],
+      allowedWriteModes: [memoryPolicy.write],
+    },
   };
   const workerProfile: WorkerProfile = {
     id: "fixture-worker" as WorkerProfileId,
@@ -59,7 +64,7 @@ export function resolvedRunProfileFixture(
     contextTransforms: [{ kind: "compact", preserve: ["goal"] }],
     toolPolicy: { allowedTools },
     budget,
-    memoryPolicy: { read: "none", write: "disabled" },
+    memoryPolicy,
     evalPolicy: { contract: "disabled", quality: "disabled" },
     artifactContract: workerProfile.artifactContract,
     terminalRules: {

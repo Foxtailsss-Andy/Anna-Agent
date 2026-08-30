@@ -7,19 +7,27 @@ import {
   type RunProfileId,
   type EventStore,
   type LoopKernel,
+  type MemoryReadMode,
   type ToolResult,
   type StartRun,
   type ToolGateway,
   type WorkerProfileId,
 } from "@anna/harness-v2";
 import { SqliteEventStore } from "@anna/event-store";
-import { createOpenAICompatiblePiLoopKernel } from "@anna/pi-loop-kernel";
+import {
+  createOpenAICompatiblePiLoopKernel,
+  type PiContextPreparation,
+} from "@anna/pi-loop-kernel";
 
 import {
   createDurableHarnessV2Runtime,
   type DurableHarnessV2RuntimeOptions,
 } from "./runtime";
 import type { HarnessV2Runtime, V2SurfaceId } from "./index";
+import {
+  createHostMemoryContextLoader,
+  type HostMemoryContextLoader,
+} from "./host-memory-context";
 
 export {
   createProductionToolGateway,
@@ -44,6 +52,7 @@ export interface LiveHarnessV2KernelOptions {
   readonly modelName: string;
   readonly workerProfileId: WorkerProfileId;
   readonly toolGatewayFor: (command: StartRun) => ToolGateway;
+  readonly prepareContext: PiContextPreparation;
 }
 
 export type LiveHarnessV2KernelFactory = (
@@ -137,12 +146,19 @@ export async function createLiveHarnessV2Runtime(
           ? {}
           : { apiKey: config.web_search_api_key }),
   });
-  const profile = await createLiveProfile(config.model_name, options.skillPath, webSearch !== undefined);
+  const profile = await createLiveProfile(
+    config.model_name,
+    options.skillPath,
+    webSearch !== undefined,
+    "general",
+    "channel",
+  );
   const createProfile = await createLiveProfile(
     config.model_name,
     undefined,
     webSearch !== undefined,
     "create",
+    "channel",
   );
   const reviewGateConfigured = await probeReviewGate(
     options.reviewApprovalOrigin ?? process.env.ANNA_T07_LIVE_APPROVAL_ORIGIN,
@@ -157,6 +173,7 @@ export async function createLiveHarnessV2Runtime(
   );
   await mkdir(dirname(eventStorePath), { recursive: true });
   const eventStore = new SqliteEventStore(eventStorePath);
+  const prepareContext: HostMemoryContextLoader = createHostMemoryContextLoader({ eventStore });
   const workspaceRoot = resolve(
     options.workspaceRoot
       ?? process.env.ANNA_HARNESS_V2_WORKSPACE_ROOT
@@ -174,11 +191,13 @@ export async function createLiveHarnessV2Runtime(
     modelName: config.model_name,
     toolGatewayFor: createRunToolGateway,
     workerProfileId: profile.workerProfileId,
+    prepareContext,
   }) ?? createOpenAICompatiblePiLoopKernel({
     endpoint: config.model_endpoint,
     apiKey: config.model_api_key,
     modelName: config.model_name,
     createToolGateway: createRunToolGateway,
+    prepareContext,
     workerProfileId: profile.workerProfileId,
   });
   const runtimeOptions: DurableHarnessV2RuntimeOptions = {
@@ -287,6 +306,7 @@ export async function createLiveProfile(
   configuredSkillPath?: string,
   webSearchEnabled = false,
   surface: "general" | "create" = "general",
+  memoryRead: MemoryReadMode = "none",
 ) {
   const defaultSkillPath = resolve(
     import.meta.dirname,
@@ -330,7 +350,7 @@ export async function createLiveProfile(
       allowedSkillIds: [skill.id],
       allowedModels: [model],
       budgetLimits: { wallTimeMs: 30_000, turns: 3 },
-      memoryPolicy: { allowedReadModes: ["none"], allowedWriteModes: ["disabled"] },
+      memoryPolicy: { allowedReadModes: [memoryRead], allowedWriteModes: ["disabled"] },
     },
     workerProfile: {
       id: (surface === "create"
@@ -357,7 +377,7 @@ export async function createLiveProfile(
       contextTransforms: [{ kind: "compact", preserve: ["goal", "constraints", "provenance"] }],
       toolPolicy: { allowedTools: toolNames },
       budget: { wallTimeMs: 30_000, turns: 3 },
-      memoryPolicy: { read: "none", write: "disabled" },
+      memoryPolicy: { read: memoryRead, write: "disabled" },
       evalPolicy: { contract: "required", quality: "disabled" },
       artifactContract,
       terminalRules: {

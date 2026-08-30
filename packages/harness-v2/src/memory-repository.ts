@@ -23,6 +23,7 @@ import {
   deletedChannelMemory,
   deletedMemory,
   deletedMemoryCandidate,
+  memoryQueryTokens,
   retrieveAcceptedMemories,
   workspaceReadGrantById,
 } from "./memory-projection";
@@ -253,6 +254,12 @@ export function createChannelMemoryRepository(
     },
 
     async retrieve(retrieval: MemoryRetrieval): Promise<AcceptedChannelMemory[]> {
+      if (typeof retrieval.query !== "string") {
+        throw new Error("Memory retrieval query must be a string");
+      }
+      if (!Number.isSafeInteger(retrieval.limit) || retrieval.limit < 1 || retrieval.limit > 32) {
+        throw new Error("Memory retrieval limit must be a positive integer no greater than 32");
+      }
       if (memoryPolicy.read === "none") {
         throw new Error("Memory reads are disabled by the RunProfile");
       }
@@ -272,7 +279,7 @@ export function createChannelMemoryRepository(
         throw new Error("Memory reads are disabled by the RunProfile");
       }
       const events = await readMemoryEvents(store);
-      const queryTokens = retrieval.query.toLowerCase().split(/\s+/).filter(Boolean);
+      const queryTokens = memoryQueryTokens(retrieval.query);
       const localMemories = retrieveAcceptedMemories(events, scope, queryTokens);
       const grantedMemories: AcceptedChannelMemory[] = [];
 

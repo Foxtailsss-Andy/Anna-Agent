@@ -4,7 +4,7 @@ Date: 2026-08-30
 Base: `825824a` (product code baseline `25e70a9`)
 Spec: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md)
 Goal: [HF-GOAL-1.0](../../../product/anna-harness-first-goal-2026-08-30.md)
-Status: implementation contract accepted by Sol Ultra; approved for Luna Max coding.
+Status: implemented and accepted in the [HF-01B handoff](../../handoff/2026-08-30-hf-01b-host-memory-context.md); full Goal remains active.
 Coder: GPT-5.6-Luna Max. Review: GPT-5.6-Sol Ultra.
 
 ## Outcome and Scope
@@ -92,6 +92,8 @@ history or add implicit cross-Channel grants.
 - `apps/harness-service/src/production.ts` and a focused new Host context module.
 - `apps/harness-service/test/memory-hydration.test.ts` and affected production
   tests, including actual-Pi factory injection regressions.
+- `apps/harness-service/test/memory-hydration-negative.test.ts`, a separately
+  owned test-only slice for snapshot corruption and projection-CAS winner cases.
 - `packages/pi-loop-kernel/src/pi-loop-kernel.ts` and its focused tests.
 - `packages/harness-v2/src/run-context.ts` and `src/index.ts`, only for the typed
   prepared-input boundary/validation shared with the Host and adapter.
@@ -132,3 +134,14 @@ Record actual RED/GREEN commands per changed behavior. Complete focused tests,
 related typechecks and a handoff before requesting independent Standards/Spec
 review. Main Agent verifies the integrated tree, fixes remaining correctness
 findings through Luna and publishes only the evidenced scope.
+
+## Test Ownership Amendment
+
+On 2026-08-30, independent Spec review identified missing real reopen/continue,
+snapshot-corruption and CAS-loser evidence. A second GPT-5.6-Luna Max may edit
+only `memory-hydration-negative.test.ts` for the latter two behaviors, using
+the same already-approved public boundaries and real SQLite. The primary Luna
+retains all product code and the actual-Pi reopen/continue tests. This does not
+expand product scope, weaken a gate or authorize changes to Store sequencing.
+Any observed implementation defect returns to the primary coder for a public
+RED/minimal GREEN cycle and final Sol Ultra review.
