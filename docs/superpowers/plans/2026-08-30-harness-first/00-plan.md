@@ -23,6 +23,8 @@ HF-00 Protected takeover + source mapping
            -> HF-06 Coding tools + sandbox + benchmark adapter
            -> HF-07 Create/Artifact workflow
         -> HF-08 Crew/Lanes/Hub + Scheduler
+
+HF-01B + HF-02..HF-08 integrated and accepted
   -> HF-09 State migration + Desktop single authority
   -> HF-10 Legacy deletion + release/benchmark acceptance
 ```

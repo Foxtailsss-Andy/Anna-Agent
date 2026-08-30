@@ -57,10 +57,15 @@ and conformance evidence; do not infer duration from the number of tests.
   HF-01A and HF-01B cover only their stated Tool and Context subsets.
 - HF-08 owns the unified Supervisor and full HF-072 crash-point matrix.
   HF-03 supplies the Chat lifecycle integration and consumes that authority.
+  Recheck the Chat recovery cases after HF-08; HF-03 alone cannot close AC-07.
 - HF-08 owns Hub/Settings Host-backed contracts and projections; HF-09 owns
   their default Desktop client switch and native package validation.
 - HF-10 verifies the completed implementation. It is not a substitute for an
   implementation owner or a place to hide unassigned work.
+
+HF-09 preparation may proceed independently, but the default Desktop cutover
+waits for HF-01B and HF-02..HF-08 convergence and acceptance. HF-10 is the final
+verification after that cutover, not a parallel shortcut around its dependencies.
 
 ## Global Acceptance Ledger
 
