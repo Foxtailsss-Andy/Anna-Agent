@@ -10,8 +10,8 @@ import { SchemaValidationError, expectRecord } from "./schema";
 import type { SkillCatalogEntry } from "./skill-catalog";
 import type { ToolDefinition } from "./tool-gateway";
 import {
-  parsePiKernelDescriptor,
-  type PiKernelDescriptorV1,
+  parseKernelDescriptor,
+  type KernelDescriptorV1,
 } from "./kernel-descriptor";
 
 export interface AllowedToolsPolicy {
@@ -102,7 +102,7 @@ export interface RunProfile {
   evalPolicy: EvalPolicy;
   artifactContract: ArtifactContract;
   terminalRules: TerminalRules;
-  readonly kernel?: PiKernelDescriptorV1;
+  readonly kernel?: KernelDescriptorV1;
 }
 
 export interface ResolveRunProfileOptions {
@@ -133,7 +133,7 @@ export interface ResolvedRunProfile {
   readonly evalPolicy: Readonly<EvalPolicy>;
   readonly artifactContract: Readonly<ArtifactContract>;
   readonly terminalRules: Readonly<TerminalRules>;
-  readonly kernel?: PiKernelDescriptorV1;
+  readonly kernel?: KernelDescriptorV1;
 }
 
 const budgetKeys = [
@@ -537,7 +537,7 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     "stopCondition",
   ]);
   const kernel = Object.hasOwn(value, "kernel")
-    ? parsePiKernelDescriptor(value.kernel)
+    ? parseKernelDescriptor(value.kernel)
     : undefined;
 
   const snapshot: Omit<ResolvedRunProfile, "hash"> = {
@@ -782,7 +782,7 @@ export function resolveRunProfile(
   };
   const kernel = runProfile?.kernel === undefined
     ? undefined
-    : parsePiKernelDescriptor(runProfile.kernel);
+    : parseKernelDescriptor(runProfile.kernel);
 
   if (!modelIsAllowed(model, channelModels) || !modelIsAllowed(model, workerModels)) {
     throw new Error("RunProfile.model must be allowed by ChannelPolicy and WorkerProfile");

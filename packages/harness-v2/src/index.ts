@@ -137,7 +137,11 @@ export {
   type WorkerProfile,
 } from "./run-profile";
 export {
+  parseKernelDescriptor,
+  parseOmpKernelDescriptor,
   parsePiKernelDescriptor,
+  type KernelDescriptorV1,
+  type OmpKernelDescriptorV1,
   type PiKernelDescriptorV1,
 } from "./kernel-descriptor";
 export {
@@ -175,6 +179,7 @@ export {
 export {
   buildRunContext,
   compactRunContext,
+  type PreparedRunContext,
   type PendingToolCall,
   type RunContext,
   type RunContextMemoryHit,

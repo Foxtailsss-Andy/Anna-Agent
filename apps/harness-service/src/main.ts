@@ -34,7 +34,7 @@ try {
       : { createActivation: live.createActivation }),
   });
 } catch (error) {
-  live?.close();
+  await live?.close();
   await localApproval?.close();
   throw error;
 }
@@ -47,7 +47,7 @@ process.stdout.write(JSON.stringify({
 
 const shutdown = async () => {
   await service.close();
-  live?.close();
+  await live?.close();
   await localApproval?.close();
 };
 

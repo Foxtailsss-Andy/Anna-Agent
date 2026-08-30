@@ -12,6 +12,8 @@ import {
   type StartRun,
   type ToolGateway,
   type WorkerProfileId,
+  parseOmpKernelDescriptor,
+  type KernelDescriptorV1,
 } from "@anna/harness-v2";
 import { SqliteEventStore } from "@anna/event-store";
 import {
@@ -41,6 +43,10 @@ export {
   type ProductionToolGatewayOptions,
 } from "./production-tools";
 import { createProductionToolGateway } from "./production-tools";
+import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
+import { verifyOmpKernelIdentity } from "../../../packages/omp-loop-kernel/src/kernel-identity";
+import type { OmpHostModelTransport } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
+import { createOmpModelTransport } from "./omp-model-transport";
 
 export interface LiveHarnessV2RuntimeOptions {
   readonly runtimeConfigPath?: string;
@@ -51,6 +57,8 @@ export interface LiveHarnessV2RuntimeOptions {
   readonly reviewApprovalOrigin?: string;
   readonly reviewOwnerId?: string;
   readonly createKernel?: LiveHarnessV2KernelFactory;
+  readonly ompRuntimeRoot?: string;
+  readonly ompModelTransport?: OmpHostModelTransport;
 }
 
 export interface LiveHarnessV2KernelOptions {
@@ -74,7 +82,7 @@ export interface LiveHarnessV2Runtime {
     readonly approvalOrigin: string;
     readonly ownerId: string;
   };
-  close(): void;
+  close(): void | Promise<void>;
 }
 
 interface RuntimeConfig {
@@ -85,6 +93,8 @@ interface RuntimeConfig {
   readonly web_search_endpoint?: unknown;
   readonly web_search_api_key?: unknown;
   readonly harness_v2_kernel?: unknown;
+  readonly harness_v2_omp_runtime_root?: unknown;
+  readonly harness_v2_omp_descriptor?: unknown;
 }
 
 export interface WebSearchProviderOptions {
@@ -156,6 +166,21 @@ export async function createLiveHarnessV2Runtime(
         }
       : { mode: "development" },
   );
+  let ompDescriptor: ReturnType<typeof parseOmpKernelDescriptor> | undefined;
+  let ompRuntimeRoot: string | undefined;
+  if (config.harness_v2_kernel === "omp" && config.harness_v2_omp_descriptor !== undefined) {
+    try {
+      if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("OMP platform unavailable");
+      ompDescriptor = parseOmpKernelDescriptor(config.harness_v2_omp_descriptor);
+      const configuredRoot = options.ompRuntimeRoot ?? config.harness_v2_omp_runtime_root;
+      if (typeof configuredRoot !== "string" || configuredRoot.trim() === "") throw new Error("OMP runtime unavailable");
+      ompRuntimeRoot = resolve(configuredRoot);
+      await verifyOmpKernelIdentity(ompRuntimeRoot, ompDescriptor);
+    } catch {
+      ompDescriptor = undefined;
+      ompRuntimeRoot = undefined;
+    }
+  }
   const surfaces = options.surfaces ?? ["create", "cowork", "hub"];
   const webSearch = config.web_search_endpoint === undefined
     ? undefined
@@ -171,7 +196,7 @@ export async function createLiveHarnessV2Runtime(
     webSearch !== undefined,
     "general",
     "channel",
-    kernelDescriptor,
+    ompDescriptor ?? kernelDescriptor,
   );
   const createProfile = await createLiveProfile(
     config.model_name,
@@ -179,7 +204,7 @@ export async function createLiveHarnessV2Runtime(
     webSearch !== undefined,
     "create",
     "channel",
-    kernelDescriptor,
+    ompDescriptor ?? kernelDescriptor,
   );
   const reviewGateConfigured = await probeReviewGate(
     options.reviewApprovalOrigin ?? process.env.ANNA_T07_LIVE_APPROVAL_ORIGIN,
@@ -206,7 +231,7 @@ export async function createLiveHarnessV2Runtime(
     workspaceRoot,
     ...(webSearch === undefined ? {} : { webSearch }),
   });
-  const kernel = options.createKernel?.({
+  const piKernel = options.createKernel?.({
     endpoint: config.model_endpoint,
     apiKey: config.model_api_key,
     modelName: config.model_name,
@@ -221,6 +246,40 @@ export async function createLiveHarnessV2Runtime(
     prepareContext,
     workerProfileId: profile.workerProfileId,
   });
+  const ompKernel = ompDescriptor && ompRuntimeRoot ? new OmpLoopKernel({
+    runtimeRoot: ompRuntimeRoot,
+    expectedManifestDigest: `sha256:${ompDescriptor.runtime.runtimeManifestSha256}`,
+    workspaceRoot,
+    prepareContext,
+    createToolGateway: createRunToolGateway,
+    modelTransport: options.ompModelTransport ?? createOmpModelTransport({
+      endpoint: config.model_endpoint, apiKey: config.model_api_key, modelName: config.model_name,
+      tools: [{ name: "read_only", description: "Read an admitted relative file.", parameters: {
+        type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false,
+      } }],
+    }),
+  }) : undefined;
+  const owners = new Map<string, { command: StartRun; kernel: LoopKernel }>();
+  const ownerFor = (runId: string, scope?: { workspaceId: string; channelId: string }): LoopKernel => {
+    const matches = [...owners.values()].filter(owner => owner.command.runId === runId
+      && (!scope || owner.command.workspaceId === scope.workspaceId && owner.command.channelId === scope.channelId));
+    if (matches.length !== 1) throw new Error("Run control requires one active scoped owner");
+    return matches[0].kernel;
+  };
+  const kernel: LoopKernel = {
+    async start(command, sink, signal) {
+      const selected = command.runProfileSnapshot.kernel?.adapterId === "omp" ? ompKernel : piKernel;
+      if (!selected) throw new Error("OMP runtime unavailable");
+      const key = JSON.stringify([command.workspaceId, command.channelId, command.runId]);
+      if (owners.has(key)) throw new Error("Run already has an active owner");
+      owners.set(key, { command, kernel: selected });
+      try { return await selected.start(command, sink, signal); }
+      finally { owners.delete(key); }
+    },
+    steer: (runId, message) => ownerFor(runId, message).steer(runId, message),
+    answer: (runId, answer) => ownerFor(runId).answer(runId, answer),
+    abort: (runId, reason) => ownerFor(runId).abort(runId, reason),
+  };
   const runtimeOptions: DurableHarnessV2RuntimeOptions = {
     eventStore,
     kernel,
@@ -234,9 +293,17 @@ export async function createLiveHarnessV2Runtime(
     evidenceMode: "live",
     webSearchConfigured: webSearch !== undefined,
     reviewGateConfigured,
-    validateStartCommand: () => assertKernelSelectionAdmitted(config.harness_v2_kernel),
-    validateResumeCommand: (command) =>
-      assertPersistedKernelIdentity(command, kernelDescriptor),
+    validateStartCommand: (command) => {
+      if (config.harness_v2_kernel === "omp" && ompKernel) {
+        if (command.runProfileSnapshot.allowedTools.some(name => name !== "read_only")) throw new KernelSelectionError({ code: "kernel_unavailable", requested_adapter: "omp", reason: "managed_runtime_unavailable" });
+        return;
+      }
+      assertKernelSelectionAdmitted(config.harness_v2_kernel);
+    },
+    validateResumeCommand: (command) => {
+      if (command.runProfileSnapshot.kernel?.adapterId === "omp") throw new KernelSelectionError({ code: "kernel_unavailable", requested_adapter: "omp", reason: "managed_runtime_unavailable" });
+      assertPersistedKernelIdentity(command, kernelDescriptor);
+    },
   };
   const runtime = createDurableHarnessV2Runtime(runtimeOptions);
 
@@ -246,7 +313,7 @@ export async function createLiveHarnessV2Runtime(
     ...(approvalOrigin === undefined || ownerId === undefined || ownerId.trim() === ""
       ? {}
       : { createActivation: { workspaceRoot, approvalOrigin, ownerId } }),
-    close: () => eventStore.close(),
+    close: () => ompKernel ? ompKernel.close().then(() => eventStore.close()) : eventStore.close(),
   };
 }
 
@@ -255,7 +322,7 @@ function assertPersistedKernelIdentity(
   available: PiKernelDescriptorV1,
 ): void {
   const persisted = command.runProfileSnapshot.kernel;
-  if (persisted !== undefined && !samePiKernelDescriptor(persisted, available)) {
+  if (persisted !== undefined && (persisted.adapterId !== "pi" || !samePiKernelDescriptor(persisted, available))) {
     throw new KernelSelectionError({
       code: "kernel_unavailable",
       requested_adapter: "pi",
@@ -317,6 +384,8 @@ function parseRuntimeConfig(input: unknown): {
   readonly web_search_endpoint?: string;
   readonly web_search_api_key?: string;
   readonly harness_v2_kernel?: unknown;
+  readonly harness_v2_omp_runtime_root?: unknown;
+  readonly harness_v2_omp_descriptor?: unknown;
 } {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error("live Runtime config must be a JSON object");
@@ -344,6 +413,8 @@ function parseRuntimeConfig(input: unknown): {
     model_api_key: apiKey,
     model_endpoint: endpoint,
     harness_v2_kernel: config.harness_v2_kernel,
+    harness_v2_omp_runtime_root: config.harness_v2_omp_runtime_root,
+    harness_v2_omp_descriptor: config.harness_v2_omp_descriptor,
     ...(webSearchEndpoint === undefined ? {} : { web_search_endpoint: webSearchEndpoint }),
     ...(webSearchApiKey === undefined ? {} : { web_search_api_key: webSearchApiKey }),
   };
@@ -355,7 +426,7 @@ export async function createLiveProfile(
   webSearchEnabled = false,
   surface: "general" | "create" = "general",
   memoryRead: MemoryReadMode = "none",
-  kernel?: PiKernelDescriptorV1,
+  kernel?: KernelDescriptorV1,
 ) {
   const defaultSkillPath = resolve(
     import.meta.dirname,

@@ -1,10 +1,12 @@
 import {
   parseJsonValue,
   type ChannelScope,
+  type JsonValue,
   type RunId,
   type WorkerProfileId,
 } from "./contracts";
 import type { ToolRequest } from "./interfaces";
+import type { AcceptedChannelMemory } from "./memory-types";
 import {
   expectNonEmptyString,
   expectRecord,
@@ -45,6 +47,13 @@ export interface RunContext extends ChannelScope {
 
 export interface RunContextSummary {
   readonly summary: string;
+}
+
+export interface PreparedRunContext {
+  readonly context: RunContext;
+  readonly memoryHits: readonly AcceptedChannelMemory[];
+  readonly snapshotDigest: string;
+  readonly originalExecutionFingerprint: JsonValue;
 }
 
 type RunContextBinding = Pick<

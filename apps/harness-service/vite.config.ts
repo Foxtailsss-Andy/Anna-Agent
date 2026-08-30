@@ -3,6 +3,7 @@ import { builtinModules } from "node:module";
 import { resolve } from "node:path";
 
 import { defineConfig } from "vite";
+import { measureOmpImplementation } from "../../packages/omp-loop-kernel/src/kernel-source.ts";
 import {
   assertPiKernelSourceIdentity,
   createPiKernelSourceIdentitySync,
@@ -10,6 +11,7 @@ import {
 } from "../../packages/pi-loop-kernel/src/kernel-source.ts";
 
 const root = resolve(import.meta.dirname);
+const ompImplementation = measureOmpImplementation(resolve(root, "../../packages/omp-loop-kernel"));
 const buildSourceIdentity = createPiKernelSourceIdentitySync(
   resolve(root, "../../packages/pi-loop-kernel/src"),
 );
@@ -18,6 +20,7 @@ export default defineConfig({
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
     __ANNA_PI_KERNEL_SOURCE_SHA256__: JSON.stringify(buildSourceIdentity.sha256),
+    __ANNA_OMP_IMPLEMENTATION__: JSON.stringify(ompImplementation),
   },
   plugins: [piKernelDescriptorSidecar()],
   build: {
@@ -55,6 +58,9 @@ function piKernelDescriptorSidecar() {
 }
 
 async function createBuildPiKernelDescriptor() {
+  if (JSON.stringify(measureOmpImplementation(resolve(root, "../../packages/omp-loop-kernel"))) !== JSON.stringify(ompImplementation)) {
+    throw new Error("OMP implementation changed during build");
+  }
   await verifyBuildUpstreamIdentity();
   assertPiKernelSourceIdentity(
     buildSourceIdentity,

@@ -1,7 +1,9 @@
 # HF-02 S1: Actual Governed Worker
 
 Date: 2026-08-30
-Status: frozen for first-tracer coding; independent Standards and Spec design gates passed.
+Status: locally accepted on 2026-08-31; fixed-source Standards/Spec review and
+integrated gates passed. GitHub publication/CI pending. See
+[implementation evidence](../../handoff/2026-08-30-hf-02-s1-runtime-materialization.md).
 Implementation base: `991394b52c6c167d9dd56d50cd4f71f629526a58`.
 Parent: [HF-02](HF-02-governed-omp-kernel.md).
 Evidence inputs: [runtime preflight](../../handoff/2026-08-30-hf-02-runtime-preflight.md).

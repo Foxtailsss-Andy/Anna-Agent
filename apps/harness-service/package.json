@@ -12,6 +12,7 @@
     "@anna/eval": "0.0.0",
     "@anna/event-store": "0.0.0",
     "@anna/harness-v2": "0.0.0",
+    "@anna/omp-loop-kernel": "0.0.0",
     "@anna/pi-loop-kernel": "0.0.0",
     "@anna/trace": "0.0.0"
   }

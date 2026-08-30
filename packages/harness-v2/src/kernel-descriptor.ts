@@ -20,6 +20,33 @@ export interface PiKernelDescriptorV1 {
   };
 }
 
+export interface OmpKernelDescriptorV1 {
+  readonly schemaVersion: 1;
+  readonly adapterId: "omp";
+  readonly protocolVersion: "anna-omp/1";
+  readonly adapterSource: {
+    readonly packageName: "@anna/omp-loop-kernel";
+    readonly sha256: string;
+  };
+  readonly upstream: {
+    readonly packageName: "@oh-my-pi/pi-coding-agent";
+    readonly version: "18.0.11";
+    readonly sourceCommit: "b8ce33a58911c26bed1d84f0db9a5e2e727c49a2";
+    readonly integrity: string;
+  };
+  readonly runtime: {
+    readonly platform: "darwin";
+    readonly arch: "arm64";
+    readonly bunVersion: "1.3.14";
+    readonly bunSha256: string;
+    readonly nativeSha256: string;
+    readonly dependencyLockSha256: string;
+    readonly runtimeManifestSha256: string;
+  };
+}
+
+export type KernelDescriptorV1 = PiKernelDescriptorV1 | OmpKernelDescriptorV1;
+
 function exactRecord(
   input: unknown,
   name: string,
@@ -139,4 +166,55 @@ export function parsePiKernelDescriptor(input: unknown): PiKernelDescriptorV1 {
       },
     },
   }) as PiKernelDescriptorV1;
+}
+
+export function parseOmpKernelDescriptor(input: unknown): OmpKernelDescriptorV1 {
+  const value = exactRecord(input, "OmpKernelDescriptorV1", [
+    "schemaVersion",
+    "adapterId",
+    "protocolVersion",
+    "adapterSource",
+    "upstream",
+    "runtime",
+  ]);
+  const adapterSource = exactRecord(value.adapterSource, "OmpKernelDescriptorV1.adapterSource", ["packageName", "sha256"]);
+  const upstream = exactRecord(value.upstream, "OmpKernelDescriptorV1.upstream", ["packageName", "version", "sourceCommit", "integrity"]);
+  const runtime = exactRecord(value.runtime, "OmpKernelDescriptorV1.runtime", [
+    "platform",
+    "arch",
+    "bunVersion",
+    "bunSha256",
+    "nativeSha256",
+    "dependencyLockSha256",
+    "runtimeManifestSha256",
+  ]);
+  return deepFreeze({
+    schemaVersion: literal(value.schemaVersion, 1, "OmpKernelDescriptorV1.schemaVersion"),
+    adapterId: literal(value.adapterId, "omp", "OmpKernelDescriptorV1.adapterId"),
+    protocolVersion: literal(value.protocolVersion, "anna-omp/1", "OmpKernelDescriptorV1.protocolVersion"),
+    adapterSource: {
+      packageName: literal(adapterSource.packageName, "@anna/omp-loop-kernel", "OmpKernelDescriptorV1.adapterSource.packageName"),
+      sha256: sha256(adapterSource.sha256, "OmpKernelDescriptorV1.adapterSource.sha256"),
+    },
+    upstream: {
+      packageName: literal(upstream.packageName, "@oh-my-pi/pi-coding-agent", "OmpKernelDescriptorV1.upstream.packageName"),
+      version: literal(upstream.version, "18.0.11", "OmpKernelDescriptorV1.upstream.version"),
+      sourceCommit: literal(upstream.sourceCommit, "b8ce33a58911c26bed1d84f0db9a5e2e727c49a2", "OmpKernelDescriptorV1.upstream.sourceCommit"),
+      integrity: sha512Integrity(upstream.integrity, "OmpKernelDescriptorV1.upstream.integrity"),
+    },
+    runtime: {
+      platform: literal(runtime.platform, "darwin", "OmpKernelDescriptorV1.runtime.platform"),
+      arch: literal(runtime.arch, "arm64", "OmpKernelDescriptorV1.runtime.arch"),
+      bunVersion: literal(runtime.bunVersion, "1.3.14", "OmpKernelDescriptorV1.runtime.bunVersion"),
+      bunSha256: sha256(runtime.bunSha256, "OmpKernelDescriptorV1.runtime.bunSha256"),
+      nativeSha256: sha256(runtime.nativeSha256, "OmpKernelDescriptorV1.runtime.nativeSha256"),
+      dependencyLockSha256: sha256(runtime.dependencyLockSha256, "OmpKernelDescriptorV1.runtime.dependencyLockSha256"),
+      runtimeManifestSha256: sha256(runtime.runtimeManifestSha256, "OmpKernelDescriptorV1.runtime.runtimeManifestSha256"),
+    },
+  }) as OmpKernelDescriptorV1;
+}
+
+export function parseKernelDescriptor(input: unknown): KernelDescriptorV1 {
+  const value = expectRecord(input, "KernelDescriptorV1");
+  return value.adapterId === "omp" ? parseOmpKernelDescriptor(value) : parsePiKernelDescriptor(value);
 }
