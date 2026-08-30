@@ -93,7 +93,7 @@ Source-level smoke, deterministic transport, live provider, live MCP, packaged a
 
 - SPEC: reviewed by Sol Ultra; no P0/P1; HF-01A/B split and Memory lookup semantics clarified before coding.
 - HF-00: integration tree created from verified GitHub main; branch census and protected-source fingerprints captured.
-- HF-01A: approved for Luna Max coding after the SPEC commit is pinned.
+- HF-01A: completed by Luna Max; accepted by independent Sol Ultra Standards and Spec reviews. Final local gates and retained risks are recorded in the [2026-08-30 update](../../../product/anna-harness-first-update-2026-08-30.md).
 - HF-01B: pending; no Memory hydration completion claimed by HF-01A.
 - HF-02..HF-10: planned, not implemented by this document.
 

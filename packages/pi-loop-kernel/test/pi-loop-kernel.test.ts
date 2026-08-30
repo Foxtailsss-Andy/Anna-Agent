@@ -153,6 +153,122 @@ test("completes a natural first turn when the one-turn budget is exhausted", asy
   expect(events.at(-1)?.type).toBe("run.completed");
 });
 
+test("binds a per-Run ToolGateway and worker identity from the admitted profile", async () => {
+  const provider = fauxProvider();
+  const observedRequests: ToolRequest[] = [];
+  let factoryCalls = 0;
+  let streamCalls = 0;
+  const kernel = new PiLoopKernel({
+    model: provider.getModel(),
+    toolGateway: inMemoryToolGateway,
+    createToolGateway(command) {
+      factoryCalls += 1;
+      expect(command.runProfileSnapshot.workerProfileId).toBe("fixture-worker");
+      return {
+        async execute(request) {
+          observedRequests.push(request);
+          return { status: "succeeded", output: "Fixture: release-note" };
+        },
+      };
+    },
+    workerProfileId,
+    streamFn: () => {
+      const stream = createAssistantMessageEventStream();
+      const message = streamCalls === 0
+        ? fauxAssistantMessage(
+            fauxToolCall("fixture_read", { key: "release-note" }),
+            { stopReason: "toolUse" },
+          )
+        : fauxAssistantMessage("done");
+      streamCalls += 1;
+      stream.push({ type: "start", partial: message });
+      stream.push({
+        type: "done",
+        reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+        message,
+      });
+      return stream;
+    },
+    now: () => 0,
+  });
+
+  await expect(kernel.start(
+    startRun({ turns: 2 }, { allowedTools: ["fixture_read"] }),
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+
+  expect(factoryCalls).toBe(1);
+  expect(observedRequests).toHaveLength(1);
+  expect(observedRequests[0]).toEqual(expect.objectContaining({
+    workspaceId: "workspace-1",
+    channelId: "channel-1",
+    runId: "run-1",
+    workerProfileId: "fixture-worker",
+    name: "fixture_read",
+  }));
+});
+
+test("assigns a stable scoped effect key to Create artifact requests", async () => {
+  const provider = fauxProvider();
+  const command = startRun({ turns: 2 }, { allowedTools: ["create_artifact"] });
+  const effectKeys: string[] = [];
+
+  const runKernel = () => {
+    let streamCalls = 0;
+    return new PiLoopKernel({
+      model: provider.getModel(),
+      toolGateway: {
+        async execute(request) {
+          effectKeys.push(request.effectKey ?? "");
+          return {
+            status: "succeeded",
+            output: { artifact: { kind: "skill" }, validation: { valid: true } },
+          };
+        },
+      },
+      workerProfileId,
+      streamFn: () => {
+        const stream = createAssistantMessageEventStream();
+        const message = streamCalls === 0
+          ? fauxAssistantMessage(
+              fauxToolCall("create_artifact", {
+                kind: "skill",
+                skill_id: "release-notes",
+                preview: "---\nname: Release notes\n---",
+              }),
+              { stopReason: "toolUse" },
+            )
+          : fauxAssistantMessage("done");
+        streamCalls += 1;
+        stream.push({ type: "start", partial: message });
+        stream.push({
+          type: "done",
+          reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+          message,
+        });
+        return stream;
+      },
+      now: () => 0,
+    });
+  };
+
+  await expect(runKernel().start(
+    command,
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+  await expect(runKernel().start(
+    command,
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+
+  expect(effectKeys).toHaveLength(2);
+  expect(effectKeys[0]).toMatch(/^artifact:/);
+  expect(effectKeys[1]).toBe(effectKeys[0]);
+});
+
 test("attributes every child Run event to its parent Run and lane", async () => {
   const provider = fauxProvider();
   const kernel = new PiLoopKernel({
@@ -1048,7 +1164,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
       workspaceId: "workspace-1" as ToolRequest["workspaceId"],
       channelId: "channel-1" as ToolRequest["channelId"],
     }),
-    workerProfileId: "worker-profile-1" as WorkerProfileId,
+    workerProfileId: "fixture-worker" as WorkerProfileId,
     policy,
     sandbox,
     events,
@@ -1076,7 +1192,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
       return stream;
     },
     toolGateway: gateway,
-    workerProfileId: "worker-profile-1" as WorkerProfileId,
+    workerProfileId: "fixture-worker" as WorkerProfileId,
   };
   const kernel = new PiLoopKernel(options);
 
@@ -1092,7 +1208,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
     workspaceId: "workspace-1",
     channelId: "channel-1",
     runId: "run-1",
-    workerProfileId: "worker-profile-1",
+    workerProfileId: "fixture-worker",
     toolCallId: expect.any(String),
   }]);
   expect(contexts[1]?.messages).toContainEqual(expect.objectContaining({

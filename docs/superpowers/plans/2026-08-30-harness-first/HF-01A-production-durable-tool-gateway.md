@@ -4,7 +4,7 @@ Date: 2026-08-30
 Spec: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md)
 Code base: `7c5ca7f7a6797604b82a853eee5c4652b375e318`
 Coding: GPT-5.6-Luna Max. Review: GPT-5.6-Sol Ultra.
-Status: approved for implementation after SPEC review.
+Status: implemented by Luna Max and accepted by Sol Ultra Standards and Spec review. See the [verification and limitations](../../../product/anna-harness-first-update-2026-08-30.md).
 
 ## Outcome
 
@@ -21,6 +21,16 @@ Coverage is limited to HF-050, the Tool policy part of HF-030/031 and Tool evide
 - Development handoff `docs/superpowers/handoff/2026-08-30-hf-01a-durable-tool-gateway.md`
 
 Any other ownership expansion requires a recorded main-Agent decision before edits. No Python, Desktop startup, dependency, Memory, SPEC or release-document changes belong to the coding Agent.
+
+### Ownership amendment: local Artifact effects
+
+Approved by the main Agent on 2026-08-30 after Sol Ultra's focused contract review, before the core edit. Existing `allow + effectKey` fails with `invalid_tool_combination`; the existing effect ledger is otherwise usable. A local draft Artifact does not require activation approval, and the implementation must not fabricate an approval to use that ledger.
+
+- Additional owned files: `packages/harness-v2/src/tool-gateway.ts` and `packages/harness-v2/test/tool-gateway.test.ts` only.
+- Permit `allow` with a nonempty effect key and an explicit `safe` or `never` replay policy to invoke the existing `executeEffect`. Keep the current `allow + safe + no key` read path and the entire `require_approval` path unchanged. Missing policy, missing/empty identity and unsupported combinations remain fail-closed.
+- Local Artifact generation uses `replayPolicy: never`: its exclusive filesystem write is not safely repeatable. A persisted success returns its original result; an uncertain dispatched effect is reported unknown and is not rewritten. Activation and external business writes retain their separate approval requirements.
+- Add RED/GREEN tests for this new allowed combination and for invalid/denied/unapproved combinations, duplicate/changed-intent effects and unknown outcomes. Do not change shared effect-ledger implementation or weaken existing approval tests.
+- Production policy must also bind Run and parent/Lane attribution to the captured admitted command. A request cannot select another Run that happens to share a worker.
 
 ## Required behavior
 

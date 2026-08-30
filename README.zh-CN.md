@@ -190,6 +190,9 @@ Hiker 是外部合作项目，作者为 [kc8zshnt6n-gif](https://github.com/kc8z
 
 深入了解项目和发布边界：
 
+- [Harness-first SPEC 与验收标准 - 2026-08-30](docs/product/anna-harness-first-spec-2026-08-30.md)
+- [Harness-first 更新：交付范围、验证结果与待完成项](docs/product/anna-harness-first-update-2026-08-30.md)
+- [Harness-first SDD 计划与迁移状态](docs/superpowers/plans/2026-08-30-harness-first/00-plan.md)
 - [Developer Preview Wayfinder](docs/product/anna-github-developer-preview-wayfinder-2026-08-23.md)
 - [Developer Preview Spec](docs/product/anna-github-developer-preview-spec-2026-08-23.md)
 - [Release tickets](docs/superpowers/plans/2026-08-23-github-developer-preview/00-tickets.md)

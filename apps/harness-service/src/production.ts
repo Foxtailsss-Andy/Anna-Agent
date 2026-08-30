@@ -1,13 +1,15 @@
-import { mkdir, readFile, realpath, stat } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 import {
   loadSkillCatalogEntry,
   resolveRunProfile,
   type RunProfileId,
   type EventStore,
-  type ToolGateway,
+  type LoopKernel,
   type ToolResult,
+  type StartRun,
+  type ToolGateway,
   type WorkerProfileId,
 } from "@anna/harness-v2";
 import { SqliteEventStore } from "@anna/event-store";
@@ -17,8 +19,13 @@ import {
   createDurableHarnessV2Runtime,
   type DurableHarnessV2RuntimeOptions,
 } from "./runtime";
-import { createSkillArtifact } from "./create-artifact";
 import type { HarnessV2Runtime, V2SurfaceId } from "./index";
+
+export {
+  createProductionToolGateway,
+  type ProductionToolGatewayOptions,
+} from "./production-tools";
+import { createProductionToolGateway } from "./production-tools";
 
 export interface LiveHarnessV2RuntimeOptions {
   readonly runtimeConfigPath?: string;
@@ -28,7 +35,20 @@ export interface LiveHarnessV2RuntimeOptions {
   readonly workspaceRoot?: string;
   readonly reviewApprovalOrigin?: string;
   readonly reviewOwnerId?: string;
+  readonly createKernel?: LiveHarnessV2KernelFactory;
 }
+
+export interface LiveHarnessV2KernelOptions {
+  readonly endpoint: string;
+  readonly apiKey: string;
+  readonly modelName: string;
+  readonly workerProfileId: WorkerProfileId;
+  readonly toolGatewayFor: (command: StartRun) => ToolGateway;
+}
+
+export type LiveHarnessV2KernelFactory = (
+  options: LiveHarnessV2KernelOptions,
+) => LoopKernel;
 
 export interface LiveHarnessV2Runtime {
   readonly runtime: HarnessV2Runtime;
@@ -142,75 +162,23 @@ export async function createLiveHarnessV2Runtime(
       ?? process.env.ANNA_HARNESS_V2_WORKSPACE_ROOT
       ?? ".anna/workspace",
   );
-  const toolGateway: ToolGateway = {
-    async execute(request, signal): Promise<ToolResult> {
-      if (request.name === "create_artifact") {
-        const input = request.input;
-        if (typeof input !== "object" || input === null || Array.isArray(input)
-          || input.kind !== "skill"
-          || typeof input.skill_id !== "string"
-          || typeof input.preview !== "string") {
-          return { status: "failed", output: { reason: "invalid_create_artifact" } };
-        }
-        return createSkillArtifact({
-          workspaceRoot,
-          runId: request.runId,
-          input: {
-            kind: "skill",
-            skill_id: input.skill_id,
-            preview: input.preview,
-          },
-        });
-      }
-      if (request.name === "web_search") {
-        if (webSearch === undefined) {
-          return { status: "failed", output: { reason: "web_search_provider_not_configured" } };
-        }
-        const input = request.input;
-        if (typeof input !== "object" || input === null || Array.isArray(input)
-          || typeof input.query !== "string") {
-          return { status: "failed", output: { reason: "invalid_web_search_query" } };
-        }
-        return webSearch(input.query, signal);
-      }
-      if (request.name !== "read_only") {
-        return { status: "failed", output: { reason: "tool_not_enabled_in_live_vertical_slice" } };
-      }
-      const input = request.input;
-      if (typeof input !== "object" || input === null || Array.isArray(input)
-        || typeof input.path !== "string" || input.path.trim() === "") {
-        return { status: "failed", output: { reason: "invalid_read_only_path" } };
-      }
-      try {
-        const root = await realpath(workspaceRoot);
-        const target = resolve(root, input.path);
-        const targetRelative = relative(root, target);
-        if (targetRelative === "" || targetRelative.startsWith("..") || targetRelative.startsWith("/")) {
-          return { status: "failed", output: { reason: "read_only_path_outside_workspace" } };
-        }
-        const resolvedTarget = await realpath(target);
-        const resolvedRelative = relative(root, resolvedTarget);
-        if (resolvedRelative.startsWith("..") || resolvedRelative.startsWith("/")) {
-          return { status: "failed", output: { reason: "read_only_path_outside_workspace" } };
-        }
-        const metadata = await stat(resolvedTarget);
-        if (!metadata.isFile() || metadata.size > 16_384) {
-          return { status: "failed", output: { reason: "read_only_file_not_bounded" } };
-        }
-        return {
-          status: "succeeded",
-          output: { path: resolvedRelative, content: await readFile(resolvedTarget, "utf8") },
-        };
-      } catch {
-        return { status: "failed", output: { reason: "read_only_source_unavailable" } };
-      }
-    },
-  };
-  const kernel = createOpenAICompatiblePiLoopKernel({
+  const createRunToolGateway = (command: StartRun) => createProductionToolGateway({
+    eventStore,
+    command,
+    workspaceRoot,
+    ...(webSearch === undefined ? {} : { webSearch }),
+  });
+  const kernel = options.createKernel?.({
     endpoint: config.model_endpoint,
     apiKey: config.model_api_key,
     modelName: config.model_name,
-    toolGateway,
+    toolGatewayFor: createRunToolGateway,
+    workerProfileId: profile.workerProfileId,
+  }) ?? createOpenAICompatiblePiLoopKernel({
+    endpoint: config.model_endpoint,
+    apiKey: config.model_api_key,
+    modelName: config.model_name,
+    createToolGateway: createRunToolGateway,
     workerProfileId: profile.workerProfileId,
   });
   const runtimeOptions: DurableHarnessV2RuntimeOptions = {

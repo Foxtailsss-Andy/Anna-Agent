@@ -135,13 +135,41 @@ export function createToolGateway(
         );
       }
 
-      if (
-        decision === "allow" &&
-        definition.replayPolicy === "safe" &&
-        normalizedRequest.effectKey === undefined
-      ) {
-        const result = await boundOptions.sandbox.execute(normalizedRequest, signal);
-        return terminalResult(boundOptions, lifecycleRequest, result);
+      if (decision === "allow") {
+        if (
+          definition.replayPolicy === "safe" &&
+          normalizedRequest.effectKey === undefined
+        ) {
+          const result = await boundOptions.sandbox.execute(normalizedRequest, signal);
+          return terminalResult(boundOptions, lifecycleRequest, result);
+        }
+        if (
+          (definition.replayPolicy === "safe" || definition.replayPolicy === "never") &&
+          typeof normalizedRequest.effectKey === "string" &&
+          normalizedRequest.effectKey.length > 0
+        ) {
+          const effectOptions = {
+            ...boundOptions,
+            sandbox: {
+              async execute(request: ToolRequest, effectSignal: AbortSignal): Promise<ToolResult> {
+                if (effectSignal.aborted) {
+                  return {
+                    status: "failed",
+                    output: { reason: "cancelled" },
+                  };
+                }
+                return boundOptions.sandbox.execute(request, effectSignal);
+              },
+            },
+          };
+          const result = await executeEffect(
+            effectOptions,
+            normalizedRequest,
+            definition.replayPolicy,
+            signal,
+          );
+          return terminalResult(boundOptions, lifecycleRequest, result);
+        }
       }
 
       if (

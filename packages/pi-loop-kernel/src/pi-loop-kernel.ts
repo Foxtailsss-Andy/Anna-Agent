@@ -29,7 +29,9 @@ import { createHash } from "node:crypto";
 export interface PiLoopKernelOptions {
   model: Model<Api>;
   streamFn: StreamFn;
-  toolGateway: ToolGateway;
+  toolGateway?: ToolGateway;
+  /** Build a Gateway from the admitted Run/Profile scope before any Tool call. */
+  createToolGateway?: (command: StartRun) => ToolGateway;
   workerProfileId: WorkerProfileId;
   getApiKey?: (provider: string) => string | undefined | Promise<string | undefined>;
   now?: () => number;
@@ -40,7 +42,9 @@ export interface OpenAICompatiblePiLoopKernelOptions {
   endpoint: string;
   apiKey: string;
   modelName: string;
-  toolGateway: ToolGateway;
+  toolGateway?: ToolGateway;
+  /** Build a Gateway from the admitted Run/Profile scope before any Tool call. */
+  createToolGateway?: (command: StartRun) => ToolGateway;
   workerProfileId: WorkerProfileId;
 }
 
@@ -72,6 +76,7 @@ export function createOpenAICompatiblePiLoopKernel(
     streamFn: openAICompletionsStream as StreamFn,
     getApiKey: () => options.apiKey,
     toolGateway: options.toolGateway,
+    createToolGateway: options.createToolGateway,
     workerProfileId: options.workerProfileId,
   });
 }
@@ -393,6 +398,7 @@ function createArtifactTool(
           skill_id: params.skill_id,
           preview: params.preview,
         },
+        effectKey: createArtifactEffectKey(command, params),
         workspaceId: command.workspaceId,
         channelId: command.channelId,
         runId: command.runId,
@@ -414,6 +420,29 @@ function createArtifactTool(
       };
     },
   };
+}
+
+function createArtifactEffectKey(
+  command: StartRun,
+  input: CreateArtifactParameters,
+): string {
+  const material = JSON.stringify({
+    workspaceId: command.workspaceId,
+    channelId: command.channelId,
+    runId: command.runId,
+    workerProfileId: command.runProfileSnapshot.workerProfileId,
+    runProfileHash: command.runProfileSnapshot.hash,
+    ...(command.parentRunId === undefined ? {} : { parentRunId: command.parentRunId }),
+    ...(command.parentEventId === undefined ? {} : { parentEventId: command.parentEventId }),
+    ...(command.laneId === undefined ? {} : { laneId: command.laneId }),
+    tool: "create_artifact",
+    input: {
+      kind: input.kind,
+      skill_id: input.skill_id,
+      preview: input.preview,
+    },
+  });
+  return `artifact:${createHash("sha256").update(material, "utf8").digest("hex")}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -479,6 +508,13 @@ export class PiLoopKernel implements LoopKernel {
     sink: EventSink,
     signal: AbortSignal,
   ): Promise<RunOutcome> {
+    const toolGateway = this.options.createToolGateway?.(command) ?? this.options.toolGateway;
+    if (toolGateway === undefined) {
+      throw new Error("Pi Loop Kernel requires a ToolGateway");
+    }
+    // The admitted Run snapshot is authoritative. The constructor field remains
+    // for compatibility with the static test/live adapter shape.
+    const workerProfileId = command.runProfileSnapshot.workerProfileId;
     const history = await readRunHistory(sink, command.runId);
     if (history.some(isTerminalRunEvent)) {
       throw new Error("Cannot restore a terminal Pi Run");
@@ -499,16 +535,16 @@ export class PiLoopKernel implements LoopKernel {
         messages: transcript,
         tools: [
           ...(command.runProfileSnapshot.allowedTools.includes("fixture_read")
-            ? [fixtureReadTool(command, this.options.toolGateway, this.options.workerProfileId)]
+            ? [fixtureReadTool(command, toolGateway, workerProfileId)]
             : []),
           ...(command.runProfileSnapshot.allowedTools.includes("read_only")
-            ? [readOnlyTool(command, this.options.toolGateway, this.options.workerProfileId)]
+            ? [readOnlyTool(command, toolGateway, workerProfileId)]
             : []),
           ...(command.runProfileSnapshot.allowedTools.includes("web_search")
-            ? [webSearchTool(command, this.options.toolGateway, this.options.workerProfileId)]
+            ? [webSearchTool(command, toolGateway, workerProfileId)]
             : []),
           ...(command.runProfileSnapshot.allowedTools.includes("create_artifact")
-            ? [createArtifactTool(command, this.options.toolGateway, this.options.workerProfileId)]
+            ? [createArtifactTool(command, toolGateway, workerProfileId)]
             : []),
         ],
       },

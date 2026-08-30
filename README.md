@@ -190,6 +190,9 @@ This GitHub repository was created on April 2, 2026 to plan the Anna project. As
 
 For deeper project and release detail, see:
 
+- [Harness-first SPEC and acceptance gates - 2026-08-30](docs/product/anna-harness-first-spec-2026-08-30.md)
+- [Harness-first update: delivered scope, verification and open work](docs/product/anna-harness-first-update-2026-08-30.md)
+- [Harness-first SDD plan and migration status](docs/superpowers/plans/2026-08-30-harness-first/00-plan.md)
 - [Developer Preview Wayfinder](docs/product/anna-github-developer-preview-wayfinder-2026-08-23.md)
 - [Developer Preview Spec](docs/product/anna-github-developer-preview-spec-2026-08-23.md)
 - [Release tickets](docs/superpowers/plans/2026-08-23-github-developer-preview/00-tickets.md)
