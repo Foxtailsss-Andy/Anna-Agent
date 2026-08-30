@@ -129,5 +129,7 @@ force push, automatic production deployment or formal installer Release is
 authorized by this Goal. Source branch/PR updates retain their exact scope and
 reviewed evidence. Do not lower a gate after discovering a failure.
 
-The next implementation ticket is HF-01B. The overall Goal remains active
-through individual ticket completions and unresolved external verification.
+The next implementation ticket is HF-01B; its
+[design handoff](../superpowers/handoff/2026-08-30-hf-01b-design.md) records the
+writer/input-recovery decisions that precede coding. The overall Goal remains
+active through individual ticket completions and unresolved verification.
