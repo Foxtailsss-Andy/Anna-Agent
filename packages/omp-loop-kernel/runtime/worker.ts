@@ -2,17 +2,11 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createInterface, type Interface } from "node:readline";
 
-import { Type } from "@oh-my-pi/omptype/typebox";
-import { registerCustomApi } from "@oh-my-pi/pi-ai/api-registry";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import type { AssistantMessage as OmpAssistantMessage, Context as OmpContext, Model as OmpModel } from "@oh-my-pi/pi-ai/types";
-import { getStreamingPartialJson, setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createAgentSession, type CreateAgentSessionOptions } from "@oh-my-pi/pi-coding-agent/sdk";
+import type { AssistantMessage as OmpAssistantMessage, Context as OmpContext, Message as OmpMessage, Model as OmpModel } from "@oh-my-pi/pi-ai/types";
+import type { AssistantMessageEventStream as OmpAssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
+import type { AuthStorage as OmpAuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
+import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { CustomTool } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 
 import {
   OMP_PROTOCOL,
@@ -26,6 +20,8 @@ import {
   type ModelContext,
   type ModelDelta,
   type Observation,
+  projectRestoreTranscript,
+  type RestoreProjection,
   type StartInput,
   type ToolDefinition,
   type WorkerBinding,
@@ -35,6 +31,17 @@ import {
 const CUSTOM_API = "anna-host-transport-v1";
 const MAX_QUEUED_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_PENDING_RECEIPTS = 64;
+// Values load from this artifact's source tree; type-only imports above use pinned published declarations.
+const { Type } = (await import(new URL("./node_modules/@oh-my-pi/omptype/src/typebox.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/omptype/typebox");
+const { registerCustomApi } = (await import(new URL("./node_modules/@oh-my-pi/pi-ai/src/api-registry.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-ai/api-registry");
+const { AuthStorage } = (await import(new URL("./node_modules/@oh-my-pi/pi-ai/src/auth-storage.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-ai/auth-storage");
+const { getStreamingPartialJson, setStreamingPartialJson } = (await import(new URL("./node_modules/@oh-my-pi/pi-ai/src/utils/block-symbols.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-ai/utils/block-symbols");
+const { AssistantMessageEventStream } = (await import(new URL("./node_modules/@oh-my-pi/pi-ai/src/utils/event-stream.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-ai/utils/event-stream");
+const { ModelRegistry } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/config/model-registry.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/config/model-registry");
+const { Settings } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/config/settings.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/config/settings");
+const { createAgentSession } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/sdk.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/sdk");
+const { SessionManager } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/session/session-manager.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/session/session-manager");
+
 const configuredAttemptRoot = process.env.ANNA_OMP_ATTEMPT_ROOT;
 if (configuredAttemptRoot === undefined) throw new Error("managed launcher attempt root is required");
 const attemptRoot = configuredAttemptRoot;
@@ -43,8 +50,8 @@ class WorkerRuntime {
   private readonly reader: Interface;
   private binding: WorkerBinding | undefined;
   private input: StartInput | undefined;
-  private session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined;
-  private authStorage: AuthStorage | undefined;
+  private session: CreateAgentSessionResult["session"] | undefined;
+  private authStorage: OmpAuthStorage | undefined;
   private nextWorkerSeq = 0;
   private outputChain = Promise.resolve();
   private queuedOutputBytes = 0;
@@ -90,6 +97,9 @@ class WorkerRuntime {
   private async start(frame: Extract<HostFrame, { kind: "start" }>): Promise<void> {
     const input = this.input;
     if (input === undefined || this.binding === undefined) throw new Error("worker start state is missing");
+    const projection: RestoreProjection | undefined = input.transcript === undefined
+      ? undefined
+      : projectRestoreTranscript(input.transcript);
     this.session = await this.createSession(input);
     const activeTools = this.session.getActiveToolNames();
     const runtimePackage = JSON.parse(await readFile(
@@ -107,6 +117,26 @@ class WorkerRuntime {
     );
     this.ready = true;
     if (this.aborted) throw new Error("worker was aborted before prompt");
+    if (input.transcript !== undefined) {
+      const model = this.session.model;
+      if (model === undefined) throw new Error("admitted OMP model is unavailable");
+      this.session.agent.replaceMessages((projection?.messages ?? input.transcript).map((message) => toOmpMessage(message, model)));
+      if (isCompletedAssistantTail(input.transcript)) {
+        await this.awaitObservations();
+        if (this.aborted) throw new Error("worker was aborted before terminal proposal");
+        await this.sendFrame("terminal.proposed", { outcome: this.runOutcome });
+        await this.dispose();
+        return;
+      }
+      await this.session.agent.continue();
+      await this.session.waitForIdle();
+      await this.awaitObservations();
+      await Promise.all([...this.pendingReceipts.values()].map((receipt) => receipt.promise));
+      if (this.aborted) throw new Error("worker was aborted before terminal proposal");
+      await this.sendFrame("terminal.proposed", { outcome: this.runOutcome });
+      await this.dispose();
+      return;
+    }
     await this.emitObservation({
       type: "message_end",
       message: { role: "user", content: input.goal },
@@ -224,6 +254,16 @@ class WorkerRuntime {
     };
     const created = await createAgentSession(options);
     this.session = created.session;
+    // The SDK's CustomTool shape omits AgentTool concurrency. Set the policy
+    // on the live admitted proxies through the public Agent API so a single
+    // Host gateway call is in flight at a time for this bounded profile.
+    const admittedToolNames = new Set(input.allowedTools.map((tool) => tool.name));
+    const serializedTools = created.session.agent.state.tools.map((tool) => {
+      if (!admittedToolNames.has(tool.name)) return tool;
+      tool.concurrency = "exclusive";
+      return tool;
+    });
+    created.session.agent.setTools(serializedTools);
     this.session.subscribe((event) => this.onSessionEvent(event));
     return created.session;
   }
@@ -294,7 +334,7 @@ class WorkerRuntime {
     model: OmpModel,
     context: OmpContext,
     signal: AbortSignal | undefined,
-    stream: AssistantMessageEventStream,
+    stream: OmpAssistantMessageEventStream,
   ): Promise<void> {
     const startedAt = Date.now();
     try {
@@ -404,8 +444,20 @@ class WorkerRuntime {
     if (this.aborted || this.stopping) throw new HostModelError("cancelled", "tool request cancelled");
     if (this.pendingTools.size > 0) throw new Error("OMP tool request overlap");
     const requestId = randomUUID();
-    const frame = this.makeFrame("tool.request", { toolCallId, name, input }, requestId);
-    return new Promise((resolvePromise, rejectPromise) => {
+    const state = this.session?.agent.state;
+    const toolContext = state === undefined ? undefined : {
+      systemPrompt: state.systemPrompt.join("\n"),
+      messages: state.messages.map((message) => toNeutralMessage(message)).filter((message): message is Message => message !== undefined),
+    };
+    const frame = this.makeFrame("tool.request", {
+      toolCallId,
+      name,
+      input,
+      ...(toolContext === undefined || this.input?.transcript === undefined ? {} : {
+        context: { systemPrompt: toolContext.systemPrompt, messages: [...toolContext.messages] },
+      }),
+    }, requestId);
+    const result = await new Promise<Extract<HostFrame, { kind: "tool.result" }>>((resolvePromise, rejectPromise) => {
       const pending: PendingTool = { requestId, workerSeq: frame.workerSeq, resolve: resolvePromise, reject: rejectPromise };
       this.pendingTools.set(toolCallId, pending);
       const onAbort = () => {
@@ -423,6 +475,7 @@ class WorkerRuntime {
         rejectPromise(error);
       });
     });
+    return result;
   }
 
   private async receive(frame: HostFrame): Promise<void> {
@@ -666,6 +719,29 @@ function toNeutralContext(context: OmpContext): ModelContext {
   };
 }
 
+function toOmpMessage(message: Message, model: OmpModel): OmpMessage {
+  if (message.role === "user") {
+    return { role: "user", content: message.content, timestamp: Date.now() };
+  }
+  if (message.role === "assistant") return toOmpAssistant(message, model);
+  return {
+    role: "toolResult",
+    toolCallId: message.toolCallId,
+    toolName: message.toolName,
+    content: [{ type: "text", text: message.content }],
+    details: { status: message.status },
+    isError: message.status !== "succeeded",
+    timestamp: Date.now(),
+  };
+}
+
+function isCompletedAssistantTail(transcript: readonly Message[]): boolean {
+  const tail = transcript.at(-1);
+  return tail?.role === "assistant"
+    && tail.stopReason === "stop"
+    && !tail.content.some((block) => block.type === "toolCall");
+}
+
 function toNeutralMessage(value: unknown): Message | undefined {
   if (!isRecord(value) || typeof value.role !== "string") return undefined;
   if (value.role === "user" || value.role === "developer") {
@@ -704,14 +780,28 @@ function toNeutralMessage(value: unknown): Message | undefined {
   return undefined;
 }
 
+const REPORTED_USAGE_FIELDS = Symbol("annaReportedUsageFields");
+
 function toNeutralUsage(value: unknown): AssistantMessage["usage"] {
   if (!isRecord(value)) return undefined;
+  const usageRecord = value as Record<PropertyKey, unknown>;
+  const markedFields = Array.isArray(usageRecord[REPORTED_USAGE_FIELDS])
+    ? usageRecord[REPORTED_USAGE_FIELDS].filter((field): field is string => typeof field === "string")
+    : undefined;
+  const fields = markedFields ?? [
+    ...["input", "output", "cacheRead", "cacheWrite"].filter((key) =>
+      typeof value[key] === "number" && Number.isFinite(value[key]) && value[key] > 0),
+    ...(isRecord(value.cost) && typeof value.cost.total === "number" && Number.isFinite(value.cost.total) && value.cost.total > 0
+      ? ["cost"] : []),
+  ];
   const usage: Record<string, number> = {};
   for (const key of ["input", "output", "cacheRead", "cacheWrite"] as const) {
-    if (typeof value[key] === "number" && Number.isFinite(value[key]) && value[key] >= 0) usage[key] = value[key];
+    if (fields.includes(key) && typeof value[key] === "number" && Number.isFinite(value[key]) && value[key] >= 0) usage[key] = value[key];
   }
-  if (isRecord(value.cost) && typeof value.cost.total === "number" && Number.isFinite(value.cost.total) && value.cost.total >= 0) usage.cost = value.cost.total;
-  return usage;
+  if (fields.includes("cost") && isRecord(value.cost) && typeof value.cost.total === "number" && Number.isFinite(value.cost.total) && value.cost.total >= 0) {
+    usage.cost = value.cost.total;
+  }
+  return Object.keys(usage).length === 0 ? undefined : usage;
 }
 
 function toOmpAssistant(message: AssistantMessage, model: OmpModel): OmpAssistantMessage {
@@ -730,14 +820,24 @@ function toOmpAssistant(message: AssistantMessage, model: OmpModel): OmpAssistan
 }
 
 function toOmpUsage(usage: AssistantMessage["usage"]): OmpAssistantMessage["usage"] {
-  return {
+  const result = {
     input: usage?.input ?? 0,
     output: usage?.output ?? 0,
     cacheRead: usage?.cacheRead ?? 0,
     cacheWrite: usage?.cacheWrite ?? 0,
     totalTokens: (usage?.input ?? 0) + (usage?.output ?? 0) + (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0),
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: usage?.cost ?? 0 },
-  } as OmpAssistantMessage["usage"];
+  } as OmpAssistantMessage["usage"] & { [REPORTED_USAGE_FIELDS]?: string[] };
+  if (usage !== undefined) {
+    result[REPORTED_USAGE_FIELDS] = [
+      ...(usage.input === undefined ? [] : ["input"]),
+      ...(usage.output === undefined ? [] : ["output"]),
+      ...(usage.cacheRead === undefined ? [] : ["cacheRead"]),
+      ...(usage.cacheWrite === undefined ? [] : ["cacheWrite"]),
+      ...(usage.cost === undefined ? [] : ["cost"]),
+    ];
+  }
+  return result;
 }
 
 function assertModelResponseMatchesDeltas(

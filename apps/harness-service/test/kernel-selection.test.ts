@@ -111,7 +111,7 @@ test("explicit OMP admission is unavailable before HTTP Run claim or Pi dispatch
     expect(events).toEqual([]);
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -162,7 +162,7 @@ test.each(["absent", "explicit"] as const)(
 
       expect(command?.runProfileSnapshot.kernel).toEqual(await createPiKernelDescriptor());
     } finally {
-      live.close();
+      await live.close();
       await rm(directory, { recursive: true, force: true });
     }
   },
@@ -221,7 +221,7 @@ test.each(["", "omp-v2", null, 42, {}])(
       }).getRunCommand("run-kernel-selection-invalid" as never)).toBeUndefined();
     } finally {
       await service.close();
-      live.close();
+      await live.close();
       await rm(directory, { recursive: true, force: true });
     }
   },
@@ -255,7 +255,7 @@ test("selector admission preserves existing invalid-body precedence", async () =
     expect(await response.json()).toEqual({ code: "v2_runtime_failed" });
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

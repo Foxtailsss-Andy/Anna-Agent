@@ -330,7 +330,7 @@ test("production Host hydrates accepted Memory before the actual Pi model turn",
     expect(restoredBeforeReopen.context.memoryHits[0]?.content)
       .toBe("Release notes require owner review before publication.");
 
-    live.close();
+    await live.close();
     liveClosed = true;
     eventStoreClosed = true;
     const reopenedStore = new SqliteEventStore(eventStorePath);
@@ -420,7 +420,7 @@ test("production Host hydrates accepted Memory before the actual Pi model turn",
     }
   } finally {
     if (!liveClosed) {
-      live.close();
+      await live.close();
     }
     if (!eventStoreClosed) {
       eventStore.close();
@@ -578,7 +578,7 @@ test("a required channel Memory loader failure stops the production Pi before mo
     ]);
     expect(runEvents.some((event) => event.type === "run.context.ready")).toBe(false);
   } finally {
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -651,7 +651,7 @@ test("a legal zero-hit channel lookup records readiness and still reaches the ac
     expect(runEvents.at(-2)?.type).toBe("run.eval.contract");
     expect(runEvents.at(-1)?.type).toBe("run.completed");
   } finally {
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

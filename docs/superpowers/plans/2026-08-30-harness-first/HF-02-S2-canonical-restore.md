@@ -1,9 +1,9 @@
 # HF-02 S2: Canonical OMP Restore
 
 Date: 2026-08-31
-Status: frozen for canonical-restore tracer coding after independent design
-review. Single-Host ownership amendment accepted; any broader lifecycle change
-requires the concrete RED described below.
+Status: implementation passed local gates and independent source review;
+exact-SHA publication acceptance is recorded in PR 1. The scope and amendments
+below remain the frozen contract.
 Implementation base: `c030246d90fca322717e6d20d2af07a2ee5866bc`.
 Parent: [HF-02](HF-02-governed-omp-kernel.md).
 Contract: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md),
@@ -66,7 +66,7 @@ workers and Host callbacks settle and the canonical Store closes.
 
 Only verified local filesystems are supported for this owner mechanism. Test
 two actual Node processes, ordinary close and owner process exit; do not infer
-network filesystem safety or full supervisor recovery from those tests. The
+network filesystem safety or full supervisor recovery from those tests.
 This guarantees mutual exclusion only among local Hosts that obey this
 protocol. Stop older S1 Hosts before upgrading; they do not acquire this lock.
 The owner guard is a narrow production composition amendment needed for explicit
@@ -83,7 +83,9 @@ Contract Eval: `live.close()` settled while the real Eval append ACK was
 paused. Sol accepted the narrow amendment: add `DurableRunRuntime.close()` to
 stop admission, abort controllers and drain every in-flight start and complete
 drive (including Eval/terminal ACK), without early return when one Run fails.
-Expose it on the production Runtime object; preserve existing LoopKernel and
+The service factory also tracks pending start/resume/read operations that have
+not yet reached core admission, so command lookup cannot outlive Store close.
+Expose close on the production Runtime object; preserve existing LoopKernel and
 HTTP payload contracts. The single production close Promise orders
 `runtime.close -> omp.close -> store.close -> ownership.close`.
 
@@ -117,6 +119,14 @@ closed neutral Message schema. A present empty array is invalid; an absent field
 means a fresh start. An existing transcript means replacement of SDK messages
 and actual SDK continuation, never another prompt of the original goal.
 
+Preparation can be durable before the original user input is consumed. A Run
+with only started history and no committed private projection performs its
+first preparation. A committed projection, partial Memory hits or readiness
+without consumption reuses that original Host snapshot and submits the original
+user input once. Partial-hit/readiness history with a missing projection fails
+closed. Model requests, tool dispatch or other consumption evidence without
+the required transcript must not be reclassified as an unconsumed start.
+
 The Host validates the complete transcript: scope/stream and contiguous event
 sequence; one initial user goal; ordered assistant/tool-call/tool-result
 pairing; admitted tool names and arguments; unique tool-call identities; and
@@ -133,6 +143,76 @@ Exhausted budgets still yield timed_out, including loss after reply persistence
 but before the original cap check. A user or tool-result
 tail continues the SDK. An assistant with an unexecuted admitted tool call can
 continue that same call only when durable records prove it was not dispatched.
+
+## Partial Tool-Batch Projection
+
+Sol reviewed this narrow clarification on 2026-08-31 after an actual public
+partial-batch recovery RED. A later Root capture was GREEN on an unvalidated
+overlay; that candidate is not acceptance evidence for SDK context validation.
+The pinned SDK cannot directly continue a partially completed tool batch from
+its tool-result tail. Use its actual continuation with a validated pending-only
+projection, without executing completed tools again or implementing a new loop.
+
+Let `H0` be the immutable initial Host canonical transcript. For the final
+assistant batch only, completed tool results must form a nonempty, strictly
+ordered prefix, followed by calls proven not yet dispatched. Freeze one
+projection `P`: remove those completed call blocks and their result messages
+from the disposable SDK representation. Preserve every other block, message,
+argument and ordering. The original assistant and all results remain intact in
+Host canonical history. Unknown results, unresolved dispatch fences, duplicate
+identities and invalid ordering do not qualify for this projection.
+
+Freeze the mapping once, including its original assistant position and removed
+call/result identities. For later canonical messages `N`, it must satisfy
+`P(H0 ++ N) = P(H0) ++ N`. Do not rediscover pending calls each turn or revert to
+an identity projection when the original batch becomes complete. Use independent
+SDK message objects so upstream mutation cannot change `H0` or Host accounting.
+
+Worker model requests must carry the actual neutral SDK context. Node verifies
+the actual system prompt and messages against `P(H)` before supplying complete
+canonical `H` to `beforeModel` or the transport. Every canonical observation must
+already have a durable ACK, and no tool call may remain pending. Do not hide raw
+SDK differences by substituting another message list in the Worker. Only the
+existing metadata/usage normalization is allowed; text, status, identity and
+argument differences remain errors.
+
+Extend the closed `tool.request` frame with `context?: ModelContext`, using the
+existing context parser and 1 MiB bound. Fresh workers may omit it. Whenever
+the admitted start has `transcript`, Node requires this field on every tool
+request and the Worker must collect it from actual SDK state. Missing or invalid
+restore context must not fall back to fresh behavior.
+
+Tool dispatch can precede observation of a just-delivered result, but not its
+Host checkpoint. In the existing Node serial processing chain, define `A` as
+the canonical prefix whose observations have received durable ACKs, `H` as the
+full Host canonical messages, and require:
+
+```text
+L = P(A)
+U = P(H)
+L.length <= actual.messages.length <= U.length
+actual.messages == U.slice(0, actual.messages.length)
+actual.systemPrompt == admitted.systemPrompt
+```
+
+The prefix must include the current call's already-ACKed authorizing assistant.
+Only an unacknowledged trailing portion may be absent; no middle gaps or changed
+fields are permitted. `A` comes from Host durable observation bookkeeping, not
+Worker claims, pipe writes or a set of delivered tool replies. Apply these
+checks plus the existing scope, identity, arguments, sibling order, used-call,
+budget and fence checks before entering Gateway. A failure must stop dispatch,
+not become an ordinary tool result that permits continuation.
+
+Keep admitted proxies sequential. No upstream upgrade, cached tool re-execution,
+generic projection framework or new persisted authority is part of this fix.
+A small shared pure mapping in the existing neutral protocol module is permitted
+to avoid duplicate Node/Worker logic and a new runtime file-copy boundary.
+
+Required evidence includes both public multitool checkpoint cases, missing or
+changed raw context with zero new tool/model I/O, valid unacknowledged tail
+handling, and at least two new model cycles after restoration using the same
+fixed mapping. Keep genuine zero and absent usage distinct and prove single
+tool execution, continuous sequence, and one Eval before one terminal.
 
 ## Lost Replies and Dispatch Fences
 
@@ -164,20 +244,22 @@ type ToolDispatch = {
   toolCallId: string;
   tool: "read_only";
   inputDigest: string;
-  transcriptIndex: number;
+  transcriptIndex: number; // authorizing assistant message position
 }; // omp.tool.dispatch
 type ToolDelivery = {
   schemaVersion: 1;
   toolCallId: string;
   dispatchEventId: string;
-  transcriptIndex: number;
+  transcriptIndex: number; // actual ordered tool-result message position
   result: { status: "succeeded" | "failed" | "unknown"; output?: JsonValue };
 }; // omp.tool.response
 ```
 
 Logical uniqueness is `(scope, runId, requestIndex)` for model delivery and
 `(scope, runId, toolCallId)` for tool dispatch/delivery; observation repair uses
-the validated transcript index. A duplicate with changed identity or content
+the validated result index. Multiple tool calls in one assistant share its
+authorization position but have distinct ordered result positions; a later
+result need not immediately follow that assistant. A duplicate with changed identity or content
 fails. Do not use new attempt/frame IDs to reinterpret an old checkpoint.
 Each referenced request/dispatch event must exist, match its recorded type and
 index, and belong to the same scope/Run. A new request cannot appropriate an
@@ -187,6 +269,9 @@ requestIndex), and await both before forwarding to the worker. A restore can
 complete a missing usage update from the provider-reported usage in a durable
 model delivery, without charging an already recorded response twice. Existing
 usage/response records must agree; placeholder usage is never accepted.
+Model-request input digests use the same Host-authorized canonical context for
+writing and restore validation. Preserve genuinely reported zero usage; an SDK
+projection's omitted fields or placeholder values are not usage authority.
 
 Persist a tool-dispatch fence before entering Gateway. Restoring a fence with
 no durable reply does not execute the tool again, even for read_only; stop with
@@ -248,17 +333,44 @@ or fabricate provider usage.
 - `apps/harness-service/src/production.ts`: recovery installation and identity
   admission only. `host-memory-context.ts`: consumed-input marker recognition
   only if required to keep Host loading fail-closed for OMP events.
-- One small production `omp-host-ownership.ts` helper and its process-level
-  tests for the single-owner mechanism above; no canonical Store schema change.
+- A small `packages/event-store/src/host-ownership.ts` helper, its export and
+  process-level tests for the single-owner mechanism above. The existing
+  architecture gate forbids direct SQLite imports from the service; retain
+  that gate rather than adding an exception. No canonical Store schema change.
 - `packages/event-store/src/run-runtime.ts` and its focused tests, plus
   `apps/harness-service/src/runtime.ts`: the demonstrated close/drain amendment
   only. Root owns these and Host ownership tests; Luna owns kernel restore and
   production composition.
 - Focused public tests under `apps/harness-service/test/omp-resume*.test.ts`,
-  relevant existing regressions, this ticket and its handoff.
+  relevant existing regressions, this ticket and its handoff. The service and
+  OMP Vitest configurations may bound test-file concurrency for pinned-runtime
+  fixture I/O, without changing product concurrency, budgets or assertions.
 
 No root lock/runtime dependency update is expected. Re-materialize the final
 worker artifact from the unchanged pinned dependency lock before acceptance.
+
+### Verification-Only Crew Amendment
+
+Two final full Python runs exposed unchanged Legacy test races in
+`tests/api/test_crew_api.py`: active-agent durable-steer version saving and the
+terminal-signal race's exact last-message assertion. Five independent focused
+process runs passed, so repeated green-only retries are not acceptance.
+The tests' `run_inflight` wait proves execution admission, while asynchronous
+`execution.claimed` projection can still update the Crew version and Channel.
+
+Independent Sol review verified that the matching public
+`crew.task.execution_claimed` audit record (task ID and Run reference) is
+committed in the same Crew transaction as those startup changes. Outbox order
+requires the preceding started event to have been delivered first. This is
+the required setup barrier; an executor-entered flag or started audit alone
+is insufficient.
+
+Luna may strengthen only those two tests' initial polling conditions to await
+that public project audit record. Preserve every behavioral assertion, the
+3-second wait limit and 5-second parked executor timeout. No production Python,
+private SQL/flush hook, conflict suppression, skip/xfail, assertion weakening
+or unrelated test refactor is authorized. Rerun both tests, the Crew file and
+the full Python/JavaScript gates, then independently review the exact test delta.
 
 ## Vertical Verification Order
 

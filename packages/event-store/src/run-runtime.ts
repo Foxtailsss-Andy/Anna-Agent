@@ -65,6 +65,9 @@ export class DurableRunRuntime {
   private readonly createEventId: () => EventId;
   private readonly active = new Map<string, DurableRunHandle>();
   private readonly inFlight = new Map<string, Promise<DurableRunHandle>>();
+  private readonly controllers = new Set<AbortController>();
+  private closing = false;
+  private closePromise: Promise<void> | undefined;
 
   constructor(
     private readonly eventStore: EventStore,
@@ -90,11 +93,23 @@ export class DurableRunRuntime {
     return this.begin(command, signal, true);
   }
 
+  close(): Promise<void> {
+    if (this.closePromise !== undefined) return this.closePromise;
+    this.closing = true;
+    for (const controller of this.controllers) controller.abort("Host shutdown");
+    this.closePromise = Promise.resolve().then(async () => {
+      await Promise.allSettled([...this.inFlight.values()]);
+      await Promise.allSettled([...this.active.values()].map((handle) => handle.completion));
+    });
+    return this.closePromise;
+  }
+
   private begin(
     command: StartRun,
     signal: AbortSignal,
     allowRunning: boolean,
   ): Promise<DurableRunHandle> {
+    if (this.closing) return Promise.reject(new Error("Run Runtime is closing"));
     const runtimeKey = keyFor(command);
 
     const inFlight = this.inFlight.get(runtimeKey);
@@ -102,8 +117,21 @@ export class DurableRunRuntime {
       return inFlight;
     }
 
-    const pending = this.beginOnce(command, signal, allowRunning);
+    const controller = new AbortController();
+    const onAbort = () => controller.abort(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    this.controllers.add(controller);
+    const cleanup = () => {
+      signal.removeEventListener("abort", onAbort);
+      this.controllers.delete(controller);
+    };
+    const pending = this.beginOnce(command, controller.signal, allowRunning);
     this.inFlight.set(runtimeKey, pending);
+    void pending.then(
+      (handle) => { void handle.completion.then(cleanup, cleanup); },
+      cleanup,
+    );
     void pending.then(
       () => this.clearInFlight(runtimeKey, pending),
       () => this.clearInFlight(runtimeKey, pending),

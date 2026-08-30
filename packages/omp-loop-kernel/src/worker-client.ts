@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { launchManagedWorker, type ManagedWorkerLaunchSpec } from "./managed-launcher";
 import {
   OMP_PROTOCOL, MAX_FRAME_BYTES, byteLength, encodeFrame, parseWorkerFrame,
+  projectRestoreTranscript,
   type AssistantMessage, type HostFrame, type JsonValue, type ModelContext,
   type Message, type ModelDelta, type Observation, type StartInput, type WorkerBinding, type WorkerFrame,
 } from "./protocol";
@@ -24,21 +25,60 @@ export interface ManagedOmpWorkerOptions extends ManagedWorkerLaunchSpec {
 }
 
 export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
+  const restoreProjection = options.input.transcript === undefined
+    ? undefined
+    : projectRestoreTranscript(options.input.transcript);
   const worker = await launchManagedWorker(options);
   const controller = new AbortController();
   const observations: Observation[] = [];
   const seen = new Set<string>();
   const requests = new Set<string>();
-  const pendingCalls = new Map<string, { name: string; arguments: JsonValue }>();
+  const pendingCalls = new Map<string, {
+    name: string;
+    arguments: JsonValue;
+    authorizingIndex: number;
+    authorizingObserved: boolean;
+  }>();
+  const authorizingCalls = new Map<number, string[]>();
+  const acknowledgedToolReplies = new Set<string>();
   const usedCalls = new Set<string>();
-  const expectedMessages: Message[] = [{ role: "user", content: options.input.goal }];
-  let observedMessages = 0;
+  const expectedMessages: Message[] = options.input.transcript === undefined
+    ? [{ role: "user", content: options.input.goal }]
+    : [...options.input.transcript];
+  let observedMessages = options.input.transcript?.length ?? 0;
+  for (const [authorizingIndex, message] of expectedMessages.entries()) {
+    if (message.role === "assistant") {
+      const callIds: string[] = [];
+      for (const content of message.content) {
+        if (content.type === "toolCall") {
+          pendingCalls.set(content.id, {
+            name: content.name,
+            arguments: content.arguments,
+            authorizingIndex,
+            authorizingObserved: true,
+          });
+          callIds.push(content.id);
+        }
+      }
+      if (callIds.length > 0) authorizingCalls.set(authorizingIndex, callIds);
+    } else if (message.role === "toolResult") {
+      const pending = pendingCalls.get(message.toolCallId);
+      if (pending !== undefined && pending.name === message.toolName) {
+        pendingCalls.delete(message.toolCallId);
+        usedCalls.add(message.toolCallId);
+        acknowledgedToolReplies.add(message.toolCallId);
+      }
+    }
+  }
   const bootstrapId = randomUUID();
   let sequence = -1;
   let ready: Extract<WorkerFrame, {kind: "ready"}>["runtime"] | undefined;
   let modelRequestCount = 0;
   let pendingOperation = false;
-  let lastModelStop: AssistantMessage["stopReason"] | undefined;
+  let lastModelStop: AssistantMessage["stopReason"] | undefined = [...expectedMessages]
+    .reverse()
+    .find((message): message is AssistantMessage => message.role === "assistant")
+    ?.stopReason;
   let settled = false;
   let buffer = "";
   let chain = Promise.resolve();
@@ -104,32 +144,51 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
     switch (frame.kind) {
       case "event": {
         let observation = frame.event;
+        let acknowledgedMessage: Message | undefined;
         if (observation.type === "message_end") {
           const expected = expectedMessages[observedMessages];
           if (!expected || !sameMessages([observation.message], [expected])) throw new Error("OMP observation differs from Host history");
           observation = { type: "message_end", message: expected };
-          observedMessages += 1;
+          acknowledgedMessage = expected;
         }
         await options.persistObservation?.(observation);
         if (settled) return;
         observations.push(observation);
         await send({ ...response(frame), kind: "receipt", forFrameId: frame.frameId, accepted: true, throughWorkerSeq: sequence });
+        if (acknowledgedMessage !== undefined) {
+          if (acknowledgedMessage.role === "assistant") {
+            for (const toolCallId of authorizingCalls.get(observedMessages) ?? []) {
+              const pending = pendingCalls.get(toolCallId);
+              if (pending !== undefined) pending.authorizingObserved = true;
+            }
+          }
+          observedMessages += 1;
+        }
         return;
       }
       case "model.request": {
         if (frame.modelId !== options.input.modelId || frame.context.systemPrompt !== options.input.systemPrompt) throw new Error("OMP model input mismatch");
+        const projectedExpected = projectedMessagesFor(restoreProjection, options.input.transcript, expectedMessages);
         if (requests.has(frame.requestId) || pendingCalls.size !== 0 || observedMessages !== expectedMessages.length
-          || !sameMessages(frame.context.messages, expectedMessages)) {
+          || !sameMessages(frame.context.messages, projectedExpected)) {
           throw new Error("OMP model request history mismatch");
         }
         requests.add(frame.requestId);
-        await options.beforeModel?.(frame.context);
+        // The SDK context is a disposable projection: it may normalize usage
+        // and add runtime-only fields. Host checkpoints authorize the canonical
+        // transcript, so both the admission hook and transport see that exact
+        // history after the projection has been verified.
+        const canonicalContext: ModelContext = {
+          systemPrompt: options.input.systemPrompt,
+          messages: [...expectedMessages],
+        };
+        await options.beforeModel?.(canonicalContext);
         if (settled) return;
         modelRequestCount += 1;
         pendingOperation = true;
         let index = 0;
         let final: AssistantMessage | undefined;
-        for await (const item of options.modelTransport(frame.context, controller.signal)) {
+        for await (const item of options.modelTransport(canonicalContext, controller.signal)) {
           if (final) throw new Error("OMP model transport returned multiple final responses");
           for (const delta of item.deltas) await send({ ...response(frame), kind: "model.delta", index: index++, delta });
           final = item.message;
@@ -139,8 +198,20 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
           if (content.type !== "toolCall") continue;
           if (pendingCalls.has(content.id) || usedCalls.has(content.id)
             || !options.input.allowedTools.some(tool => tool.name === content.name)) throw new Error("OMP model returned invalid tool identity");
-          pendingCalls.set(content.id, { name: content.name, arguments: content.arguments });
         }
+        const authorizingIndex = expectedMessages.length;
+        const callIds: string[] = [];
+        for (const content of final.content) {
+          if (content.type !== "toolCall") continue;
+          pendingCalls.set(content.id, {
+            name: content.name,
+            arguments: content.arguments,
+            authorizingIndex,
+            authorizingObserved: false,
+          });
+          callIds.push(content.id);
+        }
+        if (callIds.length > 0) authorizingCalls.set(authorizingIndex, callIds);
         expectedMessages.push(final);
         lastModelStop = final.stopReason;
         await send({ ...response(frame), kind: "model.end", index, message: final });
@@ -148,19 +219,30 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         return;
       }
       case "tool.request": {
-        if (observedMessages !== expectedMessages.length) throw new Error("OMP tool dispatch precedes durable model observation");
         if (!options.input.allowedTools.some(tool => tool.name === frame.name)) throw new Error("OMP undeclared tool request");
         const expected = pendingCalls.get(frame.toolCallId);
+        const siblings = expected === undefined ? [] : authorizingCalls.get(expected.authorizingIndex) ?? [frame.toolCallId];
+        const siblingIndex = siblings.indexOf(frame.toolCallId);
+        const priorSiblingUnacknowledged = siblingIndex > 0
+          && siblings.slice(0, siblingIndex).some((toolCallId) => !acknowledgedToolReplies.has(toolCallId));
+        if (!validateToolContext(frame.context, options.input, restoreProjection, expectedMessages, observedMessages, expected, frame.toolCallId, frame.name, frame.input)) {
+          throw new Error("OMP tool request raw context mismatch");
+        }
         if (requests.has(frame.requestId) || expected === undefined || expected.name !== frame.name
-          || stableJson(expected.arguments) !== stableJson(frame.input)) throw new Error("OMP tool request does not match model authorization");
+          || !expected.authorizingObserved || priorSiblingUnacknowledged
+          || stableJson(expected.arguments) !== stableJson(frame.input)) {
+          throw new Error("OMP tool request lacks durable authorization or prior Host reply checkpoint ACK");
+        }
         requests.add(frame.requestId);
         pendingCalls.delete(frame.toolCallId);
         usedCalls.add(frame.toolCallId);
         pendingOperation = true;
         const tool = await options.toolGateway(frame.name, frame.input, frame.toolCallId, controller.signal);
-        expectedMessages.push({ role: "toolResult", toolCallId: frame.toolCallId, toolName: frame.name,
-          status: tool.status, content: tool.output === undefined ? tool.status : typeof tool.output === "string" ? tool.output : JSON.stringify(tool.output) });
+        const resultMessage: Message = { role: "toolResult", toolCallId: frame.toolCallId, toolName: frame.name,
+          status: tool.status, content: tool.output === undefined ? tool.status : typeof tool.output === "string" ? tool.output : JSON.stringify(tool.output) };
+        expectedMessages.push(resultMessage);
         await send({ ...response(frame), kind: "tool.result", toolCallId: frame.toolCallId, ...tool });
+        acknowledgedToolReplies.add(frame.toolCallId);
         pendingOperation = false;
         return;
       }
@@ -232,4 +314,52 @@ function sameMessages(actual: readonly Message[], expected: readonly Message[]):
     return content;
   });
   return stableJson(withoutSdkUsage(actual)) === stableJson(withoutSdkUsage(expected));
+}
+
+function projectedMessagesFor(
+  restoreProjection: ReturnType<typeof projectRestoreTranscript> | undefined,
+  transcript: readonly Message[] | undefined,
+  expectedMessages: readonly Message[],
+): readonly Message[] {
+  if (restoreProjection === undefined || transcript === undefined) return expectedMessages;
+  return [...restoreProjection.messages, ...expectedMessages.slice(transcript.length)];
+}
+
+function validateToolContext(
+  actual: ModelContext | undefined,
+  input: StartInput,
+  restoreProjection: ReturnType<typeof projectRestoreTranscript> | undefined,
+  expectedMessages: readonly Message[],
+  observedMessages: number,
+  expected: {
+    readonly name: string;
+    readonly arguments: JsonValue;
+    readonly authorizingIndex: number;
+    readonly authorizingObserved: boolean;
+  } | undefined,
+  toolCallId: string,
+  toolName: string,
+  toolInput: JsonValue,
+): boolean {
+  if (input.transcript === undefined) return actual === undefined;
+  if (actual === undefined || expected === undefined || !expected.authorizingObserved || restoreProjection === undefined) return false;
+  const initialTranscriptLength = input.transcript.length;
+  const upperMessages = [...restoreProjection.messages, ...expectedMessages.slice(initialTranscriptLength)];
+  const lowerMessages = [...restoreProjection.messages, ...expectedMessages.slice(initialTranscriptLength, observedMessages)];
+  if (actual.systemPrompt !== input.systemPrompt
+    || actual.messages.length < lowerMessages.length
+    || actual.messages.length > upperMessages.length
+    || !sameMessages(actual.messages, upperMessages.slice(0, actual.messages.length))) return false;
+  if (expected.name !== toolName || stableJson(expected.arguments) !== stableJson(toolInput)) return false;
+  const authorizing = expectedMessages[expected.authorizingIndex];
+  return authorizing?.role === "assistant"
+    && authorizing.content.some((content) => content.type === "toolCall"
+      && content.id === toolCallId
+      && content.name === toolName
+      && stableJson(content.arguments) === stableJson(toolInput))
+    && actual.messages.some((message) => message.role === "assistant"
+      && message.content.some((content) => content.type === "toolCall"
+        && content.id === toolCallId
+        && content.name === toolName
+        && stableJson(content.arguments) === stableJson(toolInput)));
 }

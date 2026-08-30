@@ -55,6 +55,7 @@ interface RecoveryLease {
 
 export { ChannelSessionService } from "./channel-session";
 export { RunManager } from "./run-manager";
+export { acquireHarnessHostOwnership, HarnessHostAlreadyOwnedError } from "./host-ownership";
 export {
   DurableRunRuntime,
   RunResumeRequiredError,

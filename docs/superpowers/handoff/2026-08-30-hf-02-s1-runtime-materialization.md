@@ -228,7 +228,7 @@ with no known vulnerabilities; public-preview boundary and diff checks.
 The first whole-workspace run on this artifact failed three integration tests
 at their default five-second test timeout during concurrent full-manifest
 verification. Only their test watchdogs changed to 30 seconds; product budgets
-were preserved. The final `npm test` rerun exited zero: 1,085 passed and seven
+were preserved. The final `npm test` rerun exited zero: 1,075 passed and seven
 skipped (651 Desktop, 117 core, 103 EventStore, 20 scheduler, 37 Pi, 25 OMP,
 99 service, 13 trace and 10 Eval). No external receipt was present during this
 rerun. Both Sol Ultra Standards and Spec reviews accepted the exact 47-file
@@ -236,6 +236,8 @@ fingerprint above with no outstanding P0/P1/P2 finding. Reviews were read-only;
 Root ran the integration gates. The accepted implementation is commit
 `c030246d90fca322717e6d20d2af07a2ee5866bc`. GitHub push run `33324464372` and
 PR run `33324466412` both completed successfully at that exact commit.
+The first aggregate report said 1,085; this was an addition error. The recorded
+per-workspace figures above were unchanged and sum to 1,075.
 
 ## Outstanding Global Work
 

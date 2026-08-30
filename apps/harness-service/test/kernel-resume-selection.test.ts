@@ -114,7 +114,7 @@ test.each(["legacy", "descriptor"] as const)(
       expect(events.find((event) => event.type === "run.queued")).toBeDefined();
     } finally {
       await service.close();
-      live.close();
+      await live.close();
       await rm(directory, { recursive: true, force: true });
     }
   },
@@ -188,7 +188,7 @@ test("a validly hashed Pi identity drift rejects resume before new events", asyn
     expect(events.map((event) => event.type)).toEqual(["run.queued"]);
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -422,7 +422,7 @@ test("production HTTP resumes a consumed Pi transcript with its Host snapshot an
     );
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

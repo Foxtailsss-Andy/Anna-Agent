@@ -1,8 +1,10 @@
 # HF-02: Governed Oh-my-Pi Kernel
 
 Date: 2026-08-30
-Status: in progress; S0 and S1 accepted, remaining controls/restore/isolation and distribution gates open.
-Current accepted implementation: `c030246d90fca322717e6d20d2af07a2ee5866bc` (S1).
+Status: in progress; S0/S1 published, S2 local restore gates passed with publication CI tracked separately; controls/isolation/distribution remain open.
+Previously published implementation: `c030246d90fca322717e6d20d2af07a2ee5866bc` (S1).
+S2 local acceptance and publication boundary: [canonical restore evidence](../../handoff/2026-08-31-hf-02-s2-canonical-restore.md).
+Next frozen design: [S3 scoped controls](HF-02-S3-scoped-controls.md); no S3 coding before S2 publication acceptance.
 Spec: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md), HF-020..025.
 Goal: [HF-GOAL-1.0](../../../product/anna-harness-first-goal-2026-08-30.md).
 Coder: GPT-5.6-Luna Max. Review: GPT-5.6-Sol Ultra, independent axes.

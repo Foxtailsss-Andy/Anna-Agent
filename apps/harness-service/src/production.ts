@@ -14,8 +14,9 @@ import {
   type WorkerProfileId,
   parseOmpKernelDescriptor,
   type KernelDescriptorV1,
+  type OmpKernelDescriptorV1,
 } from "@anna/harness-v2";
-import { SqliteEventStore } from "@anna/event-store";
+import { acquireHarnessHostOwnership, SqliteEventStore } from "@anna/event-store";
 import {
   createOpenAICompatiblePiLoopKernel,
   loadPiKernelDescriptor,
@@ -168,7 +169,7 @@ export async function createLiveHarnessV2Runtime(
   );
   let ompDescriptor: ReturnType<typeof parseOmpKernelDescriptor> | undefined;
   let ompRuntimeRoot: string | undefined;
-  if (config.harness_v2_kernel === "omp" && config.harness_v2_omp_descriptor !== undefined) {
+  if (config.harness_v2_omp_descriptor !== undefined) {
     try {
       if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("OMP platform unavailable");
       ompDescriptor = parseOmpKernelDescriptor(config.harness_v2_omp_descriptor);
@@ -190,13 +191,16 @@ export async function createLiveHarnessV2Runtime(
           ? {}
           : { apiKey: config.web_search_api_key }),
   });
+  const selectedKernelDescriptor = config.harness_v2_kernel === "omp"
+    ? ompDescriptor ?? kernelDescriptor
+    : kernelDescriptor;
   const profile = await createLiveProfile(
     config.model_name,
     options.skillPath,
     webSearch !== undefined,
     "general",
     "channel",
-    ompDescriptor ?? kernelDescriptor,
+    selectedKernelDescriptor,
   );
   const createProfile = await createLiveProfile(
     config.model_name,
@@ -204,7 +208,7 @@ export async function createLiveHarnessV2Runtime(
     webSearch !== undefined,
     "create",
     "channel",
-    ompDescriptor ?? kernelDescriptor,
+    selectedKernelDescriptor,
   );
   const reviewGateConfigured = await probeReviewGate(
     options.reviewApprovalOrigin ?? process.env.ANNA_T07_LIVE_APPROVAL_ORIGIN,
@@ -217,8 +221,12 @@ export async function createLiveHarnessV2Runtime(
       ?? process.env.ANNA_HARNESS_V2_EVENT_STORE_PATH
       ?? ".anna/state/harness-v2.sqlite3",
   );
-  await mkdir(dirname(eventStorePath), { recursive: true });
-  const eventStore = new SqliteEventStore(eventStorePath);
+  const ownership = await acquireHarnessHostOwnership(eventStorePath);
+  let openedEventStore: SqliteEventStore | undefined;
+  try {
+    await mkdir(dirname(ownership.eventStorePath), { recursive: true });
+    const eventStore = new SqliteEventStore(ownership.eventStorePath);
+    openedEventStore = eventStore;
   const prepareContext: HostMemoryContextLoader = createHostMemoryContextLoader({ eventStore });
   const workspaceRoot = resolve(
     options.workspaceRoot
@@ -301,11 +309,73 @@ export async function createLiveHarnessV2Runtime(
       assertKernelSelectionAdmitted(config.harness_v2_kernel);
     },
     validateResumeCommand: (command) => {
-      if (command.runProfileSnapshot.kernel?.adapterId === "omp") throw new KernelSelectionError({ code: "kernel_unavailable", requested_adapter: "omp", reason: "managed_runtime_unavailable" });
+      if (command.runProfileSnapshot.kernel?.adapterId === "omp") {
+        if (ompKernel === undefined || ompDescriptor === undefined) {
+          throw new KernelSelectionError({
+            code: "kernel_unavailable",
+            requested_adapter: "omp",
+            reason: "managed_runtime_unavailable",
+          });
+        }
+        if (!sameOmpKernelDescriptor(command.runProfileSnapshot.kernel, ompDescriptor)) {
+          throw new KernelSelectionError({
+            code: "kernel_unavailable",
+            requested_adapter: "omp",
+            reason: "kernel_identity_mismatch",
+          });
+        }
+        if (
+          command.runProfileSnapshot.model.provider !== profile.model.provider
+          || command.runProfileSnapshot.model.name !== profile.model.name
+        ) {
+          throw new KernelSelectionError({
+            code: "kernel_unavailable",
+            requested_adapter: "omp",
+            reason: "kernel_identity_mismatch",
+          });
+        }
+        if (command.runProfileSnapshot.allowedTools.some((name) => name !== "read_only")) {
+          throw new KernelSelectionError({
+            code: "kernel_unavailable",
+            requested_adapter: "omp",
+            reason: "managed_runtime_unavailable",
+          });
+        }
+        return;
+      }
       assertPersistedKernelIdentity(command, kernelDescriptor);
     },
   };
   const runtime = createDurableHarnessV2Runtime(runtimeOptions);
+  let closePromise: Promise<void> | undefined;
+  const close = (): Promise<void> => {
+    if (closePromise !== undefined) return closePromise;
+    closePromise = (async () => {
+      let firstError: unknown;
+      try {
+        await runtime.close();
+      } catch (error) {
+        firstError = error;
+      }
+      try {
+        await ompKernel?.close();
+      } catch (error) {
+        firstError ??= error;
+      }
+      try {
+        eventStore.close();
+      } catch (error) {
+        firstError ??= error;
+      }
+      try {
+        ownership.close();
+      } catch (error) {
+        firstError ??= error;
+      }
+      if (firstError !== undefined) throw firstError;
+    })();
+    return closePromise;
+  };
 
   return {
     runtime,
@@ -313,8 +383,13 @@ export async function createLiveHarnessV2Runtime(
     ...(approvalOrigin === undefined || ownerId === undefined || ownerId.trim() === ""
       ? {}
       : { createActivation: { workspaceRoot, approvalOrigin, ownerId } }),
-    close: () => ompKernel ? ompKernel.close().then(() => eventStore.close()) : eventStore.close(),
+    close,
   };
+  } catch (error) {
+    openedEventStore?.close();
+    ownership.close();
+    throw error;
+  }
 }
 
 function assertPersistedKernelIdentity(
@@ -334,6 +409,13 @@ function assertPersistedKernelIdentity(
 function samePiKernelDescriptor(
   left: PiKernelDescriptorV1,
   right: PiKernelDescriptorV1,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sameOmpKernelDescriptor(
+  left: OmpKernelDescriptorV1,
+  right: OmpKernelDescriptorV1,
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }

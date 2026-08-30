@@ -841,7 +841,7 @@ test("production Runtime constructs the durable Gateway from each admitted Run",
     expect(toolEvents[1]?.payload).toEqual(expect.objectContaining({ decision: "allow" }));
     expect(toolEvents[2]?.payload).toEqual(expect.objectContaining({ status: "succeeded" }));
   } finally {
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -963,7 +963,7 @@ test("production Runtime drives the actual Pi adapter through SQLite and ToolGat
     expect(toolEvents[1]?.payload).toEqual(expect.objectContaining({ decision: "allow" }));
     expect(toolEvents[2]?.payload).toEqual(expect.objectContaining({ status: "succeeded" }));
   } finally {
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -1107,7 +1107,7 @@ test("production Create drives Pi through one durable Artifact effect", async ()
       "SKILL.md",
     ), "utf8")).resolves.toBe(input.preview);
   } finally {
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

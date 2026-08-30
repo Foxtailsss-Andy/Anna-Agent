@@ -93,6 +93,62 @@ function profile(turns = 1) {
   });
 }
 
+test("close drains a resume command lookup before the core Runtime is entered", async () => {
+  const store = new SqliteEventStore(":memory:");
+  const configuredProfile = profile();
+  const command = parseStartRun({
+    workspaceId: "workspace-close-lookup", channelId: "channel-close-lookup",
+    commandId: "command-close-lookup", runId: "run-close-lookup", goal: "Resume after lookup.",
+    source: { eventId: "source-close-lookup" },
+    runProfile: { id: configuredProfile.id, version: configuredProfile.version },
+    runProfileSnapshot: configuredProfile, budget: configuredProfile.budget,
+    permissionScope: "permission-close-lookup", stopCondition: configuredProfile.terminalRules.stopCondition,
+  });
+  await store.scope(command).claimStart(command);
+  const originalScope = store.scope.bind(store);
+  let entered!: () => void;
+  let release!: () => void;
+  const reading = new Promise<void>((resolveReading) => { entered = resolveReading; });
+  const gate = new Promise<void>((resolveGate) => { release = resolveGate; });
+  store.scope = (scope) => {
+    const port = originalScope(scope);
+    return new Proxy(port, {
+      get(target, key) {
+        if (key === "getRunCommand") return async (runId: StartRun["runId"]) => {
+          entered(); await gate; return target.getRunCommand(runId);
+        };
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  };
+  let starts = 0;
+  const runtime = createDurableHarnessV2Runtime({
+    eventStore: store, profile: configuredProfile, surfaces: ["create"],
+    kernel: {
+      async start() { starts += 1; return { status: "completed" }; },
+      async steer() {}, async answer() {}, async abort() {},
+    },
+  });
+  const resuming = runtime.resume!("create", command.runId, {
+    workspace_id: command.workspaceId, channel_id: command.channelId,
+  });
+  void resuming.catch(() => undefined);
+  try {
+    await reading;
+    let closed = false;
+    const closing = runtime.close().then(() => { closed = true; });
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    expect(closed).toBe(false);
+    release();
+    await expect(resuming).rejects.toThrow("closing");
+    await closing;
+    expect(starts).toBe(0);
+  } finally {
+    release(); await resuming.catch(() => undefined); await runtime.close(); store.close();
+  }
+});
+
 class CompletingKernel implements LoopKernel {
   async start(command: StartRun, sink: EventSink): Promise<RunOutcome> {
     await sink.append(event(command, 1, "run.started", { phase: "started" }));

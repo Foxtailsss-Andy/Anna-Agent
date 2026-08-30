@@ -8,6 +8,32 @@ Authority: [HF-SPEC-1.0](anna-harness-first-spec-2026-08-30.md).
 Execution: [SDD plan](../superpowers/plans/2026-08-30-harness-first/00-plan.md).
 Implementation: [HF-01A handoff](../superpowers/handoff/2026-08-30-hf-01a-durable-tool-gateway.md).
 
+## HF-02 S2 Local Acceptance
+
+S2 now restores actual OMP execution from canonical Host history through the
+production HTTP route and real SQLite close/reopen. It retains original input,
+Memory/profile/kernel identity and cumulative budgets, repairs provable lost
+observations, and avoids re-running consumed tools. Unprovable dispatch gaps
+fail closed. Local Host ownership and complete Runtime/Eval shutdown draining
+prevent a second owner or an early Store close.
+
+Principal coding used Luna Max; independent Sol Ultra Standards and Spec reviews
+accepted the final 29-input fingerprint. Local JavaScript passed **1,136 tests /
+7 skipped**, Python **1,048 tests**, and the configured typechecks, eight new
+test-file strict checks, builds, frontend smoke and publication/audit checks
+passed. The source and runtime digests, earlier failures and exact evidence
+boundaries are in the [S2 handoff](../superpowers/handoff/2026-08-31-hf-02-s2-canonical-restore.md).
+Two existing Python test races required a reviewed startup-projection wait;
+their original assertions and time limits were preserved. A whole-service-test
+strict sweep still exposes older typing debt, which is not claimed resolved.
+
+This is local source acceptance, with final published SHA and its push/PR CI
+recorded in PR 1. S1 CI below remains historical. The separately reviewed
+[S3 SPEC](../superpowers/plans/2026-08-30-harness-first/HF-02-S3-scoped-controls.md)
+defines scoped steer, human question/answer and abort; no S3 implementation is
+claimed. Desktop still defaults to Python Legacy, and full Harness-first,
+live Provider/Hiker, Windows delivery and official SWE-bench remain open.
+
 ## HF-02 S1 Follow-on - 2026-08-31
 
 Commit `c030246d90fca322717e6d20d2af07a2ee5866bc` adds actual managed
@@ -18,11 +44,13 @@ profile is text/read-only on verified macOS arm64, with deterministic Host
 model transport in the public integration tests.
 
 Both Sol Ultra review axes accepted the fixed source. Root gates passed:
-JavaScript **1,085 passed / 7 skipped**, Python **1,048 passed**, typechecks,
+JavaScript **1,075 passed / 7 skipped**, Python **1,048 passed**, typechecks,
 web/service builds, frontend smoke, public boundary and Python audit. GitHub
 push `33324464372` and PR `33324466412` both completed successfully at that
 exact commit. Detailed evidence and prior failed runs are retained in the
 [S1 handoff](../superpowers/handoff/2026-08-30-hf-02-s1-runtime-materialization.md).
+The earlier S1 aggregate of 1,085 was an arithmetic error; the nine recorded
+workspace counts sum to 1,075. No individual test result changed.
 
 HF-02 remains open for canonical OMP restore, steer/answer, distribution and
 complete isolation. Full surface migration, default Desktop cutover, Legacy

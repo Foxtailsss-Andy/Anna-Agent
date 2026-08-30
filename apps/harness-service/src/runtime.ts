@@ -30,7 +30,7 @@ export interface DurableHarnessV2RuntimeOptions {
 
 export function createDurableHarnessV2Runtime(
   options: DurableHarnessV2RuntimeOptions,
-): HarnessV2Runtime {
+): HarnessV2Runtime & { close(): Promise<void> } {
   const runtime = new DurableRunRuntime(
     options.eventStore,
     options.profile.evalPolicy.contract === "required"
@@ -38,69 +38,91 @@ export function createDurableHarnessV2Runtime(
       : options.kernel,
   );
   const permissionScope = options.permissionScope ?? "permission:harness-v2";
+  const pending = new Set<Promise<unknown>>();
+  let closing = false;
+  let closePromise: Promise<void> | undefined;
+  const track = <T>(operation: () => Promise<T>): Promise<T> => {
+    if (closing) return Promise.reject(new Error("Harness Runtime is closing"));
+    const task = Promise.resolve().then(operation);
+    pending.add(task);
+    void task.then(() => pending.delete(task), () => pending.delete(task));
+    return task;
+  };
 
   return {
+    close() {
+      if (closePromise !== undefined) return closePromise;
+      closing = true;
+      closePromise = Promise.allSettled([runtime.close(), ...pending]).then(() => undefined);
+      return closePromise;
+    },
     evidenceMode: options.evidenceMode ?? "test",
     surfaces: [...options.surfaces],
     webSearchConfigured: options.webSearchConfigured ?? false,
     reviewGateConfigured: options.reviewGateConfigured ?? false,
-    async start(surfaceId, body) {
-      if (!options.surfaces.includes(surfaceId)) {
-        throw new Error("v2 surface is not enabled by this Runtime");
-      }
+    start(surfaceId, body) {
+      return track(async () => {
+        if (!options.surfaces.includes(surfaceId)) {
+          throw new Error("v2 surface is not enabled by this Runtime");
+        }
 
-      const command = commandFromRequest(
-        surfaceId,
-        body,
-        options.surfaceProfiles?.[surfaceId] ?? options.profile,
-        permissionScope,
-      );
-      await options.validateStartCommand?.(command);
-      const handle = await runtime.start(command);
-      return { runId: command.runId, status: handle.run.status };
+        const command = commandFromRequest(
+          surfaceId,
+          body,
+          options.surfaceProfiles?.[surfaceId] ?? options.profile,
+          permissionScope,
+        );
+        await options.validateStartCommand?.(command);
+        const handle = await runtime.start(command);
+        return { runId: command.runId, status: handle.run.status };
+      });
     },
-    async resume(surfaceId, runId, body) {
-      if (!options.surfaces.includes(surfaceId)) {
-        throw new Error("v2 surface is not enabled by this Runtime");
-      }
+    resume(surfaceId, runId, body) {
+      return track(async () => {
+        if (!options.surfaces.includes(surfaceId)) {
+          throw new Error("v2 surface is not enabled by this Runtime");
+        }
 
-      const request = requestRecord(body);
-      const workspaceId = requiredString(request.workspace_id, "workspace_id");
-      const channelId = requiredString(request.channel_id, "channel_id");
-      const command = await options.eventStore
-        .scope({
+        const request = requestRecord(body);
+        const workspaceId = requiredString(request.workspace_id, "workspace_id");
+        const channelId = requiredString(request.channel_id, "channel_id");
+        const command = await options.eventStore
+          .scope({
+            workspaceId: workspaceId as ChannelScope["workspaceId"],
+            channelId: channelId as ChannelScope["channelId"],
+          })
+          .getRunCommand(runId as never);
+        if (command === undefined) {
+          throw new Error("v2 Run is not present in the requested Channel scope");
+        }
+        if (command.surfaceId !== undefined && command.surfaceId !== surfaceId) {
+          throw new Error("v2 Run surface does not match the resume route");
+        }
+        await options.validateResumeCommand?.(command);
+        const handle = await runtime.resume(command);
+        return { runId: command.runId, status: handle.run.status };
+      });
+    },
+    readEvents(workspaceId, channelId, runId, fromSeq = -1) {
+      return track(async () => {
+        if (!Number.isSafeInteger(fromSeq) || fromSeq < -1) {
+          throw new Error("from_seq must be an integer greater than or equal to -1");
+        }
+        const scope: ChannelScope = {
           workspaceId: workspaceId as ChannelScope["workspaceId"],
           channelId: channelId as ChannelScope["channelId"],
-        })
-        .getRunCommand(runId as never);
-      if (command === undefined) {
-        throw new Error("v2 Run is not present in the requested Channel scope");
-      }
-      if (command.surfaceId !== undefined && command.surfaceId !== surfaceId) {
-        throw new Error("v2 Run surface does not match the resume route");
-      }
-      await options.validateResumeCommand?.(command);
-      const handle = await runtime.resume(command);
-      return { runId: command.runId, status: handle.run.status };
-    },
-    async readEvents(workspaceId, channelId, runId, fromSeq = -1) {
-      if (!Number.isSafeInteger(fromSeq) || fromSeq < -1) {
-        throw new Error("from_seq must be an integer greater than or equal to -1");
-      }
-      const scope: ChannelScope = {
-        workspaceId: workspaceId as ChannelScope["workspaceId"],
-        channelId: channelId as ChannelScope["channelId"],
-      };
-      const store = options.eventStore.scope(scope);
-      if (await store.getRunCommand(runId as never) === undefined) {
-        throw new Error("Run is outside the requested Channel scope");
-      }
+        };
+        const store = options.eventStore.scope(scope);
+        if (await store.getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
 
-      const events: CanonicalEvent[] = [];
-      for await (const event of store.read(runId as never, fromSeq)) {
-        events.push(event);
-      }
-      return events;
+        const events: CanonicalEvent[] = [];
+        for await (const event of store.read(runId as never, fromSeq)) {
+          events.push(event);
+        }
+        return events;
+      });
     },
   };
 }

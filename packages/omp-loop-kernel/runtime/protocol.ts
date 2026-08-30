@@ -54,6 +54,70 @@ export interface ModelContext {
   readonly messages: readonly Message[];
 }
 
+export interface RestoreProjection {
+  readonly messages: readonly Message[];
+  readonly authorizingIndex?: number;
+  readonly completedCallIds: readonly string[];
+  readonly pendingCallIds: readonly string[];
+}
+
+export function projectRestoreTranscript(transcript: readonly Message[]): RestoreProjection {
+  let tail = transcript.length;
+  while (tail > 0 && transcript[tail - 1]?.role === "toolResult") tail -= 1;
+  const tailMessage = tail > 0 ? transcript[tail - 1] : undefined;
+  const authorizingIndex = tailMessage?.role === "assistant" ? tail - 1 : undefined;
+  const authorizingMessage = authorizingIndex === undefined ? undefined : transcript[authorizingIndex];
+  if (authorizingIndex === undefined || authorizingMessage?.role !== "assistant") {
+    return { messages: cloneMessages(transcript), completedCallIds: [], pendingCallIds: [] };
+  }
+  if (!authorizingMessage.content.some((block) => block.type === "toolCall")) {
+    return { messages: cloneMessages(transcript), completedCallIds: [], pendingCallIds: [] };
+  }
+
+  const calls = authorizingMessage.content.filter((block): block is Extract<Content, { type: "toolCall" }> => block.type === "toolCall");
+  const callIds = new Set<string>();
+  for (const call of calls) {
+    if (callIds.has(call.id)) throw new Error("restore transcript has duplicate tool identity");
+    callIds.add(call.id);
+  }
+  const trailing = transcript.slice(authorizingIndex + 1);
+  if (trailing.length > calls.length) throw new Error("restore transcript has too many tool results");
+  const completedCallIds: string[] = [];
+  const completedResultIds = new Set<string>();
+  let hasUnknownResult = false;
+  for (const [index, message] of trailing.entries()) {
+    if (message.role !== "toolResult" || message.toolCallId !== calls[index]?.id) {
+      throw new Error("restore transcript tool results are not an ordered prefix");
+    }
+    if (completedResultIds.has(message.toolCallId)) throw new Error("restore transcript tool result is duplicated");
+    if (message.status === "unknown") hasUnknownResult = true;
+    completedResultIds.add(message.toolCallId);
+    completedCallIds.push(message.toolCallId);
+  }
+  const pendingCallIds = calls.slice(completedCallIds.length).map((call) => call.id);
+  if (hasUnknownResult && pendingCallIds.length > 0) throw new Error("restore transcript partial tool result is unknown");
+  if (completedCallIds.length === 0 || pendingCallIds.length === 0) {
+    return {
+      messages: cloneMessages(transcript),
+      authorizingIndex,
+      completedCallIds,
+      pendingCallIds,
+    };
+  }
+
+  const projected = cloneMessages(transcript.slice(0, authorizingIndex));
+  const clonedAssistant = cloneMessage(authorizingMessage) as AssistantMessage;
+  const pendingSet = new Set(pendingCallIds);
+  const projectedAssistant: AssistantMessage = {
+    ...clonedAssistant,
+    content: clonedAssistant.content.filter(
+      (block) => block.type !== "toolCall" || pendingSet.has(block.id),
+    ),
+  };
+  projected.push(projectedAssistant);
+  return { messages: projected, authorizingIndex, completedCallIds, pendingCallIds };
+}
+
 export type ModelDelta =
   | { readonly type: "text"; readonly contentIndex: number; readonly text: string }
   | {
@@ -76,6 +140,7 @@ export interface StartInput {
   readonly allowedTools: readonly ToolDefinition[];
   readonly snapshotDigest: string;
   readonly originalExecutionFingerprint: JsonValue;
+  readonly transcript?: readonly Message[];
 }
 
 interface FrameBase {
@@ -95,7 +160,7 @@ export type WorkerFrame =
     })
   | (FrameBase & { readonly kind: "event"; readonly event: Observation })
   | (FrameBase & { readonly kind: "model.request"; readonly modelId: string; readonly context: ModelContext })
-  | (FrameBase & { readonly kind: "tool.request"; readonly toolCallId: string; readonly name: string; readonly input: { readonly [key: string]: JsonValue } })
+  | (FrameBase & { readonly kind: "tool.request"; readonly toolCallId: string; readonly name: string; readonly input: { readonly [key: string]: JsonValue }; readonly context?: ModelContext })
   | (FrameBase & { readonly kind: "terminal.proposed"; readonly outcome: "completed" | "failed" | "timed_out" | "cancelled" });
 
 export type HostFrame =
@@ -187,12 +252,20 @@ export function parseWorkerFrame(value: unknown): WorkerFrame {
       assertIdentifier(record.modelId, "modelId");
       return { ...record, kind: "model.request", modelId: record.modelId, context: parseContext(record.context) } as WorkerFrame;
     case "tool.request":
-      assertKeys(record, [...BASE_KEYS, "toolCallId", "name", "input"]);
+      assertKeys(record, [...BASE_KEYS, "toolCallId", "name", "input", ...(Object.hasOwn(record, "context") ? ["context"] : [])]);
       assertWorkerSeq(record.workerSeq);
       assertIdentifier(record.toolCallId, "toolCallId");
       assertIdentifier(record.name, "tool name");
       const input = parseObject(record.input, "tool input");
-      return { ...record, kind: "tool.request", toolCallId: record.toolCallId, name: record.name, input } as WorkerFrame;
+      const context = Object.hasOwn(record, "context") ? parseContext(record.context) : undefined;
+      return {
+        ...record,
+        kind: "tool.request",
+        toolCallId: record.toolCallId,
+        name: record.name,
+        input,
+        ...(context === undefined ? {} : { context }),
+      } as WorkerFrame;
     case "terminal.proposed":
       assertKeys(record, [...BASE_KEYS, "outcome"]);
       assertWorkerSeq(record.workerSeq);
@@ -234,7 +307,10 @@ function parseBinding(value: unknown): WorkerBinding {
 
 function parseStartInput(value: unknown): StartInput {
   const record = asRecord(value);
-  assertKeys(record, ["systemPrompt", "goal", "modelId", "allowedTools", "snapshotDigest", "originalExecutionFingerprint"]);
+  assertKeys(record, [
+    "systemPrompt", "goal", "modelId", "allowedTools", "snapshotDigest", "originalExecutionFingerprint",
+    ...(Object.hasOwn(record, "transcript") ? ["transcript"] : []),
+  ]);
   assertString(record.systemPrompt, "system prompt");
   assertString(record.goal, "goal");
   assertIdentifier(record.modelId, "modelId");
@@ -242,6 +318,18 @@ function parseStartInput(value: unknown): StartInput {
   assertJsonValue(record.originalExecutionFingerprint);
   if (!Array.isArray(record.allowedTools)) throw new Error("allowedTools must be an array");
   const allowedTools = record.allowedTools.map(parseToolDefinition);
+  if (Object.hasOwn(record, "transcript")) {
+    if (!Array.isArray(record.transcript) || record.transcript.length === 0) throw new Error("transcript must be a non-empty array");
+    return {
+      systemPrompt: record.systemPrompt,
+      goal: record.goal,
+      modelId: record.modelId,
+      allowedTools,
+      snapshotDigest: record.snapshotDigest,
+      originalExecutionFingerprint: record.originalExecutionFingerprint,
+      transcript: record.transcript.map(parseMessage),
+    };
+  }
   return { systemPrompt: record.systemPrompt, goal: record.goal, modelId: record.modelId, allowedTools, snapshotDigest: record.snapshotDigest, originalExecutionFingerprint: record.originalExecutionFingerprint };
 }
 
@@ -281,7 +369,7 @@ function parseMessage(value: unknown): Message {
   throw new Error("unsupported message role");
 }
 
-function parseAssistant(value: unknown): AssistantMessage {
+export function parseAssistant(value: unknown): AssistantMessage {
   const record = asRecord(value);
   assertKeys(record, ["role", "content", "stopReason", ...(Object.hasOwn(record, "usage") ? ["usage"] : [])]);
   if (record.role !== "assistant") throw new Error("model message must be assistant");
@@ -430,4 +518,12 @@ function assertJsonValue(value: unknown): asserts value is JsonValue {
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("expected an object");
   return value as Record<string, unknown>;
+}
+
+function cloneMessages(messages: readonly Message[]): Message[] {
+  return messages.map(cloneMessage);
+}
+
+function cloneMessage(message: Message): Message {
+  return JSON.parse(JSON.stringify(message)) as Message;
 }

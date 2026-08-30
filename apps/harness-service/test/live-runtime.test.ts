@@ -39,7 +39,7 @@ test("live Runtime advertises the enabled Create, Cowork, and Hub surfaces", asy
 
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -59,7 +59,7 @@ test("live Runtime accepts an explicit surface selection", async () => {
       surfaces: ["cowork"],
     });
     expect(live.runtime.surfaces).toEqual(["cowork"]);
-    live.close();
+    await live.close();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -161,7 +161,7 @@ runLive("live HTTP v2 create drives Pi through the durable Event Store", async (
     expect(evidence.evalPassed).toBe(true);
   } finally {
     await service.close();
-    live.close();
+    await live.close();
     if (configuredPath === undefined) delete process.env.ANNA_RUNTIME_CONFIG_PATH;
     if (configuredStorePath === undefined) delete process.env.ANNA_HARNESS_V2_EVENT_STORE_PATH;
     await rm(directory, { recursive: true, force: true });
