@@ -14,6 +14,7 @@ import { createLiveTraceCursor } from "@anna/trace";
 import { projectCreateRun } from "./create-projection";
 import { activateCreateSkill } from "./create-activation";
 import { createHttpReviewApprovalProvider } from "@anna/harness-v2";
+import { isKernelSelectionError } from "./kernel-selection";
 
 const require = createRequire(import.meta.url);
 const { version: serviceVersion } = require("../package.json") as {
@@ -687,6 +688,10 @@ async function handleRuntimeStart(
       responseJson(response, 400, { code: error.code });
       return;
     }
+    if (isKernelSelectionError(error)) {
+      responseJson(response, 503, error.body);
+      return;
+    }
     responseJson(response, 500, { code: "v2_runtime_failed" });
   }
 }
@@ -721,6 +726,10 @@ async function handleRuntimeResume(
   } catch (error) {
     if (error instanceof JsonBodyError) {
       responseJson(response, 400, { code: error.code });
+      return;
+    }
+    if (isKernelSelectionError(error)) {
+      responseJson(response, 503, error.body);
       return;
     }
     responseJson(response, 500, { code: "v2_runtime_failed" });

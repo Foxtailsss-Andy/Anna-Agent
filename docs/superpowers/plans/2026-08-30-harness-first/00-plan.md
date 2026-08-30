@@ -98,7 +98,7 @@ Source-level smoke, deterministic transport, live provider, live MCP, packaged a
 - HF-00: integration tree created from verified GitHub main; branch census and protected-source fingerprints captured.
 - HF-01A: completed by Luna Max; accepted by independent Sol Ultra Standards and Spec reviews. Final local gates and retained risks are recorded in the [2026-08-30 update](../../../product/anna-harness-first-update-2026-08-30.md).
 - HF-01B: accepted by independent Sol Ultra Standards and Spec reviews; current integrated gates and actual SQLite/Pi recovery evidence are in the [implementation handoff](../../handoff/2026-08-30-hf-01b-host-memory-context.md). This closes only the stated deterministic ticket scope.
-- HF-02: [design draft](HF-02-governed-omp-kernel.md) and verified package preflight exist; selector/schema freezing and actual worker implementation remain open.
+- HF-02: [S0 identity/admission contract](HF-02-S0-kernel-identity-selection.md) was frozen at `6407790`; its implementation passed both independent review axes and integrated gates in the [S0 handoff](../../handoff/2026-08-30-hf-02-s0-kernel-identity-selection.md). Package, native import and zero-model session construction preflight are recorded separately; actual governed worker execution and parent-ticket acceptance remain open.
 - HF-03..HF-10: planned, not implemented by this document. The full Goal remains active with nine main tickets open.
 
 Update each status as its evidence becomes available. Do not close all tickets on the strength of the first green slice.

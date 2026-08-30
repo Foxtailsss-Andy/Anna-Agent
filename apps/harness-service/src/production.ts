@@ -16,7 +16,9 @@ import {
 import { SqliteEventStore } from "@anna/event-store";
 import {
   createOpenAICompatiblePiLoopKernel,
+  loadPiKernelDescriptor,
   type PiContextPreparation,
+  type PiKernelDescriptorV1,
 } from "@anna/pi-loop-kernel";
 
 import {
@@ -28,6 +30,11 @@ import {
   createHostMemoryContextLoader,
   type HostMemoryContextLoader,
 } from "./host-memory-context";
+import { expectedPiKernelSourceSha256 } from "./pi-kernel-build-identity";
+import {
+  assertKernelSelectionAdmitted,
+  KernelSelectionError,
+} from "./kernel-selection";
 
 export {
   createProductionToolGateway,
@@ -77,6 +84,7 @@ interface RuntimeConfig {
   readonly model_endpoint?: unknown;
   readonly web_search_endpoint?: unknown;
   readonly web_search_api_key?: unknown;
+  readonly harness_v2_kernel?: unknown;
 }
 
 export interface WebSearchProviderOptions {
@@ -137,6 +145,17 @@ export async function createLiveHarnessV2Runtime(
     options.runtimeConfigPath ?? process.env.ANNA_RUNTIME_CONFIG_PATH ?? ".anna/runtime.json",
   );
   const config = parseRuntimeConfig(JSON.parse(await readFile(runtimeConfigPath, "utf8")));
+  const kernelDescriptor = await loadPiKernelDescriptor(
+    process.env.NODE_ENV === "production"
+      ? {
+          mode: "packaged",
+          metadataPath: resolve(import.meta.dirname, "pi-kernel-descriptor.json"),
+          ...(expectedPiKernelSourceSha256 === undefined
+            ? {}
+            : { expectedSourceSha256: expectedPiKernelSourceSha256 }),
+        }
+      : { mode: "development" },
+  );
   const surfaces = options.surfaces ?? ["create", "cowork", "hub"];
   const webSearch = config.web_search_endpoint === undefined
     ? undefined
@@ -152,6 +171,7 @@ export async function createLiveHarnessV2Runtime(
     webSearch !== undefined,
     "general",
     "channel",
+    kernelDescriptor,
   );
   const createProfile = await createLiveProfile(
     config.model_name,
@@ -159,6 +179,7 @@ export async function createLiveHarnessV2Runtime(
     webSearch !== undefined,
     "create",
     "channel",
+    kernelDescriptor,
   );
   const reviewGateConfigured = await probeReviewGate(
     options.reviewApprovalOrigin ?? process.env.ANNA_T07_LIVE_APPROVAL_ORIGIN,
@@ -213,16 +234,41 @@ export async function createLiveHarnessV2Runtime(
     evidenceMode: "live",
     webSearchConfigured: webSearch !== undefined,
     reviewGateConfigured,
+    validateStartCommand: () => assertKernelSelectionAdmitted(config.harness_v2_kernel),
+    validateResumeCommand: (command) =>
+      assertPersistedKernelIdentity(command, kernelDescriptor),
   };
+  const runtime = createDurableHarnessV2Runtime(runtimeOptions);
 
   return {
-    runtime: createDurableHarnessV2Runtime(runtimeOptions),
+    runtime,
     eventStore,
     ...(approvalOrigin === undefined || ownerId === undefined || ownerId.trim() === ""
       ? {}
       : { createActivation: { workspaceRoot, approvalOrigin, ownerId } }),
     close: () => eventStore.close(),
   };
+}
+
+function assertPersistedKernelIdentity(
+  command: StartRun,
+  available: PiKernelDescriptorV1,
+): void {
+  const persisted = command.runProfileSnapshot.kernel;
+  if (persisted !== undefined && !samePiKernelDescriptor(persisted, available)) {
+    throw new KernelSelectionError({
+      code: "kernel_unavailable",
+      requested_adapter: "pi",
+      reason: "kernel_identity_mismatch",
+    });
+  }
+}
+
+function samePiKernelDescriptor(
+  left: PiKernelDescriptorV1,
+  right: PiKernelDescriptorV1,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export async function probeReviewGate(
@@ -270,6 +316,7 @@ function parseRuntimeConfig(input: unknown): {
   readonly model_endpoint: string;
   readonly web_search_endpoint?: string;
   readonly web_search_api_key?: string;
+  readonly harness_v2_kernel?: unknown;
 } {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error("live Runtime config must be a JSON object");
@@ -296,6 +343,7 @@ function parseRuntimeConfig(input: unknown): {
     model_name: modelName,
     model_api_key: apiKey,
     model_endpoint: endpoint,
+    harness_v2_kernel: config.harness_v2_kernel,
     ...(webSearchEndpoint === undefined ? {} : { web_search_endpoint: webSearchEndpoint }),
     ...(webSearchApiKey === undefined ? {} : { web_search_api_key: webSearchApiKey }),
   };
@@ -307,6 +355,7 @@ export async function createLiveProfile(
   webSearchEnabled = false,
   surface: "general" | "create" = "general",
   memoryRead: MemoryReadMode = "none",
+  kernel?: PiKernelDescriptorV1,
 ) {
   const defaultSkillPath = resolve(
     import.meta.dirname,
@@ -384,6 +433,7 @@ export async function createLiveProfile(
         allowedOutcomes: ["completed", "failed", "timed_out", "cancelled"],
         stopCondition: "artifact_or_terminal",
       },
+      ...(kernel === undefined ? {} : { kernel }),
     },
   });
 }

@@ -24,6 +24,8 @@ export interface DurableHarnessV2RuntimeOptions {
   readonly permissionScope?: string;
   readonly webSearchConfigured?: boolean;
   readonly reviewGateConfigured?: boolean;
+  readonly validateStartCommand?: (command: StartRun) => void | Promise<void>;
+  readonly validateResumeCommand?: (command: StartRun) => void | Promise<void>;
 }
 
 export function createDurableHarnessV2Runtime(
@@ -53,6 +55,7 @@ export function createDurableHarnessV2Runtime(
         options.surfaceProfiles?.[surfaceId] ?? options.profile,
         permissionScope,
       );
+      await options.validateStartCommand?.(command);
       const handle = await runtime.start(command);
       return { runId: command.runId, status: handle.run.status };
     },
@@ -76,6 +79,7 @@ export function createDurableHarnessV2Runtime(
       if (command.surfaceId !== undefined && command.surfaceId !== surfaceId) {
         throw new Error("v2 Run surface does not match the resume route");
       }
+      await options.validateResumeCommand?.(command);
       const handle = await runtime.resume(command);
       return { runId: command.runId, status: handle.run.status };
     },

@@ -107,7 +107,7 @@ conditions from the SPEC hold:
 
 | Dependency | Current observation | Required resolution |
 | --- | --- | --- |
-| Managed Bun | Local `1.3.6`; chosen OMP source requires `>=1.3.14` | HF-02 selects and verifies a compatible pinned worker runtime and package lifecycle |
+| Managed Bun | Isolated `1.3.14` archive/hash/version and macOS arm64 native/SDK construction preflight verified; not yet shipped | HF-02 integrates the managed worker, final artifacts and complete lifecycle/platform evidence |
 | Docker/Linux x86_64 | Docker not found in the local PATH; local host is Darwin arm64 | HF-06 establishes an actual Linux x86_64 evaluator executor; ARM local smoke is insufficient |
 | Windows | Current CI covers macOS only | HF-09 provides Windows execution and packaged workflow evidence |
 | Real Provider and Hiker | Existing private configuration contains Provider and MCP connection fields; presence only confirmed, validity/connectivity still unverified | Authorized private configuration and real read-only preflight before live cases |
@@ -131,8 +131,10 @@ reviewed evidence. Do not lower a gate after discovering a failure.
 
 HF-01B is accepted in its
 [implementation handoff](../superpowers/handoff/2026-08-30-hf-01b-host-memory-context.md).
-Next is the [HF-02 draft](../superpowers/plans/2026-08-30-harness-first/HF-02-governed-omp-kernel.md):
-freeze its selector/schema slice before coding, then implement the actual
-governed worker. Its verified package preflight is not runtime acceptance.
+Current work is [HF-02 S0](../superpowers/plans/2026-08-30-harness-first/HF-02-S0-kernel-identity-selection.md):
+the selector/schema implementation passed both independent review axes and
+the integrated gates recorded in its implementation handoff. The actual
+governed worker remains next. Its verified dependency/construction preflight is
+not production runtime acceptance.
 The overall Goal remains active through individual ticket completions and
 unresolved verification.

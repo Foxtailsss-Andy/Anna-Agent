@@ -9,6 +9,10 @@ import type {
 import { SchemaValidationError, expectRecord } from "./schema";
 import type { SkillCatalogEntry } from "./skill-catalog";
 import type { ToolDefinition } from "./tool-gateway";
+import {
+  parsePiKernelDescriptor,
+  type PiKernelDescriptorV1,
+} from "./kernel-descriptor";
 
 export interface AllowedToolsPolicy {
   allowedTools: readonly string[];
@@ -98,6 +102,7 @@ export interface RunProfile {
   evalPolicy: EvalPolicy;
   artifactContract: ArtifactContract;
   terminalRules: TerminalRules;
+  readonly kernel?: PiKernelDescriptorV1;
 }
 
 export interface ResolveRunProfileOptions {
@@ -128,6 +133,7 @@ export interface ResolvedRunProfile {
   readonly evalPolicy: Readonly<EvalPolicy>;
   readonly artifactContract: Readonly<ArtifactContract>;
   readonly terminalRules: Readonly<TerminalRules>;
+  readonly kernel?: PiKernelDescriptorV1;
 }
 
 const budgetKeys = [
@@ -352,10 +358,11 @@ function exactRecord(
   input: unknown,
   name: string,
   keys: readonly string[],
+  optionalKeys: readonly string[] = [],
 ): Record<string, unknown> {
   const value = allowedRecord(input, name, keys);
   for (const key of keys) {
-    if (!Object.hasOwn(value, key)) {
+    if (!optionalKeys.includes(key) && !Object.hasOwn(value, key)) {
       throw new SchemaValidationError(`${name}.${key} is required`);
     }
   }
@@ -478,7 +485,8 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     "evalPolicy",
     "artifactContract",
     "terminalRules",
-  ]);
+    "kernel",
+  ], ["kernel"]);
   const workerProfile = exactRecord(value.workerProfile, "RunProfileSnapshot.workerProfile", [
     "id",
     "version",
@@ -528,6 +536,9 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     "allowedOutcomes",
     "stopCondition",
   ]);
+  const kernel = Object.hasOwn(value, "kernel")
+    ? parsePiKernelDescriptor(value.kernel)
+    : undefined;
 
   const snapshot: Omit<ResolvedRunProfile, "hash"> = {
     id: snapshotString(value.id, "RunProfileSnapshot.id") as RunProfileId,
@@ -615,6 +626,7 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
         "RunProfileSnapshot.terminalRules.stopCondition",
       ),
     },
+    ...(kernel === undefined ? {} : { kernel }),
   };
   const hash = snapshotString(value.hash, "RunProfileSnapshot.hash");
   if (hash !== profileHash(snapshot)) {
@@ -768,6 +780,9 @@ export function resolveRunProfile(
       "RunProfile.terminalRules.stopCondition",
     ),
   };
+  const kernel = runProfile?.kernel === undefined
+    ? undefined
+    : parsePiKernelDescriptor(runProfile.kernel);
 
   if (!modelIsAllowed(model, channelModels) || !modelIsAllowed(model, workerModels)) {
     throw new Error("RunProfile.model must be allowed by ChannelPolicy and WorkerProfile");
@@ -827,6 +842,7 @@ export function resolveRunProfile(
     evalPolicy,
     artifactContract,
     terminalRules,
+    ...(kernel === undefined ? {} : { kernel }),
   };
 
   return deepFreeze({

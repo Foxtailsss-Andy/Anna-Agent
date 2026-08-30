@@ -137,6 +137,10 @@ export {
   type WorkerProfile,
 } from "./run-profile";
 export {
+  parsePiKernelDescriptor,
+  type PiKernelDescriptorV1,
+} from "./kernel-descriptor";
+export {
   memoryQueryTokens,
 } from "./memory-projection";
 export {
