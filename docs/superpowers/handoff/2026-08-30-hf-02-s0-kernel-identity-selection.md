@@ -138,7 +138,19 @@ The package
 smoke still launches the existing Python default; it does not prove Host
 cutover, configured provider/MCP execution, Windows support or publication.
 
-## Remaining Boundary
+## CI Follow-up
+
+For published `63f0efa4d96e94fc6e488ba324fd36b7ba2f0202`, push workflow
+`33314936593` passed. PR workflow `33314938200` failed only because the full
+sidecar build/copy/startup test exceeded Vitest's default 5-second test budget.
+The follow-up changes that integration-test budget to 60 seconds and bounds its
+build subprocess at 30 seconds; each service retains its 5-second watchdog and
+all original assertions. Luna and root each reran the focused test successfully;
+both Sol review axes accepted this test-only correction. No product source
+changed. Timeout-induced npm descendant cleanup was not separately verified.
+The original 17-file fingerprint above predates this test-budget-only change.
+
+## Parent Work Still Open
 
 S0 does not execute OMP, add workers/process pools/protocols, change Desktop
 defaults, alter Legacy/Python/UI, or attest the entire bundle/Node/Bun/native

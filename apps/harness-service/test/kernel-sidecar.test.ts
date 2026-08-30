@@ -15,6 +15,7 @@ test("built service reads the sidecar without source fallback", async () => {
   await execFile("npm", ["run", "build", "--workspace=@anna/harness-service"], {
     cwd: repositoryRoot,
     env: { ...process.env, NODE_ENV: "test" },
+    timeout: 30_000,
   });
 
   const directory = await mkdtemp(join(tmpdir(), "anna-kernel-sidecar-"));
@@ -114,7 +115,7 @@ test("built service reads the sidecar without source fallback", async () => {
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 60_000);
 
 async function runService(
   entry: string,
