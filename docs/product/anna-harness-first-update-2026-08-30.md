@@ -1,6 +1,6 @@
 # Harness-first Update - 2026-08-30
 
-Status: HF-00, HF-01A and HF-01B accepted for scoped Developer Preview source updates.
+Status: HF-00, HF-01A, HF-01B and HF-02 S0/S1 accepted for scoped Developer Preview source updates.
 The complete Harness-first migration remains open. This is not a new signed
 release, a Desktop cutover, or a benchmark result.
 
@@ -8,10 +8,30 @@ Authority: [HF-SPEC-1.0](anna-harness-first-spec-2026-08-30.md).
 Execution: [SDD plan](../superpowers/plans/2026-08-30-harness-first/00-plan.md).
 Implementation: [HF-01A handoff](../superpowers/handoff/2026-08-30-hf-01a-durable-tool-gateway.md).
 
+## HF-02 S1 Follow-on - 2026-08-31
+
+Commit `c030246d90fca322717e6d20d2af07a2ee5866bc` adds actual managed
+Bun/Oh-my-Pi model/Gateway/model execution through the v2 production Host.
+Host Memory preparation, scoped SQLite, identity validation, bounded protocol
+receipts, cancellation and required pre-terminal Eval are covered. This first
+profile is text/read-only on verified macOS arm64, with deterministic Host
+model transport in the public integration tests.
+
+Both Sol Ultra review axes accepted the fixed source. Root gates passed:
+JavaScript **1,085 passed / 7 skipped**, Python **1,048 passed**, typechecks,
+web/service builds, frontend smoke, public boundary and Python audit. GitHub
+push `33324464372` and PR `33324466412` both completed successfully at that
+exact commit. Detailed evidence and prior failed runs are retained in the
+[S1 handoff](../superpowers/handoff/2026-08-30-hf-02-s1-runtime-materialization.md).
+
+HF-02 remains open for canonical OMP restore, steer/answer, distribution and
+complete isolation. Full surface migration, default Desktop cutover, Legacy
+removal, live Provider/Hiker and official SWE-bench gates also remain open.
+
 ## HF-01B Follow-on
 
 The subsequent [HF-01B handoff](../superpowers/handoff/2026-08-30-hf-01b-host-memory-context.md)
-records the latest accepted source/test candidate. Production v2 now loads
+records that milestone's accepted source/test candidate. Production v2 now loads
 accepted Channel Memory through its Host before actual Pi input, persists a
 private immutable input checkpoint, and writes coordinated provenance-only
 hit/readiness receipts. Memory writes remain disabled in these profiles.
@@ -30,10 +50,9 @@ the source/test SHA-256 aggregates are in the handoff. ASAR smoke deliberately
 had no configured model or MCP, and does not prove default Host cutover.
 
 The [full Goal](anna-harness-first-goal-2026-08-30.md) remains active with nine
-main tickets. Default Desktop execution is still Python Legacy. HF-02 has a
-reviewed design direction and isolated package/provenance preflight only; no
-OMP worker, native-platform execution, live Hiker or official benchmark result
-is claimed by this update.
+main tickets. Default Desktop execution is still Python Legacy. The HF-02 S1
+record above supersedes the earlier package-only preflight status, without
+claiming live Hiker, a Desktop cutover or an official benchmark result.
 
 ## Original HF-01A Record
 

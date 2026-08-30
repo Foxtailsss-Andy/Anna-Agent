@@ -2,7 +2,7 @@
 
 Date: 2026-08-30
 Status: locally accepted on 2026-08-31; fixed-source Standards/Spec review and
-integrated gates passed. GitHub publication/CI pending. See
+integrated gates passed. Published at `c030246`; exact-SHA push and PR CI passed. See
 [implementation evidence](../../handoff/2026-08-30-hf-02-s1-runtime-materialization.md).
 Implementation base: `991394b52c6c167d9dd56d50cd4f71f629526a58`.
 Parent: [HF-02](HF-02-governed-omp-kernel.md).

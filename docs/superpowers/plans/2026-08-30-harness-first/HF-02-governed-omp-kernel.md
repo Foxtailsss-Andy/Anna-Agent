@@ -1,8 +1,8 @@
 # HF-02: Governed Oh-my-Pi Kernel
 
 Date: 2026-08-30
-Status: design draft; independent review and prerequisite verification pending.
-Implementation base: record the accepted HF-01B commit before coding.
+Status: in progress; S0 and S1 accepted, remaining controls/restore/isolation and distribution gates open.
+Current accepted implementation: `c030246d90fca322717e6d20d2af07a2ee5866bc` (S1).
 Spec: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md), HF-020..025.
 Goal: [HF-GOAL-1.0](../../../product/anna-harness-first-goal-2026-08-30.md).
 Coder: GPT-5.6-Luna Max. Review: GPT-5.6-Sol Ultra, independent axes.

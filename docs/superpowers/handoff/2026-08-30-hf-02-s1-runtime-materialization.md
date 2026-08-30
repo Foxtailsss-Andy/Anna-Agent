@@ -3,7 +3,7 @@
 Date: 2026-08-30
 Contract: [frozen S1](../plans/2026-08-30-harness-first/HF-02-S1-managed-worker.md),
 commit `d36087d`. Status: S1 locally accepted after frozen dual review and
-integrated verification; publication pending. Earlier sections are chronological
+integrated verification; published at `c030246` with green push and PR CI. Earlier sections are chronological
 evidence, not results for the current source snapshot.
 
 The independent runtime manifest/lock pins OMP and its darwin-arm64 native
@@ -233,7 +233,9 @@ skipped (651 Desktop, 117 core, 103 EventStore, 20 scheduler, 37 Pi, 25 OMP,
 99 service, 13 trace and 10 Eval). No external receipt was present during this
 rerun. Both Sol Ultra Standards and Spec reviews accepted the exact 47-file
 fingerprint above with no outstanding P0/P1/P2 finding. Reviews were read-only;
-Root ran the integration gates. No S1 implementation push has occurred yet.
+Root ran the integration gates. The accepted implementation is commit
+`c030246d90fca322717e6d20d2af07a2ee5866bc`. GitHub push run `33324464372` and
+PR run `33324466412` both completed successfully at that exact commit.
 
 ## Outstanding Global Work
 

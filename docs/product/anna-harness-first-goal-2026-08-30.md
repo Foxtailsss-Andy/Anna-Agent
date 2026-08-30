@@ -77,14 +77,14 @@ or partial row cannot be converted to accepted by aggregate test counts.
 | --- | --- | --- | --- |
 | AC-01 Runtime authority | HF-09/10 | Open: default remains Python | Clean launch and every supported surface execute through one Host; replaced execution removed |
 | AC-02 Loading | HF-04, with HF-01B/02 | Partial: v2 Tool and Host Memory composition | Complete effective snapshot and actual Skill/Plugin/Tool/Memory loading in the same Run |
-| AC-03 Kernel | HF-02 | Open: no OMP adapter | Pinned upstream, conformance, governed tools, isolation, abort and restore |
+| AC-03 Kernel | HF-02 | Partial: S0/S1 actual managed OMP text/read-only execution accepted; controls/restore/full isolation remain open | Pinned upstream, conformance, governed tools, isolation, abort and restore |
 | AC-04 Memory | HF-01B/03 | Partial: deterministic Host loading/input-recovery accepted; full product/live lifecycle remains open | Owner lifecycle, next-Run retrieval, restart, deletion/revocation/isolation negatives |
 | AC-05 Effects | HF-05/07 | Partial: HF-01A local Tool/Artifact evidence | Real scoped MCP read/write, Owner approval, durable intent/outcome/readback and unknown handling |
 | AC-06 Trace/Eval | HF-03/08 | Partial: component and v2 slice evidence | In-flight cursor-readable Trace and required Eval before success across surfaces |
 | AC-07 Recovery | HF-08 | Partial: existing persistence/adapter foundations | Full crash matrix preserves profile, budgets, effects and one terminal |
 | AC-08 Surface parity | HF-03..09 | Open: Legacy surfaces remain | Frozen API/UI workflow cases for every SPEC section-10 row |
 | AC-09 Benchmark | HF-06 | Open: no official run | Isolated actual patch, valid prediction, pinned Linux x86_64 official reports and honest performance accounting |
-| AC-10 Publication | HF-10 | Partial: scoped HF-01A/HF-01B milestones, not the final migration | Final reviewed integration, fresh gates/privacy scan, exact remote SHA and green CI |
+| AC-10 Publication | HF-10 | Partial: HF-01A/HF-01B and HF-02 S0/S1 published with green exact-SHA CI, not the final migration | Final reviewed integration, fresh gates/privacy scan, exact remote SHA and green CI |
 
 The Goal closes only after all ten rows are accepted and these quantitative
 conditions from the SPEC hold:
