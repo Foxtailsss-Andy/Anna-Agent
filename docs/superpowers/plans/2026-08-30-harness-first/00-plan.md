@@ -2,6 +2,7 @@
 
 Date: 2026-08-30
 Spec: [HF-SPEC-1.0](../../../product/anna-harness-first-spec-2026-08-30.md)
+Active Goal: [HF-GOAL-1.0](../../../product/anna-harness-first-goal-2026-08-30.md)
 Publication baseline: `df1bf0ccb954af7a174e7aa1671dae9379d07da0`
 Coding: GPT-5.6-Luna Max. Independent review/correction: GPT-5.6-Sol Ultra.
 
@@ -37,12 +38,12 @@ No ticket imports an entire historical branch. A referenced old commit is a sour
 | HF-01B | HF-040/044, HF-030 Context subset, HF-070/072 sequence/restore subset | Host Context/Memory composition, Pi context inputs, event sequencing tests | Same Run Memory hit before real Pi model turn; SQLite reopen | Host/Kernel sequence ownership explicit; required retrieval failure invokes zero model calls; accepted context/fingerprint/budget survive restart |
 | HF-02 | HF-020..025 | New Oh-my-Pi adapter/managed worker; dependency boundary tests | LoopKernel conformance + governed custom tool + abort/restore | No ambient discovery/builtin bypass; actual pinned upstream executes, no fake alias |
 | HF-03 | HF-040..044,060..062,070..072 | Chat client/API, history, Trace, Memory loading | Submit/stream/stop/continue/interject/history with restart | Full Chat lifecycle uses one Run/Store and shows explicit unavailable states |
-| HF-04 | HF-031..033 | Router/RunProfile resolver | End-user goal -> catalog-bound profile/clarification | Business evidence cannot be downgraded to generic answer; no dynamic permission grant |
+| HF-04 | HF-030..033 | Complete RunProfile/resource loading, Skill/Plugin catalogs and Router | End-user goal -> catalog-bound profile/clarification and actual loading receipts | Full effective snapshot consumed before the model; business evidence cannot be downgraded to generic answer; no dynamic permission grant |
 | HF-05 | HF-050..054 | MCP edge adapter and business profiles | Governed remote I/O contract + approved live canary | Typed read/error receipts; approved writes/readback/idempotence; no Python Agent loop |
 | HF-06 | HF-053,080..085 | Coding tools, sandbox, prediction exporter | Isolated repo -> actual patch -> official evaluator | Smoke4 coding loop; prediction/evaluator/performance reported separately |
 | HF-07 | HF-060..062,071 | Create/Artifact/activation | Create/edit/list/activate through Host | Versioned artifacts, approval, non-target preservation and error recovery |
-| HF-08 | HF-033,060,070..073 | Crew/Channel/Lane/Hub/Scheduler | Parallel Runs, Human signals and scheduled admission | No independent execution store; idempotent projections and occurrence keys |
-| HF-09 | HF-001..003,043,061..062 | migration tooling and Desktop launch | Clean install + migration report + process/API trace | Default Host-only Agent Runtime; no hot fallback or lost history/effects |
+| HF-08 | HF-033,060,070..073 | Unified Supervisor/full crash matrix, Crew/Channel/Lane, Hub/Settings and Scheduler | Parallel Runs, Human signals, crash recovery and scheduled admission | One supervisor and execution fact source; preserved budgets/terminals; idempotent projections and occurrence keys |
+| HF-09 | HF-001..003,043,061..062 | Data migration, Desktop clients including Settings, native Windows/macOS launch | Clean install + migration report + process/API trace + native packaged workflows | Default Host-only Agent Runtime on both platforms; no hot fallback or lost history/effects |
 | HF-10 | all AC rows | deletion, CI, release evidence | Run all supported workflows after removing Legacy imports | Full acceptance; actual OS/benchmark/live gaps remain blockers |
 
 ## Per-ticket protocol

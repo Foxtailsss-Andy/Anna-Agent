@@ -12,6 +12,7 @@
 | Main coding role | GPT-5.6-Luna, reasoning Max |
 | Review/correction role | GPT-5.6-Sol, reasoning Ultra |
 | Execution plan | [Harness-first SDD plan](../superpowers/plans/2026-08-30-harness-first/00-plan.md) |
+| Active Goal | [HF-GOAL-1.0 and global acceptance ledger](anna-harness-first-goal-2026-08-30.md) |
 
 This document is the development contract. It is not a claim that Anna already has a complete Harness-first runtime, an Oh-my-Pi integration, or a SWE-bench result. A dated milestone may be published while the overall migration remains incomplete, provided its exact support boundary is explicit.
 
