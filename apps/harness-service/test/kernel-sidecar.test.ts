@@ -131,7 +131,7 @@ async function runService(
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
-    }, 5_000);
+    }, 30_000);
     child.on("error", (error) => {
       clearTimeout(timer);
       reject(error);

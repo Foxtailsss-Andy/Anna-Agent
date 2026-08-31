@@ -20,6 +20,7 @@ import {
   type RunOutcome,
   type StartRun,
   type StreamId,
+  type ToolResult,
 } from "@anna/harness-v2";
 import { PiLoopKernel } from "@anna/pi-loop-kernel";
 
@@ -29,6 +30,7 @@ import {
   createProductionToolGateway,
   createWebSearchProvider,
 } from "../src/production";
+import { validatedProductTask } from "../src/product-session";
 
 async function productionCommand(
   webSearchEnabled = false,
@@ -204,6 +206,244 @@ test("production Gateway keeps Hiker reads direct and keys local artifact writes
     });
   } finally {
     store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("production Gateway honors reimbursement reads, Crew proposals, and keyed intents", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "anna-production-tools-business-effects-"));
+  const store = new SqliteEventStore(join(directory, "events.sqlite"));
+  const readProfile = await createLiveProfile("fixture-model", undefined, false, "reimbursement", "channel", undefined, true);
+  const proposalProfile = await createLiveProfile("fixture-model", undefined, false, "crew", "channel", undefined, true);
+  const intentProfile = await createLiveProfile("fixture-model", undefined, false, "reimbursement", "channel", undefined, true);
+  const commandFor = (profile: Awaited<ReturnType<typeof createLiveProfile>>, surface: "reimbursement" | "crew", runId: string) =>
+    parseStartRun({
+      commandId: `command:${runId}`,
+      runId,
+      surfaceId: surface,
+      goal: "Exercise the admitted business tool.",
+      workspaceId: "workspace:production-business-effects",
+      channelId: `channel:${surface}`,
+      source: { eventId: `event:${runId}:source` },
+      runProfile: { id: profile.id, version: profile.version },
+      runProfileSnapshot: profile,
+      budget: profile.budget,
+      permissionScope: `permission:${runId}`,
+      stopCondition: profile.terminalRules.stopCondition,
+    });
+  const readCommand = commandFor(readProfile, "reimbursement", "run:business-read");
+  const proposalCommand = commandFor(proposalProfile, "crew", "run:business-proposal");
+  const intentCommand = commandFor(intentProfile, "reimbursement", "run:business-intent");
+  const requests: unknown[] = [];
+  const readTool = {
+    name: "reimbursement.get_policy",
+    replayPolicy: "safe" as const,
+    inputSchema: { parse(input: unknown) { return input; } },
+  };
+  const proposalTool = {
+    name: "crew.emit_task_drafts",
+    replayPolicy: "safe" as const,
+    inputSchema: { parse(input: unknown) { return input; } },
+  };
+  const intentTool = {
+    name: "reimbursement.submit_intent",
+    replayPolicy: "never" as const,
+    inputSchema: { parse(input: unknown) { return input; } },
+  };
+  const call = async (request: unknown) => {
+    requests.push(request);
+    return { status: "succeeded" as const, output: { accepted: true } };
+  };
+
+  try {
+    const readGateway = createProductionToolGateway({
+      eventStore: store,
+      command: readCommand,
+      workspaceRoot: directory,
+      dynamicTools: [readTool],
+      dynamicToolCall: call,
+    });
+    await expect(readGateway.execute({
+      workspaceId: readCommand.workspaceId,
+      channelId: readCommand.channelId,
+      runId: readCommand.runId,
+      workerProfileId: readCommand.runProfileSnapshot.workerProfileId,
+      name: readTool.name,
+      input: {},
+      toolCallId: "call-business-read",
+    }, new AbortController().signal)).resolves.toEqual({ status: "succeeded", output: { accepted: true } });
+    expect(requests[0]).not.toHaveProperty("effectKey");
+
+    const proposalGateway = createProductionToolGateway({
+      eventStore: store,
+      command: proposalCommand,
+      workspaceRoot: directory,
+      dynamicTools: [proposalTool],
+      dynamicToolCall: call,
+    });
+    await expect(proposalGateway.execute({
+      workspaceId: proposalCommand.workspaceId,
+      channelId: proposalCommand.channelId,
+      runId: proposalCommand.runId,
+      workerProfileId: proposalCommand.runProfileSnapshot.workerProfileId,
+      name: proposalTool.name,
+      input: { drafts: [] },
+      toolCallId: "call-business-proposal",
+    }, new AbortController().signal)).resolves.toEqual({ status: "succeeded", output: { accepted: true } });
+    expect(requests[1]).not.toHaveProperty("effectKey");
+
+    const intentGateway = createProductionToolGateway({
+      eventStore: store,
+      command: intentCommand,
+      workspaceRoot: directory,
+      dynamicTools: [intentTool],
+      dynamicToolCall: call,
+    });
+    const intentRequest = {
+      workspaceId: intentCommand.workspaceId,
+      channelId: intentCommand.channelId,
+      runId: intentCommand.runId,
+      workerProfileId: intentCommand.runProfileSnapshot.workerProfileId,
+      name: intentTool.name,
+      input: { external_reimbursement_id: "draft-1" },
+      toolCallId: "call-business-intent",
+    } as const;
+    const first = await intentGateway.execute(intentRequest, new AbortController().signal);
+    const second = await intentGateway.execute(intentRequest, new AbortController().signal);
+    expect(first).toEqual({ status: "succeeded", output: { accepted: true } });
+    expect(second).toEqual(first);
+    expect(requests).toHaveLength(3);
+    expect(requests[2]).toMatchObject({
+      effectKey: "product-business-effect:run:business-intent:reimbursement.submit_intent:call-business-intent",
+    });
+  } finally {
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("production Runtime converts and dispatches a Crew proposal catalog entry", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "anna-production-crew-proposal-runtime-"));
+  const configPath = join(directory, "runtime.json");
+  const eventStorePath = join(directory, "events.sqlite");
+  await writeFile(configPath, JSON.stringify({
+    model_provider: "openai-compatible",
+    model_name: "fixture-model",
+    model_api_key: "fixture-key",
+    model_endpoint: "https://provider.invalid/v1/chat/completions",
+  }), "utf8");
+  const task = validatedProductTask({
+    run_id: "run:production-crew-proposal-runtime",
+    workspace_id: "workspace:production-crew-proposal-runtime",
+    actor_user_id: "actor:fixture",
+    surface: "crew",
+    prompt: "Draft the admitted project tasks.",
+    context: {
+      tool_catalog: [{
+        name: "crew.emit_task_drafts",
+        description: "Emit pure task draft proposals.",
+        input_schema: {
+          type: "object",
+          properties: { drafts: { type: "array" } },
+          required: ["drafts"],
+          additionalProperties: false,
+        },
+        effect: "proposal",
+        replay_policy: "safe",
+      }],
+    },
+  });
+  const businessRequests: Record<string, unknown>[] = [];
+  let dispatched: ToolResult | undefined;
+  const live = await createLiveHarnessV2Runtime({
+    runtimeConfigPath: configPath,
+    eventStorePath,
+    workspaceRoot: directory,
+    surfaces: ["crew"],
+    businessOrigin: "https://business.fixture",
+    businessServiceToken: "fixture-business-token",
+    businessFetchImpl: async (_input, init) => {
+      if (typeof init?.body === "string") businessRequests.push(JSON.parse(init.body) as Record<string, unknown>);
+      return new Response(JSON.stringify({
+        result: { status: "succeeded", output: { drafts: [] } },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+    productTaskPeek: (runId) => runId === task.run_id ? task : undefined,
+    createKernel: ({ toolGatewayFor }) => ({
+      async start(command, sink, signal): Promise<RunOutcome> {
+        await sink.append({
+          id: `event:${command.runId}:started` as never,
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          streamId: command.runId as never,
+          seq: 1,
+          type: "run.started",
+          timestamp: "2026-08-31T00:00:00.000Z",
+          schemaVersion: 1,
+          payload: { phase: "started" },
+        });
+        dispatched = await toolGatewayFor(command).execute({
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          runId: command.runId,
+          workerProfileId: command.runProfileSnapshot.workerProfileId,
+          name: "crew.emit_task_drafts",
+          input: { drafts: [] },
+          toolCallId: "call-production-crew-proposal",
+        }, signal);
+        await sink.append({
+          id: `event:${command.runId}:completed` as never,
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          streamId: command.runId as never,
+          seq: 2,
+          type: "run.completed",
+          timestamp: "2026-08-31T00:00:01.000Z",
+          schemaVersion: 1,
+          payload: { outcome: "completed" },
+        });
+        return { status: "completed" };
+      },
+      async steer() {},
+      async answer() {},
+      async abort() {},
+    }),
+  });
+
+  try {
+    const started = await live.runtime.start("crew", {
+      workspace_id: task.workspace_id,
+      channel_id: task.channel_id ?? "channel:production-crew-proposal-runtime",
+      command_id: "command:production-crew-proposal-runtime",
+      run_id: task.run_id,
+      source_event_id: "event:production-crew-proposal-source",
+      goal: task.prompt,
+    });
+    let events: readonly CanonicalEvent[] = [];
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      events = await live.runtime.readEvents(
+        task.workspace_id,
+        task.channel_id ?? "channel:production-crew-proposal-runtime",
+        started.runId,
+      );
+      if (events.some((event) => ["run.completed", "run.failed"].includes(event.type))) break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect(dispatched).toEqual({
+      status: "succeeded",
+      output: { status: "succeeded", output: { drafts: [] } },
+    });
+    expect(businessRequests).toHaveLength(1);
+    expect(businessRequests[0]).toMatchObject({
+      workspace_id: task.workspace_id,
+      actor_user_id: task.actor_user_id,
+      run_id: task.run_id,
+      name: "crew.emit_task_drafts",
+      arguments: { drafts: [] },
+    });
+    expect(events.at(-1)?.type).toBe("run.completed");
+  } finally {
+    await live.close();
     await rm(directory, { recursive: true, force: true });
   }
 });

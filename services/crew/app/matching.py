@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 EMIT_TOOL: dict[str, Any] = {
     "name": "crew.emit_assignments",
+    "effect": "proposal",
+    "replay_policy": "safe",
     "description": (
         "Emit the assignment plan: for each unassigned task, pick the best-fit "
         "team member. Call this once with the complete assignments."

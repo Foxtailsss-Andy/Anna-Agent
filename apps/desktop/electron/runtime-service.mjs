@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const API_HOST = "127.0.0.1";
 const DEFAULT_API_PORT = 18765;
+const PRODUCT_STARTUP_TIMEOUT_MS = 30_000;
 
 export function resolveProjectRoot(currentFileUrl = import.meta.url) {
   const projectRoot = path.resolve(path.dirname(fileURLToPath(currentFileUrl)), "../../..");
@@ -444,13 +445,13 @@ export async function startProductRuntimeService(config, options = {}) {
     : processFailure(business.child, "Anna business service", () => business.stderr, () => business.started);
   try {
     await Promise.race([
-      waitForHealth(`${config.apiBase}/health`, options.healthTimeoutMs ?? 15000),
+      waitForHealth(`${config.apiBase}/health`, options.healthTimeoutMs ?? PRODUCT_STARTUP_TIMEOUT_MS),
       hostFailure,
     ]);
     hostStarted = true;
     if (business !== undefined) {
       await Promise.race([
-        waitForHealth(`${business.apiBase}/api/health`, options.healthTimeoutMs ?? 15000),
+        waitForHealth(`${business.apiBase}/api/health`, options.healthTimeoutMs ?? PRODUCT_STARTUP_TIMEOUT_MS),
         businessFailure,
       ]);
       business.started = true;

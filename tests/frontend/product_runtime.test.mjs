@@ -126,7 +126,9 @@ test("Product smoke contract names the original app and both runtime preparation
   assert.match(preloadSource, /mode:\s*["']product["']/);
   assert.match(runtimeSource, /PYTHONPATH/);
   assert.match(runtimeSource, /PYTHONHOME/);
+  assert.match(runtimeSource, /PRODUCT_STARTUP_TIMEOUT_MS\s*=\s*30_000/);
   assert.match(smokeSource, /anna-harness-product\/1/);
+  assert.match(smokeSource, /healthTimeoutMs:\s*30_000/);
   assert.match(smokeSource, /_harness\/capabilities/);
   assert.doesNotMatch(smokeSource, /api\/preview/);
   assert.match(packageJson.scripts["desktop:run"], /desktop:prepare-python/);

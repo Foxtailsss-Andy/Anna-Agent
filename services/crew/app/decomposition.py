@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 EMIT_TOOL: dict[str, Any] = {
     "name": "crew.emit_project_plan",
+    "effect": "proposal",
+    "replay_policy": "safe",
     "description": (
         "Emit the final refined project plan as a structured task DAG. "
         "Call this once with the complete plan tailored to the goal."

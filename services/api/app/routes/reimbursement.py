@@ -41,6 +41,15 @@ def build_router(
             raise HTTPException(status_code=503, detail="Harness Host is not configured")
         return harness_client
 
+    def host_tool_catalog() -> list[dict[str, Any]]:
+        try:
+            skill = reimbursement.skill_loader.load(
+                reimbursement.settings.reimbursement_skill_id
+            )
+        except Exception:  # noqa: BLE001 - an unavailable skill admits no business tools
+            return []
+        return reimbursement.tool_registry.model_visible_tools(skill)
+
     @router.post("/api/cowork/reimbursements/runs")
     def create_reimbursement_run(
         request: CreateReimbursementRunRequest,
@@ -65,7 +74,11 @@ def build_router(
             )
             reimbursement._record_created(run, request.input_text)
             try:
-                host_run = require_host().submit_and_wait(_task_for_reimbursement_run(run, stage="create"))
+                host_run = require_host().submit_and_wait(
+                    _task_for_reimbursement_run(
+                        run, stage="create", tool_catalog=host_tool_catalog()
+                    )
+                )
             except HarnessHostError as exc:
                 run = reimbursement._save_and_return(
                     reimbursement._fail_run(run, exc.code or "harness_request_failed", "Harness Host reimbursement task failed")
@@ -128,6 +141,7 @@ def build_router(
                         answers=request.answers,
                         host_run_id=_linked_host_run_id(run, "answers", request.answers),
                         linked_run_id=run.id,
+                        tool_catalog=host_tool_catalog(),
                     )
                 )
                 updated = reimbursement.apply_host_result(
@@ -193,6 +207,7 @@ def build_router(
                             "approved_by": request.approved_by,
                             "write_action": updated.write_action.model_dump(mode="json"),
                         },
+                        tool_catalog=host_tool_catalog(),
                     )
                 )
                 updated = reimbursement.apply_host_result(
@@ -307,7 +322,13 @@ def build_router(
         async def event_stream():
             if product_mode:
                 reimbursement._record_created(run, request.input_text)
-                async for frame in _stream_host_reimbursement(reimbursement, run, stage="create", client=require_host()):
+                async for frame in _stream_host_reimbursement(
+                    reimbursement,
+                    run,
+                    stage="create",
+                    client=require_host(),
+                    tool_catalog=host_tool_catalog(),
+                ):
                     yield sse_frame(frame)
                 return
             async for frame in reimbursement.stream_created_advance(
@@ -350,6 +371,7 @@ def build_router(
                     stage="answers",
                     answers=request.answers,
                     client=require_host(),
+                    tool_catalog=host_tool_catalog(),
                 ):
                     yield sse_frame(frame)
                 return
@@ -399,6 +421,7 @@ def build_router(
                             "approved_by": request.approved_by,
                             "write_action": updated.write_action.model_dump(mode="json"),
                         },
+                        tool_catalog=host_tool_catalog(),
                         client=require_host(),
                     ):
                         yield sse_frame(frame)
@@ -428,6 +451,7 @@ def _task_for_reimbursement_run(
     host_run_id: str | None = None,
     linked_run_id: str | None = None,
     continuation_facts: dict[str, Any] | None = None,
+    tool_catalog: list[dict[str, Any]] | None = None,
 ) -> ProductTask:
     if stage != "create":
         linked_run_id = linked_run_id or run.id
@@ -442,6 +466,8 @@ def _task_for_reimbursement_run(
         context["answers"] = answers
     if continuation_facts is not None:
         context["continuation_facts"] = continuation_facts
+    if tool_catalog is not None:
+        context["tool_catalog"] = tool_catalog
     if linked_run_id is not None:
         context["linked_run_id"] = linked_run_id
         context["continuation_kind"] = stage
@@ -505,6 +531,7 @@ async def _stream_host_reimbursement(
     client: HarnessHostClient,
     answers: dict[str, Any] | None = None,
     continuation_facts: dict[str, Any] | None = None,
+    tool_catalog: list[dict[str, Any]] | None = None,
 ):
     try:
         linked_run_id = run.id if stage != "create" else None
@@ -526,6 +553,7 @@ async def _stream_host_reimbursement(
                 host_run_id=host_run_id,
                 linked_run_id=linked_run_id,
                 continuation_facts=continuation_facts,
+                tool_catalog=tool_catalog,
             ),
         )
         for event in run.audit_events:

@@ -1319,6 +1319,11 @@ function isStrictJsonSchema(value: Record<string, unknown>): boolean {
 function replayPolicyFor(entry: ProductToolCatalogEntry): "safe" | "never" {
   if (entry.effect === "read" && entry.replay_policy === "safe") return "safe";
   if (entry.effect === "read" && entry.replay_policy === undefined) return "safe";
+  if (
+    entry.effect === "proposal"
+    && entry.replay_policy === "safe"
+    && (CREW_TOOL_NAMES as readonly string[]).includes(entry.name)
+  ) return "safe";
   return "never";
 }
 

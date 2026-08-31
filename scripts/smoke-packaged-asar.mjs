@@ -60,7 +60,7 @@ try {
 
   runtime = await createDesktopRuntime({
     userDataPath,
-    healthTimeoutMs: 15000,
+    healthTimeoutMs: 30_000,
   });
   const healthResponse = await fetch(`${runtime.apiBase}/health`);
   const health = await healthResponse.json();

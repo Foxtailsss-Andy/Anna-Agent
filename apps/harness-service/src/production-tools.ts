@@ -251,15 +251,26 @@ export function createProductionToolGateway(
   return {
     ...gateway,
     execute(request, signal) {
-      if (request.effectKey !== undefined || !isLocalArtifactTool(request.name)) {
+      if (request.effectKey !== undefined || !requiresHostEffectKey(request.name)) {
         return gateway.execute(request, signal);
       }
+      const effectPrefix = isLocalArtifactTool(request.name)
+        ? "product-local-write"
+        : "product-business-effect";
       return gateway.execute({
         ...request,
-        effectKey: `product-local-write:${request.runId}:${request.name}:${request.toolCallId}`,
+        effectKey: `${effectPrefix}:${request.runId}:${request.name}:${request.toolCallId}`,
       }, signal);
     },
   };
+}
+
+function requiresHostEffectKey(name: string): boolean {
+  return isLocalArtifactTool(name)
+    || name === "reimbursement.create_draft"
+    || name === "reimbursement.submit_intent"
+    || name === "reimbursement.approve_intent"
+    || name === "reimbursement.reject_intent";
 }
 
 function isLocalArtifactTool(name: string): boolean {
