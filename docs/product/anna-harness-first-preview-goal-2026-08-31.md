@@ -4,7 +4,7 @@
 
 日期：2026-08-31
 
-状态：当前执行目标；上线前仍需逐项验收。
+状态：已废止为当前执行范围。保留为偏差记录；当前目标为 [HF-PARITY-1.0](anna-harness-product-parity-goal-2026-08-31.md)，必须保留原 Home、Cowork、Crew 产品。
 
 基线：`f9f4e1ae06eb4fa54e6f5ebf2974de34ff341b64`。
 

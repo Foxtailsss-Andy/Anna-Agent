@@ -5,6 +5,7 @@ version: 0.1.0
 owner: Anna
 domain: contract
 allowed_tools:
+  - todo
   - hiker.system.list_capabilities
   - hiker.system.get_current_user_context
   - hiker.master_data.search

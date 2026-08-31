@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import { createInterface, type Interface } from "node:readline";
 
 import type { AssistantMessage as OmpAssistantMessage, Context as OmpContext, Message as OmpMessage, Model as OmpModel } from "@oh-my-pi/pi-ai/types";
+import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessageEventStream as OmpAssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import type { AuthStorage as OmpAuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
 import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { CustomTool } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
 
 import {
   OMP_PROTOCOL,
@@ -117,10 +117,19 @@ class WorkerRuntime {
     );
     this.ready = true;
     if (this.aborted) throw new Error("worker was aborted before prompt");
+    const model = this.session.model;
+    if (model === undefined) throw new Error("admitted OMP model is unavailable");
+    const initialMessages = input.initialMessages ?? [];
+    if (initialMessages.length > 0) {
+      this.session.agent.replaceMessages(initialMessages.map((message) => toOmpMessage(message, model)));
+    }
+    restoreTodoState(this.session, initialMessages);
     if (input.transcript !== undefined) {
-      const model = this.session.model;
-      if (model === undefined) throw new Error("admitted OMP model is unavailable");
-      this.session.agent.replaceMessages((projection?.messages ?? input.transcript).map((message) => toOmpMessage(message, model)));
+      this.session.agent.replaceMessages([
+        ...initialMessages,
+        ...(projection?.messages ?? input.transcript),
+      ].map((message) => toOmpMessage(message, model)));
+      restoreTodoState(this.session, input.transcript);
       if (isCompletedAssistantTail(input.transcript)) {
         await this.awaitObservations();
         if (this.aborted) throw new Error("worker was aborted before terminal proposal");
@@ -204,7 +213,9 @@ class WorkerRuntime {
       models: [{
         id: input.modelId,
         name: input.modelId,
-        reasoning: false,
+        reasoning: true,
+        thinking: { mode: "effort", efforts: ["high"], defaultLevel: "high" },
+        supportsTools: true,
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 128_000,
@@ -225,6 +236,7 @@ class WorkerRuntime {
       settings,
       sessionManager,
       systemPrompt: input.systemPrompt,
+      thinkingLevel: "high",
       skills: [],
       rules: [],
       contextFiles: [],
@@ -237,8 +249,11 @@ class WorkerRuntime {
         totalLines: 0,
         agentsMdFiles: [],
       },
-      customTools: input.allowedTools.map((tool) => this.createProxyTool(tool)),
-      toolNames: input.allowedTools.map((tool) => tool.name),
+      // Keep TodoTool native so OMP owns validation and plan transitions. The
+      // other admitted definitions are attached as live AgentTool proxies just
+      // below; restricted SDK custom-tool registration stores definitions but
+      // cannot safely execute them in this headless worker.
+      toolNames: input.allowedTools.filter((tool) => tool.name === "todo").map((tool) => tool.name),
       restrictToolNames: true,
       allowRestrictedCustomTools: true,
       disableExtensionDiscovery: true,
@@ -254,21 +269,27 @@ class WorkerRuntime {
     };
     const created = await createAgentSession(options);
     this.session = created.session;
+    const admittedProxyTools = input.allowedTools
+      .filter((tool) => tool.name !== "todo")
+      .map((tool) => this.createProxyTool(tool));
+    if (admittedProxyTools.length > 0) {
+      created.session.agent.setTools([...created.session.agent.state.tools, ...admittedProxyTools]);
+    }
     // The SDK's CustomTool shape omits AgentTool concurrency. Set the policy
     // on the live admitted proxies through the public Agent API so a single
     // Host gateway call is in flight at a time for this bounded profile.
     const admittedToolNames = new Set(input.allowedTools.map((tool) => tool.name));
     const serializedTools = created.session.agent.state.tools.map((tool) => {
       if (!admittedToolNames.has(tool.name)) return tool;
-      tool.concurrency = "exclusive";
-      return tool;
+      if (tool.concurrency === "exclusive") return tool;
+      return { ...tool, concurrency: "exclusive" };
     });
     created.session.agent.setTools(serializedTools);
     this.session.subscribe((event) => this.onSessionEvent(event));
     return created.session;
   }
 
-  private createProxyTool(tool: ToolDefinition): CustomTool {
+  private createProxyTool(tool: ToolDefinition): AgentTool {
     return {
       name: tool.name,
       label: tool.name,
@@ -277,7 +298,7 @@ class WorkerRuntime {
       strict: true,
       loadMode: "essential" as const,
       approval: { tier: "read" as const, policy: "allow" as const },
-      execute: async (toolCallId: string, params: unknown, _onUpdate: unknown, _context: unknown, signal?: AbortSignal) => {
+      execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, _onUpdate?: unknown, _context?: unknown) => {
         const input = asObject(params, "tool input");
         const result = await this.requestTool(toolCallId, tool.name, input, signal);
         const text = result.output === undefined ? result.status : renderJson(result.output);
@@ -343,41 +364,87 @@ class WorkerRuntime {
       const message = toOmpAssistant(response.message, model);
       const partial = { ...message, content: [] as OmpAssistantMessage["content"] };
       const stopReason = response.message.stopReason;
+      // `toOmpAssistant` stores provider reasoning as a leading thinking block;
+      // the neutral response is the source of truth for whether that block is
+      // present when offsetting visible/tool content indices.
+      const reasoningContent = response.message.reasoningContent;
+      const reasoningPresent = reasoningContent !== undefined || response.deltas.some((delta) => delta.type === "reasoning");
+      let reasoningStarted = false;
+      let reasoningEnded = false;
       stream.push({ type: "start", partial });
+      const hasReasoningDelta = response.deltas.some((delta) => delta.type === "reasoning");
+      if (reasoningPresent && !hasReasoningDelta) {
+        reasoningStarted = true;
+        partial.content[0] = { type: "thinking", thinking: "", thinkingSignature: "reasoning_content" };
+        stream.push({ type: "thinking_start", contentIndex: 0, partial });
+        if (reasoningContent !== undefined && reasoningContent.length > 0) {
+          partial.content[0].thinking = reasoningContent;
+          stream.push({ type: "thinking_delta", contentIndex: 0, delta: reasoningContent, partial });
+        }
+      }
       const startedToolIndexes = new Set<number>();
+      const startedTextIndexes = new Set<number>();
       for (const delta of response.deltas) {
-        if (delta.type === "text") {
-          const existing = partial.content[delta.contentIndex];
-          partial.content[delta.contentIndex] = {
-            type: "text",
-            text: existing?.type === "text" ? existing.text + delta.text : delta.text,
-          };
-          stream.push({ type: "text_start", contentIndex: delta.contentIndex, partial });
-          stream.push({ type: "text_delta", contentIndex: delta.contentIndex, delta: delta.text, partial });
-          stream.push({ type: "text_end", contentIndex: delta.contentIndex, content: delta.text, partial });
+        if (delta.type === "reasoning") {
+          if (!reasoningStarted) {
+            reasoningStarted = true;
+            partial.content[0] = { type: "thinking", thinking: "", thinkingSignature: "reasoning_content" };
+            stream.push({ type: "thinking_start", contentIndex: 0, partial });
+          }
+          const existing = partial.content[0];
+          if (existing?.type === "thinking") existing.thinking += delta.text;
+          stream.push({ type: "thinking_delta", contentIndex: 0, delta: delta.text, partial });
+        } else if (delta.type === "text") {
+          if (reasoningStarted && !reasoningEnded) {
+            reasoningEnded = true;
+            stream.push({ type: "thinking_end", contentIndex: 0, content: reasoningContent ?? "", partial });
+          }
+          const contentIndex = delta.contentIndex + (reasoningPresent ? 1 : 0);
+          if (!startedTextIndexes.has(contentIndex)) {
+            startedTextIndexes.add(contentIndex);
+            partial.content[contentIndex] = { type: "text", text: "" };
+            stream.push({ type: "text_start", contentIndex, partial });
+          }
+          const existing = partial.content[contentIndex];
+          if (existing?.type === "text") existing.text += delta.text;
+          stream.push({ type: "text_delta", contentIndex, delta: delta.text, partial });
         } else {
-          if (!startedToolIndexes.has(delta.contentIndex)) {
-            startedToolIndexes.add(delta.contentIndex);
-            partial.content[delta.contentIndex] = {
+          if (reasoningStarted && !reasoningEnded) {
+            reasoningEnded = true;
+            stream.push({ type: "thinking_end", contentIndex: 0, content: reasoningContent ?? "", partial });
+          }
+          const contentIndex = delta.contentIndex + (reasoningPresent ? 1 : 0);
+          if (!startedToolIndexes.has(contentIndex)) {
+            startedToolIndexes.add(contentIndex);
+            partial.content[contentIndex] = {
               type: "toolCall",
               id: delta.id,
               name: delta.name,
               arguments: {},
             };
-            setStreamingPartialJson(partial.content[delta.contentIndex]!, delta.argumentsDelta);
-            stream.push({ type: "toolcall_start", contentIndex: delta.contentIndex, partial });
+            setStreamingPartialJson(partial.content[contentIndex]!, delta.argumentsDelta);
+            stream.push({ type: "toolcall_start", contentIndex, partial });
           }
-          const existing = partial.content[delta.contentIndex];
+          const existing = partial.content[contentIndex];
           if (existing?.type === "toolCall") {
             setStreamingPartialJson(existing, `${getStreamingPartialJson(existing) ?? ""}${delta.argumentsDelta}`);
           }
-          stream.push({ type: "toolcall_delta", contentIndex: delta.contentIndex, delta: delta.argumentsDelta, partial });
+          stream.push({ type: "toolcall_delta", contentIndex, delta: delta.argumentsDelta, partial });
         }
+      }
+      if (reasoningStarted && !reasoningEnded) {
+        reasoningEnded = true;
+        stream.push({ type: "thinking_end", contentIndex: 0, content: reasoningContent ?? "", partial });
+      }
+      for (const index of startedTextIndexes) {
+        const block = partial.content[index];
+        if (block?.type === "text") stream.push({ type: "text_end", contentIndex: index, content: block.text, partial });
       }
       partial.content = message.content;
       for (const [index, block] of message.content.entries()) {
         if (block.type === "toolCall") {
-          stream.push({ type: "toolcall_end", contentIndex: index, toolCall: block, partial });
+          const partialBlock = partial.content[index];
+          if (partialBlock?.type === "toolCall") stream.push({ type: "toolcall_end", contentIndex: index, toolCall: partialBlock, partial });
         }
       }
       partial.stopReason = message.stopReason;
@@ -405,7 +472,11 @@ class WorkerRuntime {
     if (this.aborted || this.stopping) throw new HostModelError("cancelled", "model request cancelled");
     if (this.pendingModel !== undefined) throw new Error("OMP model request overlap");
     const requestId = randomUUID();
-    const frame = this.makeFrame("model.request", { modelId, context }, requestId);
+    const exposeToolDefinitions = this.input?.allowedTools.some((tool) => tool.name !== "read_only") === true;
+    const frame = this.makeFrame("model.request", {
+      modelId,
+      context: exposeToolDefinitions ? { ...context, tools: this.input?.allowedTools ?? [] } : context,
+    }, requestId);
     return new Promise<ModelReply>((resolvePromise, rejectPromise) => {
       const pending: PendingModel = {
         requestId,
@@ -481,6 +552,16 @@ class WorkerRuntime {
   private async receive(frame: HostFrame): Promise<void> {
     if (this.binding === undefined || !sameBinding(frame.binding, this.binding)) throw new Error("Host frame binding mismatch");
     if (frame.kind === "start") throw new Error("duplicate worker start");
+    if (frame.kind === "steer") {
+      if (!this.ready || this.session === undefined || this.stopping || this.aborted) {
+        throw new Error("OMP steer received before the session was ready");
+      }
+      // Keep steering in the pinned Agent queue. The user message is emitted
+      // later by the normal session event stream and becomes the durability
+      // point at the Host, so this frame never acts as a synthetic ACK.
+      await this.session.steer(frame.message.content);
+      return;
+    }
     if (frame.kind === "abort") {
       this.aborted = true;
       for (const pending of this.pendingReceipts.values()) pending.reject(new HostModelError("cancelled", frame.reason));
@@ -729,7 +810,9 @@ function toOmpMessage(message: Message, model: OmpModel): OmpMessage {
     toolCallId: message.toolCallId,
     toolName: message.toolName,
     content: [{ type: "text", text: message.content }],
-    details: { status: message.status },
+    details: message.toolName === "todo" && isRecord(message.details)
+      ? message.details
+      : { status: message.status },
     isError: message.status !== "succeeded",
     timestamp: Date.now(),
   };
@@ -740,6 +823,27 @@ function isCompletedAssistantTail(transcript: readonly Message[]): boolean {
   return tail?.role === "assistant"
     && tail.stopReason === "stop"
     && !tail.content.some((block) => block.type === "toolCall");
+}
+
+function restoreTodoState(
+  session: CreateAgentSessionResult["session"],
+  messages: readonly Message[],
+): void {
+  for (const message of [...messages].reverse()) {
+    if (message.role !== "toolResult" || message.toolName !== "todo" || !isRecord(message.details)) continue;
+    const phases = message.details.phases;
+    if (!Array.isArray(phases) || !phases.every(isTodoPhase)) continue;
+    session.setTodoPhases(phases as Parameters<typeof session.setTodoPhases>[0]);
+    return;
+  }
+}
+
+function isTodoPhase(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.name !== "string" || !Array.isArray(value.tasks)) return false;
+  return value.tasks.every((task) => isRecord(task)
+    && typeof task.content === "string"
+    && (task.status === "pending" || task.status === "in_progress" || task.status === "completed"
+      || task.status === "abandoned" || task.status === "blocked"));
 }
 
 function toNeutralMessage(value: unknown): Message | undefined {
@@ -762,20 +866,31 @@ function toNeutralMessage(value: unknown): Message | undefined {
       toolName: value.toolName,
       content: textContent(value.content),
       status,
+      ...(value.toolName === "todo" && isJsonValue(value.details) ? { details: value.details } : {}),
     };
   }
   if (value.role === "assistant" && Array.isArray(value.content)) {
     if (value.stopReason !== "stop" && value.stopReason !== "length" && value.stopReason !== "toolUse") return undefined;
     const content: Content[] = [];
+    let reasoningContent: string | undefined;
     for (const block of value.content) {
       if (!isRecord(block) || typeof block.type !== "string") continue;
       if (block.type === "text" && typeof block.text === "string") content.push({ type: "text", text: block.text });
+      else if (block.type === "thinking" && typeof block.thinking === "string") {
+        reasoningContent = reasoningContent === undefined ? block.thinking : `${reasoningContent}\n${block.thinking}`;
+      }
       else if (block.type === "toolCall" && typeof block.id === "string" && typeof block.name === "string") {
         content.push({ type: "toolCall", id: block.id, name: block.name, arguments: asObject(block.arguments, "assistant tool arguments") });
       }
     }
     const stopReason = value.stopReason;
-    return { role: "assistant", content, stopReason, ...(value.usage === undefined ? {} : { usage: toNeutralUsage(value.usage) }) };
+    return {
+      role: "assistant",
+      content,
+      stopReason,
+      ...(reasoningContent === undefined ? {} : { reasoningContent }),
+      ...(value.usage === undefined ? {} : { usage: toNeutralUsage(value.usage) }),
+    };
   }
   return undefined;
 }
@@ -805,11 +920,14 @@ function toNeutralUsage(value: unknown): AssistantMessage["usage"] {
 }
 
 function toOmpAssistant(message: AssistantMessage, model: OmpModel): OmpAssistantMessage {
+  const reasoning = message.reasoningContent === undefined
+    ? []
+    : [{ type: "thinking" as const, thinking: message.reasoningContent, thinkingSignature: "reasoning_content" }];
   return {
     role: "assistant",
-    content: message.content.map((block) => block.type === "text"
+    content: [...reasoning, ...message.content.map((block) => block.type === "text"
       ? { type: "text", text: block.text }
-      : { type: "toolCall", id: block.id, name: block.name, arguments: block.arguments }),
+      : { type: "toolCall", id: block.id, name: block.name, arguments: block.arguments })],
     api: CUSTOM_API,
     provider: model.provider,
     model: model.id,
@@ -845,8 +963,16 @@ function assertModelResponseMatchesDeltas(
   message: AssistantMessage,
 ): void {
   if (deltas.length === 0) return;
+  const reasoning = deltas
+    .filter((delta): delta is Extract<ModelDelta, { type: "reasoning" }> => delta.type === "reasoning")
+    .map((delta) => delta.text)
+    .join("");
+  if (reasoning.length > 0 && message.reasoningContent !== reasoning) {
+    throw new Error("OMP model reasoning delta mismatch");
+  }
   const fragments = new Map<number, { type: ModelDelta["type"]; text: string; id?: string; name?: string }>();
   for (const delta of deltas) {
+    if (delta.type === "reasoning") continue;
     const current = fragments.get(delta.contentIndex);
     if (delta.type === "text") {
       if (current !== undefined && current.type !== "text") throw new Error("OMP model delta content type mismatch");
@@ -941,6 +1067,14 @@ function asObject(value: unknown, name: string): { readonly [key: string]: JsonV
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (isRecord(value)) return Object.values(value).every(isJsonValue);
+  return false;
 }
 
 function renderJson(value: JsonValue): string {

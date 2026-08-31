@@ -2,6 +2,10 @@
 name: general-assistant-chat
 version: 0.1.0
 allowed_tools:
+  - todo
+  - chat.emit_page
+  - chat.emit_document
+  - workdir.read_file
 forbidden_tools:
   - reimbursement.submit
   - erp.collection_task.create_draft

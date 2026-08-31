@@ -44,7 +44,7 @@ jobs:
       - name: Audit Python dependencies
         run: uv run pip-audit --progress-spinner off
 
-      - name: Verify public-preview boundary
+      - name: Verify public release boundary
         run: npm run release:verify
 
       - name: Typecheck
@@ -62,9 +62,9 @@ jobs:
       - name: Run Python tests
         run: uv run pytest -q
 
-  preview:
+  product:
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -75,6 +75,17 @@ jobs:
           node-version: "22.19.0"
           cache: npm
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare managed business dependencies
+        run: |
+          python -m pip install uv
+          uv python install 3.12
+          uv sync --locked --extra dev
+
       - name: Install JavaScript dependencies
         run: npm ci
 
@@ -83,13 +94,10 @@ jobs:
           ANNA_OMP_BUN_ARCHIVE_URL: https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip
         run: npm run harness:omp:prepare
 
-      - name: Install Preview test browser
-        run: npx --no-install playwright install chromium
+      - name: Run original product launcher and UI regressions
+        run: npm run frontend:product-smoke
 
-      - name: Run Preview launcher and UI regressions
-        run: npm run frontend:preview-smoke
-
-      - name: Build the macOS arm64 Preview application
+      - name: Build the macOS arm64 product application
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run desktop:package -- --publish never

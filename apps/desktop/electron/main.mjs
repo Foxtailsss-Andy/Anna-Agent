@@ -29,9 +29,9 @@ async function createWindow() {
     userDataPath: app.getPath("userData"),
     onExit: ({ code, signal, stderr }) => {
       const reason = code === null ? `signal ${signal}` : `code ${code}`;
-      console.error(`Anna Preview Host exited with ${reason}`);
+      console.error(`Anna Product Host exited with ${reason}`);
       showRuntimeFailure({
-        message: `Anna Preview Host exited with ${reason}`,
+        message: `Anna Product Host exited with ${reason}`,
         details: stderr,
       });
     },
@@ -114,7 +114,7 @@ function createRuntimeFailureWindow(error) {
     height: 640,
     minWidth: 760,
     minHeight: 520,
-    title: "Anna Preview 启动失败",
+    title: "Anna 启动失败",
     ...(appIconPath && existsSync(appIconPath) ? { icon: appIconPath } : {}),
     backgroundColor: "#f7f8fa",
   });

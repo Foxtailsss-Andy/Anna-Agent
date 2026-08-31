@@ -33,6 +33,8 @@ export interface Usage {
 
 export interface AssistantMessage {
   readonly role: "assistant";
+  /** Provider-neutral spelling of DeepSeek/OpenAI-compatible reasoning_content. */
+  readonly reasoningContent?: string;
   readonly content: readonly Content[];
   readonly stopReason: "stop" | "length" | "toolUse";
   readonly usage?: Usage;
@@ -47,11 +49,15 @@ export type Message =
       readonly toolName: string;
       readonly content: string;
       readonly status: "succeeded" | "failed" | "unknown";
+      /** Serializable details such as the native OMP TodoTool phases snapshot. */
+      readonly details?: JsonValue;
     };
 
 export interface ModelContext {
   readonly systemPrompt: string;
   readonly messages: readonly Message[];
+  /** Frozen admitted tool definitions for this model request. */
+  readonly tools?: readonly ToolDefinition[];
 }
 
 export interface RestoreProjection {
@@ -119,6 +125,7 @@ export function projectRestoreTranscript(transcript: readonly Message[]): Restor
 }
 
 export type ModelDelta =
+  | { readonly type: "reasoning"; readonly text: string }
   | { readonly type: "text"; readonly contentIndex: number; readonly text: string }
   | {
       readonly type: "toolCall";
@@ -140,6 +147,8 @@ export interface StartInput {
   readonly allowedTools: readonly ToolDefinition[];
   readonly snapshotDigest: string;
   readonly originalExecutionFingerprint: JsonValue;
+  /** Fresh-run conversation seed, snapshotted separately from restore transcript. */
+  readonly initialMessages?: readonly Message[];
   readonly transcript?: readonly Message[];
 }
 
@@ -166,6 +175,7 @@ export type WorkerFrame =
 export type HostFrame =
   | (FrameBase & { readonly kind: "start"; readonly workerSeq: -1; readonly input: StartInput })
   | (FrameBase & { readonly kind: "receipt"; readonly forFrameId: string; readonly accepted: true; readonly throughWorkerSeq: number })
+  | (FrameBase & { readonly kind: "steer"; readonly message: { readonly role: "user"; readonly content: string } })
   | (FrameBase & { readonly kind: "model.delta"; readonly index: number; readonly delta: ModelDelta })
   | (FrameBase & { readonly kind: "model.end"; readonly index: number; readonly message: AssistantMessage })
   | (FrameBase & { readonly kind: "model.error"; readonly index: number; readonly code: "transport_failed" | "budget_exhausted" | "cancelled" | "protocol_failed" })
@@ -196,6 +206,13 @@ export function parseHostFrame(value: unknown): HostFrame {
       assertSafeNonnegativeInteger(record.throughWorkerSeq, "throughWorkerSeq");
       assertWorkerSeq(record.workerSeq);
       return { ...record, kind: "receipt", forFrameId: record.forFrameId, accepted: true, throughWorkerSeq: record.throughWorkerSeq } as HostFrame;
+    case "steer": {
+      assertKeys(record, [...BASE_KEYS, "message"]);
+      assertWorkerSeq(record.workerSeq);
+      const message = parseMessage(record.message);
+      if (message.role !== "user") throw new Error("steer message must be a user message");
+      return { ...record, kind: "steer", message } as HostFrame;
+    }
     case "model.delta":
       assertKeys(record, [...BASE_KEYS, "index", "delta"]);
       assertSafeNonnegativeInteger(record.index, "model delta index");
@@ -309,6 +326,7 @@ function parseStartInput(value: unknown): StartInput {
   const record = asRecord(value);
   assertKeys(record, [
     "systemPrompt", "goal", "modelId", "allowedTools", "snapshotDigest", "originalExecutionFingerprint",
+    ...(Object.hasOwn(record, "initialMessages") ? ["initialMessages"] : []),
     ...(Object.hasOwn(record, "transcript") ? ["transcript"] : []),
   ]);
   assertString(record.systemPrompt, "system prompt");
@@ -318,8 +336,12 @@ function parseStartInput(value: unknown): StartInput {
   assertJsonValue(record.originalExecutionFingerprint);
   if (!Array.isArray(record.allowedTools)) throw new Error("allowedTools must be an array");
   const allowedTools = record.allowedTools.map(parseToolDefinition);
+  const initialMessages = Object.hasOwn(record, "initialMessages")
+    ? parseMessageArray(record.initialMessages, "initialMessages")
+    : undefined;
   if (Object.hasOwn(record, "transcript")) {
-    if (!Array.isArray(record.transcript) || record.transcript.length === 0) throw new Error("transcript must be a non-empty array");
+    const transcript = parseMessageArray(record.transcript, "transcript");
+    if (transcript.length === 0) throw new Error("transcript must be a non-empty array");
     return {
       systemPrompt: record.systemPrompt,
       goal: record.goal,
@@ -327,10 +349,24 @@ function parseStartInput(value: unknown): StartInput {
       allowedTools,
       snapshotDigest: record.snapshotDigest,
       originalExecutionFingerprint: record.originalExecutionFingerprint,
-      transcript: record.transcript.map(parseMessage),
+      ...(initialMessages === undefined ? {} : { initialMessages }),
+      transcript,
     };
   }
-  return { systemPrompt: record.systemPrompt, goal: record.goal, modelId: record.modelId, allowedTools, snapshotDigest: record.snapshotDigest, originalExecutionFingerprint: record.originalExecutionFingerprint };
+  return {
+    systemPrompt: record.systemPrompt,
+    goal: record.goal,
+    modelId: record.modelId,
+    allowedTools,
+    snapshotDigest: record.snapshotDigest,
+    originalExecutionFingerprint: record.originalExecutionFingerprint,
+    ...(initialMessages === undefined ? {} : { initialMessages }),
+  };
+}
+
+function parseMessageArray(value: unknown, name: string): Message[] {
+  if (!Array.isArray(value)) throw new Error(`${name} must be an array`);
+  return value.map(parseMessage);
 }
 
 function parseToolDefinition(value: unknown): ToolDefinition {
@@ -343,10 +379,20 @@ function parseToolDefinition(value: unknown): ToolDefinition {
 
 function parseContext(value: unknown): ModelContext {
   const record = asRecord(value);
-  assertKeys(record, ["systemPrompt", "messages"]);
+  assertKeys(record, ["systemPrompt", "messages", ...(Object.hasOwn(record, "tools") ? ["tools"] : [])]);
   assertString(record.systemPrompt, "context system prompt");
   if (!Array.isArray(record.messages)) throw new Error("context messages must be an array");
-  return { systemPrompt: record.systemPrompt, messages: record.messages.map(parseMessage) };
+  const tools = Object.hasOwn(record, "tools") ? parseToolDefinitionArray(record.tools) : undefined;
+  return {
+    systemPrompt: record.systemPrompt,
+    messages: record.messages.map(parseMessage),
+    ...(tools === undefined ? {} : { tools }),
+  };
+}
+
+function parseToolDefinitionArray(value: unknown): ToolDefinition[] {
+  if (!Array.isArray(value)) throw new Error("context tools must be an array");
+  return value.map(parseToolDefinition);
 }
 
 function parseMessage(value: unknown): Message {
@@ -359,25 +405,44 @@ function parseMessage(value: unknown): Message {
   }
   if (record.role === "assistant") return parseAssistant(record);
   if (record.role === "toolResult") {
-    assertKeys(record, ["role", "toolCallId", "toolName", "content", "status"]);
+    assertKeys(record, ["role", "toolCallId", "toolName", "content", "status", ...(Object.hasOwn(record, "details") ? ["details"] : [])]);
     assertIdentifier(record.toolCallId, "toolCallId");
     assertIdentifier(record.toolName, "toolName");
     assertString(record.content, "tool result content");
     assertEnum(record.status, ["succeeded", "failed", "unknown"], "tool result status");
-    return { role: "toolResult", toolCallId: record.toolCallId, toolName: record.toolName, content: record.content, status: record.status };
+    const details = record.details;
+    if (Object.hasOwn(record, "details")) assertJsonValue(details);
+    const parsedDetails = Object.hasOwn(record, "details") ? details as JsonValue : undefined;
+    return {
+      role: "toolResult",
+      toolCallId: record.toolCallId,
+      toolName: record.toolName,
+      content: record.content,
+      status: record.status,
+      ...(parsedDetails === undefined ? {} : { details: parsedDetails }),
+    };
   }
   throw new Error("unsupported message role");
 }
 
 export function parseAssistant(value: unknown): AssistantMessage {
   const record = asRecord(value);
-  assertKeys(record, ["role", "content", "stopReason", ...(Object.hasOwn(record, "usage") ? ["usage"] : [])]);
+  assertKeys(record, ["role", "content", "stopReason", ...(Object.hasOwn(record, "reasoningContent") ? ["reasoningContent"] : []), ...(Object.hasOwn(record, "usage") ? ["usage"] : [])]);
   if (record.role !== "assistant") throw new Error("model message must be assistant");
   if (!Array.isArray(record.content)) throw new Error("assistant content must be an array");
   assertEnum(record.stopReason, ["stop", "length", "toolUse"], "assistant stop reason");
+  const reasoningContent = record.reasoningContent;
+  if (Object.hasOwn(record, "reasoningContent")) assertString(reasoningContent, "assistant reasoning content");
+  const parsedReasoningContent = Object.hasOwn(record, "reasoningContent") ? reasoningContent as string : undefined;
   const content = record.content.map(parseContent);
   const usage = Object.hasOwn(record, "usage") ? parseUsage(record.usage) : undefined;
-  return { role: "assistant", content, stopReason: record.stopReason, ...(usage === undefined ? {} : { usage }) };
+  return {
+    role: "assistant",
+    content,
+    stopReason: record.stopReason,
+    ...(parsedReasoningContent === undefined ? {} : { reasoningContent: parsedReasoningContent }),
+    ...(usage === undefined ? {} : { usage }),
+  };
 }
 
 function parseContent(value: unknown): Content {
@@ -409,6 +474,11 @@ function parseUsage(value: unknown): Usage {
 function parseDelta(value: unknown): ModelDelta {
   const record = asRecord(value);
   assertString(record.type, "delta type");
+  if (record.type === "reasoning") {
+    assertKeys(record, ["type", "text"]);
+    assertString(record.text, "reasoning delta");
+    return { type: "reasoning", text: record.text };
+  }
   assertKeys(record, record.type === "text" ? ["type", "contentIndex", "text"] : ["type", "contentIndex", "id", "name", "argumentsDelta"]);
   assertSafeNonnegativeInteger(record.contentIndex, "delta content index");
   const contentIndex = record.contentIndex as number;

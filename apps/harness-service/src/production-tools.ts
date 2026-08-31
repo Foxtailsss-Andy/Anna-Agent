@@ -31,6 +31,8 @@ const readOnlyInputSchema: Schema<unknown> = Object.freeze({
   },
 });
 
+const workdirReadFileInputSchema = readOnlyInputSchema;
+
 const createArtifactInputSchema: Schema<unknown> = Object.freeze({
   parse(input: unknown) {
     if (
@@ -69,11 +71,35 @@ const webSearchInputSchema: Schema<unknown> = Object.freeze({
   },
 });
 
+const chatEmitPageInputSchema: Schema<unknown> = strictObjectSchema(
+  ["title", "html"],
+  ["title", "html"],
+);
+const chatEmitDocumentInputSchema: Schema<unknown> = strictObjectSchema(
+  ["title", "markdown"],
+  ["title", "markdown"],
+);
+
 const productionToolCatalog: readonly ToolDefinition[] = Object.freeze([
   Object.freeze({
     name: "read_only",
     replayPolicy: "safe" as const,
     inputSchema: readOnlyInputSchema,
+  }),
+  Object.freeze({
+    name: "workdir.read_file",
+    replayPolicy: "safe" as const,
+    inputSchema: workdirReadFileInputSchema,
+  }),
+  Object.freeze({
+    name: "chat.emit_page",
+    replayPolicy: "never" as const,
+    inputSchema: chatEmitPageInputSchema,
+  }),
+  Object.freeze({
+    name: "chat.emit_document",
+    replayPolicy: "never" as const,
+    inputSchema: chatEmitDocumentInputSchema,
   }),
   Object.freeze({
     name: "create_artifact",
@@ -96,7 +122,11 @@ export interface ProductionToolGatewayOptions {
   readonly eventStore: EventStore;
   readonly command: StartRun;
   readonly workspaceRoot: string;
+  readonly workspaceRootFor?: (command: StartRun) => string | undefined;
   readonly webSearch?: ProductionWebSearchProvider;
+  /** Product adapters may add a typed, allowlisted business tool surface. */
+  readonly dynamicTools?: readonly ToolDefinition[];
+  readonly dynamicToolCall?: (request: Parameters<ToolGateway["execute"]>[0], signal: AbortSignal) => Promise<ToolResult>;
   readonly now?: () => string;
   readonly createEventId?: () => string;
 }
@@ -119,7 +149,13 @@ export function createProductionToolGateway(
     channelId: options.command.channelId,
   };
   const allowedTools = new Set(options.command.runProfileSnapshot.allowedTools);
-  const catalog = productionToolCatalog.filter((definition) => allowedTools.has(definition.name));
+  const catalog = [
+    ...productionToolCatalog,
+    ...(options.dynamicTools ?? []),
+  ].filter((definition, index, definitions) =>
+    allowedTools.has(definition.name)
+    && definitions.findIndex((candidate) => candidate.name === definition.name) === index,
+  );
   const events = options.eventStore.scope(scope);
 
   return createToolGateway({
@@ -137,7 +173,7 @@ export function createProductionToolGateway(
     },
     sandbox: {
       async execute(request, signal): Promise<ToolResult> {
-        if (request.name !== "read_only") {
+        if (request.name !== "read_only" && request.name !== "workdir.read_file") {
           if (request.name === "create_artifact") {
             if (signal.aborted) {
               return {
@@ -151,7 +187,7 @@ export function createProductionToolGateway(
               preview: string;
             };
             return createSkillArtifact({
-              workspaceRoot: options.workspaceRoot,
+              workspaceRoot: options.workspaceRootFor?.(options.command) ?? options.workspaceRoot,
               runId: request.runId,
               input,
             });
@@ -166,6 +202,10 @@ export function createProductionToolGateway(
             const input = request.input as { query: string };
             return options.webSearch(input.query, signal);
           }
+          const dynamic = options.dynamicTools?.some((definition) => definition.name === request.name);
+          if (dynamic && options.dynamicToolCall !== undefined) {
+            return options.dynamicToolCall(request, signal);
+          }
           return {
             status: "failed",
             output: { reason: "tool_not_enabled_in_live_vertical_slice" },
@@ -173,7 +213,7 @@ export function createProductionToolGateway(
         }
         const input = request.input as { path: string };
         try {
-          const root = await realpath(options.workspaceRoot);
+          const root = await realpath(options.workspaceRootFor?.(options.command) ?? options.workspaceRoot);
           const target = resolve(root, input.path);
           const targetRelative = relative(root, target);
           if (
@@ -189,7 +229,7 @@ export function createProductionToolGateway(
             return { status: "failed", output: { reason: "read_only_path_outside_workspace" } };
           }
           const metadata = await stat(resolvedTarget);
-          if (!metadata.isFile() || metadata.size > 16_384) {
+          if (!metadata.isFile() || metadata.size > (request.name === "workdir.read_file" ? 65_536 : 16_384)) {
             return { status: "failed", output: { reason: "read_only_file_not_bounded" } };
           }
           return {
@@ -207,5 +247,25 @@ export function createProductionToolGateway(
     events,
     ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.createEventId === undefined ? {} : { createEventId: options.createEventId }),
+  });
+}
+
+function strictObjectSchema(
+  properties: readonly string[],
+  required: readonly string[],
+): Schema<unknown> {
+  const allowed = new Set(properties);
+  return Object.freeze({
+    parse(input: unknown) {
+      if (typeof input !== "object" || input === null || Array.isArray(input)) {
+        throw new Error("tool input must be an object");
+      }
+      const value = input as Record<string, unknown>;
+      if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error("tool input contains an unknown field");
+      if (required.some((key) => typeof value[key] !== "string" || (value[key] as string).trim() === "")) {
+        throw new Error("tool input is missing a required field");
+      }
+      return value;
+    },
   });
 }

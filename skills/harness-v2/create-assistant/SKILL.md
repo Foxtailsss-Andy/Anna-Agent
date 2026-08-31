@@ -2,7 +2,10 @@
 name: Harness v2 Create Assistant
 version: 0.1.0
 allowed_tools:
-  - create_artifact
+  - todo
+  - create.emit_skill_draft
+  - create.emit_prompt_draft
+  - create.emit_python_tool_draft
   - web_search
 forbidden_tools:
   - shell

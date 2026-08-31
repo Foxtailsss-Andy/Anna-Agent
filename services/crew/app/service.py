@@ -187,6 +187,9 @@ class CrewService:
             seq = self._store.next_task_sequence()
             return f"task_{seq}_{key}"
 
+        bind_scope = getattr(decomposition, "bind_scope", None)
+        if callable(bind_scope):
+            bind_scope(project_id, workspace_id, owner_user_id)
         project = decomposition.decompose(
             project_id=project_id,
             workspace_id=workspace_id,
@@ -499,6 +502,53 @@ class CrewService:
         self._redispatch_mentioned_agents(project, mentions, author_member_id, msg)
         return msg
 
+    def is_contextual_question(self, message: ChannelMessage) -> bool:
+        """Whether a member's @Anna message asks for project context.
+
+        Task intent remains an explicit draft-card flow. A question mark or a
+        direct Chinese/English question lead is enough to route ordinary
+        contextual questions to the Host; the answer is appended to this same
+        channel, so no second UI conversation is invented.
+        """
+        if not (
+            message.kind == "say"
+            and message.author_kind == "member"
+            and SYSTEM_ANNA_ACTOR_ID in message.mentions
+        ):
+            return False
+        if self.should_draft_intent(message):
+            return False
+        body = (message.body or "").strip().lower()
+        return (
+            "?" in body
+            or "？" in body
+            or body.startswith(("why ", "what ", "how ", "which ", "请问", "能否", "可以", "当前"))
+            or any(token in body for token in ("进展", "状态", "上下文", "共识", "做到哪", "下一步"))
+        )
+
+    def append_anna_message(
+        self,
+        project_id: str,
+        body: str,
+        *,
+        task_id: str | None = None,
+        run_ref: str | None = None,
+    ) -> ChannelMessage:
+        """Append a Host-produced contextual answer to the existing channel."""
+        project = self._load(project_id)
+        message = self._emit_channel(
+            project,
+            kind="say",
+            body=body,
+            task_id=task_id,
+            run_ref=run_ref,
+            author_kind="anna",
+            author_member_id=None,
+            audit_ref="",
+        )
+        self._store.save_project(project)
+        return message
+
     def _filter_mentions(self, project: CrewProject, mentions: list[str]) -> list[str]:
         """Keep only real members plus system actors (order preserved)."""
         if self._roster is None:
@@ -562,6 +612,9 @@ class CrewService:
         project = self._load(project_id)
         roster_roles = sorted({t.role_required for t in project.tasks if t.role_required})
         if self._drafter is not None:
+            bind_scope = getattr(getattr(self._drafter, "harness_runtime", None), "bind_scope", None)
+            if callable(bind_scope):
+                bind_scope(project.id, project.workspace_id, author_member_id)
             drafts = self._drafter.draft(
                 project_id=project.id,
                 goal_text=project.goal_text,
@@ -639,6 +692,9 @@ class CrewService:
         project = self._load(project_id)
         roster_roles = sorted({t.role_required for t in project.tasks if t.role_required})
         if self._drafter is not None:
+            bind_scope = getattr(getattr(self._drafter, "harness_runtime", None), "bind_scope", None)
+            if callable(bind_scope):
+                bind_scope(project.id, project.workspace_id, author_member_id)
             drafts = self._drafter.draft(
                 project_id=project.id,
                 goal_text=project.goal_text,

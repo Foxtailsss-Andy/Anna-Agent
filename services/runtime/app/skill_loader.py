@@ -6,6 +6,11 @@ from pathlib import Path
 from typing import Any
 
 
+# ``todo`` is a native Host tool. Python remains a business adapter and must
+# not advertise that Host-owned tool through its legacy skill registry.
+_HOST_NATIVE_TOOLS = frozenset({"todo"})
+
+
 class SkillLoaderError(Exception):
     def __init__(self, error_code: str, message: str) -> None:
         super().__init__(message)
@@ -57,7 +62,7 @@ class SkillLoader:
             path=skill_path,
             content=body,
             content_hash=hashlib.sha256(raw_content.encode("utf-8")).hexdigest(),
-            allowed_tools=_string_list(frontmatter.get("allowed_tools")),
+            allowed_tools=_legacy_allowed_tools(frontmatter.get("allowed_tools")),
             forbidden_tools=_string_list(frontmatter.get("forbidden_tools")),
             frontmatter=frontmatter,
         )
@@ -75,7 +80,7 @@ class SkillLoader:
             path=skill_path,
             content=body,
             content_hash=hashlib.sha256(raw_content.encode("utf-8")).hexdigest(),
-            allowed_tools=_string_list(frontmatter.get("allowed_tools")),
+            allowed_tools=_legacy_allowed_tools(frontmatter.get("allowed_tools")),
             forbidden_tools=_string_list(frontmatter.get("forbidden_tools")),
             frontmatter=frontmatter,
         )
@@ -149,3 +154,7 @@ def _string_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     raise SkillLoaderError("skill_invalid", "tool list must be a string list")
+
+
+def _legacy_allowed_tools(value: Any) -> list[str]:
+    return [tool for tool in _string_list(value) if tool not in _HOST_NATIVE_TOOLS]

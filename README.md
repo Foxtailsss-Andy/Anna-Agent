@@ -2,15 +2,15 @@
 
 ![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner-v2.png)
 
-Anna is a governed, local-first desktop AI agent. This branch delivers the **Harness-first Developer Preview**: the normal desktop entry runs one Node Harness Host and the actual Oh-my-Pi loop, with no automatic Python or Pi fallback.
+Anna is a governed, local-first desktop AI agent organized around **Home, Cowork, and Crew**. This branch preserves the existing product while moving Agent execution into one Node Harness Host and the actual Oh-my-Pi loop.
 
-- **Run a task.** Configure a provider, submit a goal, inspect real run events and the final answer, or stop execution.
-- **Read within a workspace.** Admitted read-only tools pass through the Host ToolGateway; native shell and write tools are not exposed.
-- **Keep the history.** The Host owns Run, Profile, Context/Memory, Skill, SQLite events, and Contract Eval.
+- **Home:** personal conversations, task execution, and creation of Skills, prompts, and Python-tool artifacts in the original shared work surface.
+- **Cowork:** business dashboards, Hiker MCP assistance, and existing reimbursement workflows.
+- **Crew:** project graphs, channels, contextual Anna, specialist Workers, artifacts, review, and confirmed project Memory.
 
-This is a deliberately narrow release. Crew, Create, Cowork, Hub, and Hiker/MCP business operations remain outside the default Preview. Their prior source and data are retained; their migration is tracked in the [community backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md).
+The migration replaces Agent execution authority, while retaining business state machines, interfaces, and data. Python may serve identity, business storage, and connectors without model credentials or a legacy Agent loop. Integration and live acceptance are tracked separately; a passing unit test does not establish product readiness.
 
-**Current branch: [Harness-first Preview Goal](docs/product/anna-harness-first-preview-goal-2026-08-31.md)** | macOS arm64 | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**Current branch: [Harness Product-Parity Goal](docs/product/anna-harness-product-parity-goal-2026-08-31.md)** | macOS arm64 | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 Earlier release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0), before the default Harness cutover.
 
@@ -18,7 +18,7 @@ Earlier release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy
 
 ## Product walkthrough
 
-The following is a historical product prototype, not the set of enabled Harness-first Preview surfaces.
+The walkthrough records the existing product design retained by the migration. It is not evidence of a live Harness or Hiker run.
 
 ![Anna product tour across the Create page, Cowork Hiker dashboard, and Crew workflow](docs/public/assets/demos/anna-product-tour.gif)
 
@@ -29,32 +29,34 @@ The following is a historical product prototype, not the set of enabled Harness-
 Requirements:
 
 - Node.js `>=22.19.0`
-- macOS arm64, the platform targeted by this Preview
+- Python 3.12 and `uv` for the managed business adapter
+- macOS arm64, the current desktop validation target
 
 ```bash
 npm ci
+uv sync --locked --extra dev
 ANNA_OMP_BUN_ARCHIVE_URL=https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip npm run harness:omp:prepare
 npm run desktop:run
 ```
 
-Anna opens Settings without provider credentials. Set an OpenAI-compatible model endpoint, model name, API key, and an existing workspace to run real tasks. Python is not needed for the default Preview runtime.
+Configure the provider and business connectors locally. Model credentials belong to the Node Host; the Python business adapter receives only its business configuration. Keep configuration and application state outside any Agent-readable workdir.
 
-Prepare the fixed Bun/OMP runtime once per fresh checkout. Preparation refuses to overwrite a bound runtime. The normal launcher uses the single Preview Host; the old sidecar flag is not a migration switch for this release. See [DEVELOPMENT.md](DEVELOPMENT.md) for state isolation, rollback, and retained legacy tests.
+Prepare the fixed Bun/OMP runtime once per fresh checkout. A worker source change requires a newly bound runtime. The launcher must not fall back to the old Python or Pi Agent loop. See [DEVELOPMENT.md](DEVELOPMENT.md) for configuration, state isolation, and validation.
 
 ## What you can explore
 
 | Surface | What it demonstrates |
 | --- | --- |
-| **Tasks** | Actual OMP execution, canonical lifecycle/tool/final-answer events, stop, and explicit provider failure states. |
-| **Settings** | Local model/endpoint/key/workspace configuration; no key returned by the API. |
-| **History** | Completed Runs and canonical events from the same SQLite state after reopening. |
-| **Harness** | Host-owned Profile/Skill/Memory preparation, read-only ToolGateway, and Eval before terminal state. |
+| **Home** | Chat/Create, shared LoopCard, workdirs, files/canvas, history, execution controls, and Trace. |
+| **Cowork** | Deterministic Hiker dashboards, an Agent assistant, and existing business approval workflows. |
+| **Crew** | Graph x Channel x Memory, assignment, Worker execution, artifact versions, review, and Showcase. |
+| **Harness** | OMP model/tool iteration with Host-owned context, permissions, Memory, canonical events, and Eval. |
 
-Event streaming reports real lifecycle and final-message events; this version does not promise token-by-token text streaming. Deterministic tests are not evidence of a live provider call.
+Each surface is subject to the current Goal's live acceptance gates. Deterministic tests and demonstration fixtures are not evidence of a live provider or external business operation.
 
-## Earlier product work: channels and business systems
+## Channels and business systems
 
-The following collaboration and business workflows remain disabled in the default Preview while migration continues.
+These workflows are part of the product-preservation contract.
 
 Channels are Anna's collaboration layer. A channel keeps people, Anna, and specialist Agents aligned around the same tasks, active Runs, artifacts, mentions, review decisions, and project history. A message can add context, steer an active execution, request a person or Agent, or return the team to the exact task and artifact under discussion.
 
@@ -62,9 +64,9 @@ MCP is Anna's external-system boundary. Anna can use MCP connectors to retrieve 
 
 ## How work moves through Anna
 
-The Preview path is `Desktop -> Node Harness Host -> actual OMP -> Host model transport / ToolGateway -> Contract Eval -> terminal event`. Its completed history comes from the same event store. Memory and tools load under Harness authority.
+The Agent path is `Home / Cowork / Crew -> product adapter -> Node Harness Host -> actual OMP -> Host model transport / ToolGateway -> Contract Eval -> terminal event`. Business CRUD and connector operations retain their existing domain services. Agent history, Memory loading, and model/tool authority belong to the Harness.
 
-The longer-term enterprise workflow below includes approvals and business surfaces that are not enabled in this Preview:
+The product workflow retains explicit approval and review boundaries:
 
 ```mermaid
 flowchart LR
@@ -87,7 +89,7 @@ The shared runtime is organized around three durable foundations:
 
 When configuration is missing or a connector is unavailable, the state remains visible and recoverable. Anna does not convert an unavailable dependency into a successful result.
 
-## Earlier product work: Crew
+## Crew
 
 Crew turns multi-person work from a message stream into an observable project graph:
 
@@ -114,7 +116,7 @@ Harness v2 focuses on recoverability and evidence quality:
 | **Trace / Eval** | Link context, model calls, tools, approvals, retries, and terminal evidence. |
 | **Scheduler / fencing** | Establish controlled proactive runs, ownership, recovery, and duplicate-execution protection. |
 
-The Preview exposes Harness through the normal desktop entry. Domain-level migration for Create, Cowork, Crew, and Hub remains follow-up work; old Python sources do not run as a fallback.
+The current migration covers the existing Home, Cowork, and Crew Agent paths, including less visible drafting and matching calls. The separate Preview panel is not the product entry. Old Python Agent execution must not act as a fallback.
 
 ## Longer-term design
 
@@ -148,23 +150,23 @@ npm run desktop:package
 npm run desktop:smoke-asar
 ```
 
-CI runs deterministic gates without a private provider, local runtime state, or signing identity. Python is retained for legacy regression coverage only. A real provider smoke is recorded separately and is never inferred from passing fixture tests.
+CI runs deterministic gates without a private provider, local runtime state, or signing identity. Python tests cover the retained business services and the disabled legacy-execution boundary. Real provider and Hiker evidence is recorded separately and is never inferred from fixture tests.
 
 ## Developer Preview boundary
 
 This release is useful for:
 
-- running the default Harness-first task path;
+- preserving the original Home, Cowork, and Crew workflows while migrating their Agent execution;
 - connecting one OpenAI-compatible provider locally;
-- using admitted read-only workspace tools, stop, and persistent history;
+- validating scoped tools, execution controls, persistent history, and contextual collaboration;
 - contributing scoped improvements from the community backlog;
 - iterating from real traces and failure cases.
 
 This release does not claim:
 
 - production readiness or a hosted cloud runtime;
-- full business migration, Crew/Create/Cowork/Hub, or Hiker/MCP execution;
-- complete coding tools, interactive steer/ask-human controls, or SWE-bench results;
+- an externally enabled Hiker write capability when the connected server exposes only reads;
+- unrestricted coding tools, exhaustive recovery coverage, or SWE-bench results;
 - production Review-to-Validated-Patch approval;
 - guaranteed external WebSearch or MCP availability;
 - signed and notarized macOS installers;
@@ -172,7 +174,7 @@ This release does not claim:
 
 ## External project boundary
 
-**Hiker** is an external ERP project for small teams. The retained Anna-side MCP integration is prior product work and is not enabled in the default Harness-first Preview.
+**Hiker** is an external ERP project for small teams. Anna preserves its Hiker dashboard and MCP integration. Actual read/write capability depends on the connected server and granted permissions; a read-only server cannot satisfy write acceptance.
 
 Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). The Hiker platform, server source, deployment, and business data are not included in this repository, and Hiker is not currently open source. Anna's MIT License applies only to the Anna-side MCP connector, UI integration, and other files committed here; it does not extend to Hiker.
 
@@ -184,7 +186,7 @@ This GitHub repository was created on April 2, 2026 to plan the Anna project. As
 
 For deeper project and release detail, see:
 
-- [Current Preview Goal and release gates](docs/product/anna-harness-first-preview-goal-2026-08-31.md)
+- [Current product-parity Goal and release gates](docs/product/anna-harness-product-parity-goal-2026-08-31.md)
 - [Community backlog and capability boundaries](docs/product/anna-harness-first-community-backlog-2026-08-31.md)
 - [Harness-first SPEC and acceptance gates - 2026-08-30](docs/product/anna-harness-first-spec-2026-08-30.md)
 - [Harness-first update: delivered scope, verification and open work](docs/product/anna-harness-first-update-2026-08-30.md)

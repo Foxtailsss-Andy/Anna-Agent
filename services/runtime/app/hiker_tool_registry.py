@@ -121,6 +121,30 @@ class HikerToolRegistry:
         if tool_name not in HIKER_ALLOWED_TOOLS:
             raise PermissionError(f"tool is not available in hiker runtime: {tool_name}")
 
+    def validate_arguments(self, tool_name: str, arguments: dict) -> None:
+        """Apply the local typed schema before crossing the Hiker connector.
+
+        Hiker's ``tools/list`` currently omits useful input schemas, so the
+        pinned registry remains the authority for admitted argument names and
+        required fields. This also keeps a model/Host payload from smuggling an
+        arbitrary SQL/API operation through a known tool route.
+        """
+        self.assert_allowed(tool_name)
+        if not isinstance(arguments, dict):
+            raise ValueError("hiker tool arguments must be an object")
+        schema = _input_schema(tool_name)
+        properties = schema.get("properties", {})
+        unknown = sorted(set(arguments) - set(properties))
+        if unknown:
+            raise ValueError(
+                f"unknown arguments for {tool_name}: {', '.join(unknown)}"
+            )
+        missing = [key for key in schema.get("required", []) if key not in arguments]
+        if missing:
+            raise ValueError(
+                f"missing arguments for {tool_name}: {', '.join(missing)}"
+            )
+
     def _model_visible_tool_names(self, skill: LoadedSkill | None) -> list[str]:
         tool_names = set(HIKER_ALLOWED_TOOLS)
         if skill is not None:

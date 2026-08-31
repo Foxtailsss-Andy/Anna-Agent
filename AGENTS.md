@@ -18,8 +18,8 @@
 ## Local development
 
 - Preview configuration and state must remain separate from legacy `.anna/runtime.json` and Python databases. `.anna/` must stay out of Git; never print credentials.
-- The normal Preview desktop shell starts one Node Harness Host with the verified Oh-my-Pi runtime. It must not start or fall back to the Python Agent backend. Normal launch: `npm run desktop:run`.
-- The current scope is `docs/product/anna-harness-first-preview-goal-2026-08-31.md`. Hiker/MCP business writes and unmigrated legacy surfaces stay closed in this Preview.
+- The normal desktop shell preserves Home/Cowork/Crew and uses one Node Harness Host with the verified Oh-my-Pi runtime. It must not fall back to a Python Agent loop. A managed pure business API/connector process may remain without model credentials or Agent execution authority. Normal launch: `npm run desktop:run`.
+- The current scope is `docs/product/anna-harness-product-parity-goal-2026-08-31.md`. HF-PREVIEW-1.0 is superseded: do not hide existing product surfaces, reduce Create kinds, or disable Hiker business features to claim migration success.
 - Detailed setup and recovery commands are in `DEVELOPMENT.md`.
 
 ## Required validation

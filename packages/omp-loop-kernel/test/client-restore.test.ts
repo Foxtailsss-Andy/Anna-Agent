@@ -489,7 +489,10 @@ test("public worker client rejects a restored model request with mutated raw SDK
   const workerPath = join(runtimeRoot, "worker.ts");
   const workerSource = await readFile(workerPath, "utf8");
   const withMutatedContext = workerSource.replace(
-    `const frame = this.makeFrame("model.request", { modelId, context }, requestId);`,
+    `const frame = this.makeFrame("model.request", {
+      modelId,
+      context: exposeToolDefinitions ? { ...context, tools: this.input?.allowedTools ?? [] } : context,
+    }, requestId);`,
     `const frame = this.makeFrame("model.request", {
       modelId,
       context: {

@@ -19,6 +19,11 @@ export interface DurableHarnessV2RuntimeOptions {
   readonly kernel: LoopKernel;
   readonly profile: ResolvedRunProfile;
   readonly surfaceProfiles?: Partial<Record<V2SurfaceId, ResolvedRunProfile>>;
+  readonly profileFor?: (
+    surfaceId: V2SurfaceId,
+    body: unknown,
+    fallback: ResolvedRunProfile,
+  ) => ResolvedRunProfile;
   readonly surfaces: readonly V2SurfaceId[];
   readonly evidenceMode?: HarnessV2Runtime["evidenceMode"];
   readonly permissionScope?: string;
@@ -69,7 +74,11 @@ export function createDurableHarnessV2Runtime(
         const command = commandFromRequest(
           surfaceId,
           body,
-          options.surfaceProfiles?.[surfaceId] ?? options.profile,
+          options.profileFor?.(
+            surfaceId,
+            body,
+            options.surfaceProfiles?.[surfaceId] ?? options.profile,
+          ) ?? options.surfaceProfiles?.[surfaceId] ?? options.profile,
           permissionScope,
         );
         await options.validateStartCommand?.(command);
@@ -112,6 +121,30 @@ export function createDurableHarnessV2Runtime(
         return outcome === undefined
           ? undefined
           : { status: outcome.status };
+      });
+    },
+    steer(workspaceId, channelId, runId, content) {
+      return track(async () => {
+        const scope: ChannelScope = {
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        };
+        if (await options.eventStore.scope(scope).getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
+        await options.kernel.steer(runId as never, { ...scope, content });
+      });
+    },
+    answer(workspaceId, channelId, runId, content) {
+      return track(async () => {
+        const scope: ChannelScope = {
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        };
+        if (await options.eventStore.scope(scope).getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
+        await options.kernel.answer(runId as never, { content });
       });
     },
     readEvents(workspaceId, channelId, runId, fromSeq = -1) {

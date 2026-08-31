@@ -22,22 +22,23 @@
 | 权限 | **permission mode**（readonly / ask / contained-write / full）；审批 = **human-in-the-loop** | ADLC 原文 "Permissioned: graduated access escalation" |
 | 给 agent 看的运行时仪表 | **agent-facing telemetry** | ADLC 原文 "giving agents the same observability they have in production" |
 
-## 2. Harness-first Preview 默认链路（2026-08-31）
+## 2. Harness-first 产品边界（2026-08-31）
 
-本分支的当前交付范围以 [HF-PREVIEW-1.0](docs/product/anna-harness-first-preview-goal-2026-08-31.md) 为准。
+本分支以 [HF-PARITY-1.0](docs/product/anna-harness-product-parity-goal-2026-08-31.md) 为当前交付范围。Home、Cowork、Crew 的既定功能与界面保留，Agent 执行权迁移到 Harness。接入实现及验收证据见 Goal，以下定义所有权。
 
-| # | 跳 | 所有权 |
-|---|---|---|
-| 1 | Desktop → Node Preview Host | 默认启动单一 Harness Host；不启动 Python Agent，不做 Pi/Python fallback |
-| 2 | Preview 任务界面 → `/api/preview/runs` | Host 生成受限的本地工作区/频道作用域和 Run Profile；先持久化再执行 |
-| 3 | Host Context/Skill/Memory preparation → 实际 Oh-my-Pi | Harness 固定输入、预算与资源快照，OMP 拥有模型/工具循环 |
-| 4 | OMP → Host model transport / ToolGateway | 凭据留在 Host；仅暴露本版准入的只读工作区工具 |
-| 5 | Canonical events → SSE / SQLite history | 界面展示真实事件；重连只读取，不重新创建 Run |
-| 6 | Contract Eval → 唯一终态 | 停止通过该 Run 的 Host AbortController；结果与历史来自同一事件源 |
+| 概念 | 所有权 |
+|---|---|
+| Home | 个人对话、任务和创建产物的统一工作面，保留共享 LoopCard、历史、文件、执行控制和 Trace |
+| Cowork | 确定性业务看板、业务助手和审批流程；真实业务事实来自连接器 |
+| Crew | 项目 Graph、Channel、Memory，以及已有指派、产物、评审和协作规则 |
+| Harness Host | 唯一 Agent 执行 authority，拥有 Run/Profile、上下文、Memory 装载、权限、持久化事件与终态 |
+| Oh-my-Pi | Harness 中的模型/工具循环执行器，根据实际上下文判断下一步，通过受控工具执行 |
+| Business Adapter | 复用身份、业务 CRUD、状态机和连接器；无模型凭据、无旧 Agent Loop，不独立完成 Agent 任务 |
+| Product Projection | 将规范事件映射为已有界面的结果、过程、历史与产物视图；不产生第二个 Agent 事实源 |
 
-完整业务迁移、交互控制和多平台工作列在 [社区 Backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md)。下节保留旧实现的术语和证据映射，不代表 Preview 的默认运行链路。
+原有 Home/Cowork/Crew 的功能保真属于当前 Goal；穷尽恢复组合、多平台和 Benchmark 等后续工作见 [社区 Backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md)。下节只保留旧实现的历史术语和证据映射。
 
-### 2.1 Legacy Python 九跳链路（非 Preview 默认入口）
+### 2.1 Legacy Python 九跳链路（历史执行实现）
 
 | # | 跳 | 模块 · 位置 |
 |---|---|---|

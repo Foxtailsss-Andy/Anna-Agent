@@ -36,18 +36,24 @@ test("drives an actual OMP model/tool/model turn through the Host client", async
   const modelRequests: HostModelResponse[] = [
     {
       deltas: [
+        { type: "reasoning", text: "I need the release notes before answering." },
         { type: "toolCall", contentIndex: 0, id: "tool-call-1", name: "read_only", argumentsDelta: '{"path":"release-notes.md"}' },
       ],
       message: {
         role: "assistant",
+        reasoningContent: "I need the release notes before answering.",
         content: [{ type: "toolCall", id: "tool-call-1", name: "read_only", arguments: { path: "release-notes.md" } }],
         stopReason: "toolUse",
       },
     },
     {
-      deltas: [{ type: "text", contentIndex: 0, text: "Release notes are ready." }],
+      deltas: [
+        { type: "reasoning", text: "The file confirms the release is ready." },
+        { type: "text", contentIndex: 0, text: "Release notes are ready." },
+      ],
       message: {
         role: "assistant",
+        reasoningContent: "The file confirms the release is ready.",
         content: [{ type: "text", text: "Release notes are ready." }],
         stopReason: "stop",
       },
@@ -95,6 +101,10 @@ test("drives an actual OMP model/tool/model turn through the Host client", async
       },
       modelTransport: async function* (context) {
         if (modelRequests.length === 1) {
+          expect(context.messages[1]).toMatchObject({
+            role: "assistant",
+            reasoningContent: "I need the release notes before answering.",
+          });
           expect(context.messages.at(-1)).toMatchObject({ role: "toolResult", status: "succeeded" });
           expect(context.messages.at(-1)?.content).toContain("release notes content");
         }
@@ -121,6 +131,13 @@ test("drives an actual OMP model/tool/model turn through the Host client", async
       "message_end",
       "turn_end",
     ]));
+    const assistantMessages = result.observations
+      .filter((event) => event.type === "message_end" && event.message.role === "assistant")
+      .map((event) => event.message);
+    expect(assistantMessages.map((message) => message.reasoningContent)).toEqual([
+      "I need the release notes before answering.",
+      "The file confirms the release is ready.",
+    ]);
   } finally {
     store.close();
     await rm(container, { recursive: true, force: true });

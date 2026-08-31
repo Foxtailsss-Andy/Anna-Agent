@@ -10,6 +10,8 @@ from fastapi.responses import StreamingResponse
 
 from services.chat.app.orchestrator import ChatOrchestrator, ChatRunNotFoundError
 from services.chat.app.schemas import ChatRun
+from services.business.harness_client import HarnessHostClient, HarnessHostError, HarnessRun, ProductTask, result_payload
+from services.reimbursement.app.audit import AuditEvent
 from services.runtime.app.autocompact import clear_autocompact_tracker
 from services.runtime.app.concurrency import WorkspaceRunGate
 from services.runtime.app.frame_journal import FrameJournal
@@ -18,6 +20,7 @@ from services.runtime.app.interjections import (
     clear_interjections,
     push_interjection,
 )
+from services.runtime.app.trace_assembler import assemble_host_trace
 
 from ..schemas import (
     CreateChatRunRequest,
@@ -520,9 +523,87 @@ class BackgroundRunManager:
         return self._store.list_frames(_CHAT_SURFACE, run_id, from_seq)
 
 
-def build_router(chat: ChatOrchestrator) -> APIRouter:
+def build_router(
+    chat: ChatOrchestrator,
+    *,
+    harness_client: HarnessHostClient | None = None,
+    product_mode: bool = False,
+) -> APIRouter:
     router = APIRouter()
     manager = BackgroundRunManager(chat)
+    host_run_ids: dict[str, str] = {}
+
+    def _require_host() -> HarnessHostClient:
+        if not product_mode or harness_client is None:
+            raise HTTPException(status_code=503, detail="Harness Host is not configured")
+        return harness_client
+
+    def _task_for_run(run: ChatRun) -> ProductTask:
+        resolved = chat.build_host_inputs(run)
+        messages = resolved.request.messages
+        system_prompt = next(
+            (
+                message.get("content")
+                for message in messages
+                if message.get("role") == "system" and isinstance(message.get("content"), str)
+            ),
+            "",
+        )
+        user_messages = [
+            message
+            for message in messages
+            if message.get("role") == "user" and isinstance(message.get("content"), str)
+        ]
+        prompt = str(user_messages[-1]["content"]) if user_messages else run.message
+        conversation_history = [
+            {
+                "role": message["role"],
+                "content": message["content"],
+            }
+            for message in messages
+            if message.get("role") in {"user", "assistant"}
+            and isinstance(message.get("content"), str)
+        ][:-1]
+        # plan.update is a Python-era bookkeeping tool. Product OMP owns the
+        # equivalent native TodoTool; only formal Chat deliverables and the
+        # scoped workdir reader cross the business callback boundary.
+        tool_catalog = [
+            dict(tool)
+            for tool in resolved.request.tools
+            if tool.get("name") in {"chat.emit_page", "chat.emit_document", "workdir.read_file"}
+        ]
+        return ProductTask(
+            run_id=run.id,
+            workspace_id=run.workspace_id,
+            actor_user_id=run.actor_user_id,
+            surface="chat",
+            prompt=prompt,
+            channel_id=f"chat_channel:{run.workspace_id}",
+            conversation_id=run.thread_id,
+            system_prompt=system_prompt,
+            context={
+                "template_id": run.template_id,
+                "skill_id": resolved.skill_id,
+                "agent_id": run.agent_id,
+                "workdir_id": run.workdir_id,
+                "model_profile_id": run.model_profile_id,
+                "tool_catalog": tool_catalog,
+                "conversation_history": conversation_history,
+                "skill_provenance": {
+                    "source": "anna-python-skill-loader",
+                    "uri": resolved.skill.path.as_uri(),
+                    "skill_id": resolved.skill_id,
+                    "version": resolved.skill.version,
+                    "content_hash": resolved.skill.content_hash,
+                },
+                "agent_directive": resolved.agent_directive,
+                "source": "home.chat",
+            },
+            workdir_path=resolved.workdir_root,
+            permission_mode="readonly",
+            model_profile_id=run.model_profile_id,
+            source_event_id=run.id,
+        )
 
     @router.get("/api/chat/prompt-templates")
     def get_chat_prompt_templates(
@@ -556,17 +637,37 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
             anna_workspace_id,
             anna_user_id,
         )
-        run = chat.start_run(
-            workspace_id=request.workspace_id,
-            actor_user_id=request.actor_user_id,
-            message=request.message,
-            template_id=request.template_id,
-            model_profile_id=request.model_profile_id,
-            skill_id=request.skill_id,
-            agent_id=request.agent_id,
-            workdir_id=request.workdir_id,
-            thread_id=request.thread_id,
-        )
+        if product_mode:
+            run = chat.create_run(
+                workspace_id=request.workspace_id,
+                actor_user_id=request.actor_user_id,
+                message=request.message,
+                template_id=request.template_id,
+                model_profile_id=request.model_profile_id,
+                skill_id=request.skill_id,
+                agent_id=request.agent_id,
+                workdir_id=request.workdir_id,
+                thread_id=request.thread_id,
+            )
+            try:
+                host_run = _require_host().submit_and_wait(_task_for_run(run))
+                host_run_ids[run.id] = host_run.run_id
+            except HarnessHostError as exc:
+                _apply_chat_host_failure(chat, run, exc.code or "harness_request_failed")
+            else:
+                _apply_chat_host_run(chat, run, host_run)
+        else:
+            run = chat.start_run(
+                workspace_id=request.workspace_id,
+                actor_user_id=request.actor_user_id,
+                message=request.message,
+                template_id=request.template_id,
+                model_profile_id=request.model_profile_id,
+                skill_id=request.skill_id,
+                agent_id=request.agent_id,
+                workdir_id=request.workdir_id,
+                thread_id=request.thread_id,
+            )
         return run.model_dump()
 
     @router.get("/api/chat/runs")
@@ -575,6 +676,14 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
     ) -> list[dict]:
         _assert_workspace_access(anna_workspace_id, anna_workspace_id, anna_user_id)
+        if product_mode:
+            # Host history is the runtime fact source. The local registry still
+            # contributes compatibility metadata for runs created by this
+            # process; terminal fields are refreshed on GET/stream.
+            return [
+                run.model_dump(mode="json")
+                for run in chat.list_runs(anna_workspace_id, anna_user_id)
+            ]
         return [
             run.model_dump(mode="json")
             for run in chat.list_runs(anna_workspace_id, anna_user_id)
@@ -593,6 +702,11 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         except ChatRunNotFoundError as exc:
             raise HTTPException(status_code=404, detail="chat run not found") from exc
         _assert_run_access(run.workspace_id, run.actor_user_id, anna_workspace_id, anna_user_id)
+        if product_mode and run.status == "generating":
+            try:
+                _apply_chat_host_run(chat, run, _require_host().get(host_run_ids.get(run.id, run.id)))
+            except HarnessHostError:
+                pass
         return run.model_dump(mode="json")
 
     # 路径段比 {run_id} 更长("trace" 是第三段),与上面的详情路由不冲突。
@@ -608,6 +722,22 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         except ChatRunNotFoundError as exc:
             raise HTTPException(status_code=404, detail="chat run not found") from exc
         _assert_run_access(run.workspace_id, run.actor_user_id, anna_workspace_id, anna_user_id)
+        if product_mode:
+            try:
+                host_id = host_run_ids.get(run_id, run_id)
+                host = _require_host()
+                host_run = host.get(host_id)
+                host_events = list(host_run.events)
+                if not host_events:
+                    host_events = host.events(host_id)
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            return assemble_host_trace(
+                run_id,
+                _CHAT_SURFACE,
+                host_events,
+                conversation_id=getattr(run, "thread_id", None),
+            )
         return manager.trace(run_id, conversation_id=getattr(run, "thread_id", None))
 
     @router.post("/api/chat/runs/stream")
@@ -624,6 +754,43 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         )
 
         async def event_stream():
+            if product_mode:
+                try:
+                    run = chat.create_run(
+                        workspace_id=request.workspace_id,
+                        actor_user_id=request.actor_user_id,
+                        message=request.message,
+                        template_id=request.template_id,
+                        model_profile_id=request.model_profile_id,
+                        skill_id=request.skill_id,
+                        agent_id=request.agent_id,
+                        workdir_id=request.workdir_id,
+                        thread_id=request.thread_id,
+                    )
+                    host = _require_host()
+                    submitted = await asyncio.to_thread(host.submit, _task_for_run(run))
+                    host_run_ids[run.id] = submitted.run_id
+                    yield _json_sse({"type": "event", "event": _host_audit_event(run.id, "harness.task.submitted", {"surface": "chat"})})
+                    after_seq = -1
+                    while True:
+                        events = await asyncio.to_thread(host.events, submitted.run_id, after_seq=after_seq)
+                        for event in events:
+                            after_seq = max(after_seq, _event_seq(event))
+                            yield _json_sse(_host_event_frame(event))
+                        current = await asyncio.to_thread(host.get, submitted.run_id)
+                        if current.terminal:
+                            _apply_chat_host_run(chat, run, current)
+                            terminal_type = "done" if run.status == "ready" else "error"
+                            yield _json_sse({"type": terminal_type, "run": run.model_dump(mode="json")})
+                            return
+                        await asyncio.sleep(0.05)
+                except HarnessHostError as exc:
+                    if "run" in locals():
+                        _apply_chat_host_failure(chat, run, exc.code or "harness_request_failed")
+                        yield _json_sse({"type": "error", "run": run.model_dump(mode="json")})
+                    else:
+                        yield _json_sse({"type": "error", "message": exc.code or "harness_request_failed"})
+                return
             async for event in chat.stream_run(
                 workspace_id=request.workspace_id,
                 actor_user_id=request.actor_user_id,
@@ -645,7 +812,7 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
                     # AuditEvent so json.dumps can render it. Today's frontend
                     # ignores {"type": "event"} frames; R2 will consume them.
                     payload["event"] = inner.model_dump(mode="json")
-                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                yield _json_sse(payload)
 
         return StreamingResponse(
             event_stream(),
@@ -672,6 +839,25 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
             anna_workspace_id,
             anna_user_id,
         )
+        if product_mode:
+            run = chat.create_run(
+                workspace_id=request.workspace_id,
+                actor_user_id=request.actor_user_id,
+                message=request.message,
+                template_id=request.template_id,
+                model_profile_id=request.model_profile_id,
+                skill_id=request.skill_id,
+                agent_id=request.agent_id,
+                workdir_id=request.workdir_id,
+                thread_id=request.thread_id,
+            )
+            try:
+                submitted = _require_host().submit(_task_for_run(run))
+                host_run_ids[run.id] = submitted.run_id
+            except HarnessHostError as exc:
+                _apply_chat_host_failure(chat, run, exc.code or "harness_request_failed")
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            return {"run_id": run.id, "thread_id": run.thread_id, "status": run.status, "host_run_id": submitted.run_id}
         run = manager.submit(
             workspace_id=request.workspace_id,
             actor_user_id=request.actor_user_id,
@@ -704,8 +890,27 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
             # Frames are already JSON-safe dicts (jsonified before journaling /
             # parsed from SQLite), so they serialize directly. A dropped consumer
             # closes ONLY this generator — the background run is untouched.
+            if product_mode:
+                after_seq = from_seq
+                while True:
+                    try:
+                        host_id = host_run_ids.get(run_id, run_id)
+                        host_run = await asyncio.to_thread(_require_host().get, host_id)
+                        events = await asyncio.to_thread(_require_host().events, host_id, after_seq=after_seq)
+                    except HarnessHostError as exc:
+                        yield _json_sse({"type": "error", "message": exc.code or "harness_request_failed"})
+                        return
+                    for event in events:
+                        after_seq = max(after_seq, _event_seq(event))
+                        yield _json_sse(_host_event_frame(event))
+                    if host_run.terminal:
+                        _apply_chat_host_run(chat, run, host_run)
+                        yield _json_sse({"type": "done" if run.status == "ready" else "error", "run": run.model_dump(mode="json")})
+                        return
+                    await asyncio.sleep(0.05)
+                return
             async for frame in manager.subscribe(run_id, from_seq=from_seq):
-                yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
+                yield _json_sse(frame)
 
         return StreamingResponse(
             event_stream(),
@@ -743,6 +948,13 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         )
         # Idempotent: stopping an already-terminal run is a no-op returning its
         # status (friendlier than 409 for a stop-button race).
+        if product_mode:
+            try:
+                stopped = await asyncio.to_thread(_require_host().stop, host_run_ids.get(run_id, run_id), reason="user_stop")
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            _apply_chat_host_run(chat, run, stopped)
+            return {"run_id": run.id, "status": run.status}
         stopped = await manager.stop(run_id)
         return {"run_id": stopped.id, "status": stopped.status}
 
@@ -772,6 +984,17 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         _assert_run_access(
             run.workspace_id, run.actor_user_id, anna_workspace_id, anna_user_id
         )
+        if product_mode:
+            try:
+                accepted = await asyncio.to_thread(
+                    _require_host().signal,
+                    host_run_ids.get(run_id, run_id),
+                    kind="steer",
+                    payload={"text": text},
+                )
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            return {"run_id": run_id, "accepted": not accepted.terminal, "status": accepted.status}
         return await manager.interject(run_id, text)
 
     @router.post("/api/chat/runs/{run_id}/continue")
@@ -795,6 +1018,13 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         _assert_run_access(
             run.workspace_id, run.actor_user_id, anna_workspace_id, anna_user_id
         )
+        if product_mode:
+            try:
+                resumed = await asyncio.to_thread(_require_host().continue_run, host_run_ids.get(run_id, run_id))
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            _apply_chat_host_run(chat, run, resumed)
+            return {"run_id": run_id, "status": run.status}
         resumed = await manager.continue_run(run_id)
         return {"run_id": resumed.id, "status": resumed.status}
 
@@ -815,3 +1045,132 @@ def build_router(chat: ChatOrchestrator) -> APIRouter:
         return chat.save_result(run_id, saved_by=request.saved_by).model_dump()
 
     return router
+
+
+def _apply_chat_host_failure(
+    chat: ChatOrchestrator, run: ChatRun, error_code: str, message: str | None = None
+) -> None:
+    run.status = "failed"
+    run.error_code = error_code
+    run.error_message = message or "Harness Host did not complete the Chat task"
+    _append_host_audit(chat, run, "harness.task.failed", {"error_code": error_code})
+    chat._persist_run(run)
+
+
+def _apply_chat_host_run(
+    chat: ChatOrchestrator, run: ChatRun, host_run: HarnessRun
+) -> None:
+    result = result_payload(host_run)
+    if host_run.status in {"completed", "succeeded"}:
+        run.status = "ready"
+        answer = result.get("assistant_message")
+        if answer is None:
+            answer = result.get("answer")
+        if isinstance(answer, str):
+            run.assistant_message = answer
+        artifacts = result.get("artifacts")
+        if isinstance(artifacts, list) and all(isinstance(item, dict) for item in artifacts):
+            run.artifacts = [dict(item) for item in artifacts]
+        plan = result.get("plan")
+        if isinstance(plan, list) and all(isinstance(item, dict) for item in plan):
+            run.plan = [dict(item) for item in plan]
+        _append_host_audit(chat, run, "harness.task.completed", {"surface": "chat"})
+    elif host_run.status in {"queued", "running", "resumed"}:
+        # A status response is also the progress source for GET/stream races.
+        # Never turn a still-live Host run into a local terminal failure.
+        run.status = "generating"
+    elif host_run.status in {"awaiting_input", "awaiting_approval"}:
+        # Chat has one resumable parked state for Host input/approval waits.
+        run.status = "awaiting_continue"
+        run.error_code = None
+        run.error_message = None
+        _append_host_audit(
+            chat,
+            run,
+            "harness.task.awaiting_input",
+            {"surface": "chat", "host_status": host_run.status},
+        )
+    elif host_run.status == "cancelled":
+        run.status = "interrupted"
+        run.error_code = "harness_task_cancelled"
+        run.error_message = _host_error_message(host_run) or "Harness Host task was cancelled"
+        _append_host_audit(
+            chat,
+            run,
+            "harness.task.cancelled",
+            {"surface": "chat"},
+        )
+    elif host_run.status in {"failed", "timed_out", "exhausted"}:
+        _apply_chat_host_failure(
+            chat,
+            run,
+            _host_error_code(host_run) or "harness_task_failed",
+            _host_error_message(host_run),
+        )
+        return
+    else:
+        _apply_chat_host_failure(
+            chat,
+            run,
+            "harness_unknown_status",
+            f"Harness Host returned unsupported Chat status: {host_run.status}",
+        )
+        return
+    chat._persist_run(run)
+
+
+def _append_host_audit(
+    chat: ChatOrchestrator, run: ChatRun, event_type: str, payload: dict
+) -> None:
+    if any(event.type == event_type for event in run.audit_events):
+        return
+    chat.audit.append(run.audit_events, event_type, run.id, payload)
+
+
+def _host_error_code(run: HarnessRun) -> str | None:
+    result = run.result or {}
+    for key in ("error_code", "code", "error"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_error_message(run: HarnessRun) -> str | None:
+    result = run.result or {}
+    for key in ("error_message", "message", "error"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_audit_event(run_id: str, event_type: str, payload: dict) -> dict:
+    return AuditEvent(type=event_type, run_id=run_id, payload=payload).model_dump(mode="json")
+
+
+def _host_event_frame(event: dict) -> dict:
+    event_type = event.get("type")
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    if event_type in {"run.text.delta", "assistant.text.delta", "text_delta"}:
+        text = payload.get("text") or event.get("text")
+        if isinstance(text, str):
+            return {"type": "text_delta", "text": text}
+    if event_type in {"run.tool.started", "tool_start"}:
+        name = payload.get("tool") or payload.get("name") or event.get("name")
+        if isinstance(name, str):
+            return {"type": "tool_start", "name": name}
+    if event_type in {"run.tool.completed", "tool_done"}:
+        name = payload.get("tool") or payload.get("name") or event.get("name")
+        if isinstance(name, str):
+            return {"type": "tool_done", "name": name}
+    return {"type": "event", "event": event}
+
+
+def _event_seq(event: dict) -> int:
+    value = event.get("seq")
+    return value if isinstance(value, int) else -1
+
+
+def _json_sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"

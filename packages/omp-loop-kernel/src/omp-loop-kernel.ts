@@ -21,9 +21,10 @@ import { verifyRuntimeManifest } from "./runtime-manifest";
 import {
   runManagedOmpWorker,
   type HostModelResponse,
+  type ManagedOmpWorkerControl,
 } from "./worker-client";
 import { parseAssistant } from "./protocol";
-import type { Content, Message, ModelContext, Observation, ToolDefinition, Usage } from "./protocol";
+import type { AssistantMessage, Content, Message, ModelContext, Observation, ToolDefinition, Usage } from "./protocol";
 
 export type OmpContextPreparation = (
   command: StartRun,
@@ -35,6 +36,13 @@ export type OmpHostModelTransport = (
   signal: AbortSignal,
 ) => AsyncIterable<HostModelResponse>;
 
+export type OmpKernelEvent =
+  | { readonly type: "model.request"; readonly context: ModelContext }
+  | { readonly type: "model.response"; readonly message: AssistantMessage }
+  | { readonly type: "tool.request"; readonly toolCallId: string; readonly name: string; readonly input: JsonValue }
+  | { readonly type: "tool.response"; readonly toolCallId: string; readonly name: string; readonly result: JsonValue }
+  | { readonly type: "observation"; readonly observation: Observation };
+
 export interface OmpLoopKernelOptions {
   readonly runtimeRoot: string;
   readonly expectedManifestDigest: string;
@@ -44,6 +52,10 @@ export interface OmpLoopKernelOptions {
   readonly modelTransport: OmpHostModelTransport;
   readonly createToolGateway: (command: StartRun) => ToolGateway;
   readonly prepareContext?: OmpContextPreparation;
+  readonly toolDefinitionsFor?: (command: StartRun) => readonly ToolDefinition[] | Promise<readonly ToolDefinition[]>;
+  readonly initialMessagesFor?: (command: StartRun) => readonly Message[] | Promise<readonly Message[]>;
+  readonly beforeModel?: (command: StartRun, context: ModelContext) => Promise<void> | void;
+  readonly onEvent?: (event: OmpKernelEvent) => Promise<void> | void;
   readonly now?: () => string;
   readonly createEventId?: () => string;
 }
@@ -102,16 +114,34 @@ export class OmpLoopKernel implements LoopKernel {
     const onAbort = () => controller.abort(signal.reason);
     signal.addEventListener("abort", onAbort, { once: true });
     if (signal.aborted) onAbort();
-    const completion = this.startAttempt(command, sink, controller.signal).finally(() => {
+    let resolveControl!: (control: ManagedOmpWorkerControl) => void;
+    let rejectControl!: (error: Error) => void;
+    const controlReady = new Promise<ManagedOmpWorkerControl>((resolve, reject) => {
+      resolveControl = resolve;
+      rejectControl = reject;
+    });
+    void controlReady.catch(() => undefined);
+    const attempt: ActiveAttempt = { command, controller, controlReady, completion: Promise.resolve({ status: "cancelled" }) };
+    const completion = this.startAttempt(command, sink, controller.signal, (control) => resolveControl(control)).finally(() => {
       signal.removeEventListener("abort", onAbort);
+      rejectControl(new Error("OMP run ended before the worker control became available"));
       this.active.delete(key);
     });
-    this.active.set(key, { command, controller, completion });
+    attempt.completion = completion;
+    this.active.set(key, attempt);
     return completion;
   }
 
-  async steer(_runId: RunId, _message: ChannelMessage): Promise<void> {
-    throw new OmpKernelControlUnavailableError("steer");
+  async steer(runId: RunId, message: ChannelMessage): Promise<void> {
+    if (message.content.trim().length === 0) throw new Error("OMP steer content must be non-empty");
+    const attempts = [...this.active.values()].filter((attempt) => attempt.command.runId === runId
+      && attempt.command.workspaceId === message.workspaceId
+      && attempt.command.channelId === message.channelId);
+    if (attempts.length !== 1) {
+      throw new Error(attempts.length === 0 ? "OMP Run is not active" : "OMP steer requires a scoped Run identity");
+    }
+    const control = await attempts[0]!.controlReady;
+    await control.steer({ content: message.content });
   }
 
   async answer(_runId: RunId, _answer: HumanAnswer): Promise<void> {
@@ -142,6 +172,7 @@ export class OmpLoopKernel implements LoopKernel {
     command: StartRun,
     sink: EventSink,
     signal: AbortSignal,
+    onControlReady?: (control: ManagedOmpWorkerControl) => void,
   ): Promise<RunOutcome> {
     const attemptStartedAt = Date.now();
     if (signal.aborted) throw new Error("OMP Run was cancelled before startup");
@@ -185,6 +216,7 @@ export class OmpLoopKernel implements LoopKernel {
     let transcriptRepairs: readonly TranscriptRepair[] = [];
     let usageRepairs: readonly UsageRepair[] = [];
     let restoredUsage: Record<string, number> = {};
+    let initialMessages = initialMessagesFromHistory(history);
     const attemptId = `attempt:${command.runId}:${randomUUID()}`;
     if (restoreRequested) {
       try {
@@ -204,6 +236,18 @@ export class OmpLoopKernel implements LoopKernel {
         throw error;
       }
     }
+
+    // A fresh-run seed is an input snapshot, not a live history query. Persist
+    // it before preparation so a later reopen reuses the exact same context.
+    if (initialMessages === undefined && !restoreRequested && this.options.initialMessagesFor !== undefined) {
+      initialMessages = cloneMessages(await this.options.initialMessagesFor(command));
+      await appendEvent(sink, command, await nextSequenceFromSink(readable, command.runId), "omp.context.seed", {
+        schemaVersion: 1,
+        messages: parseJsonValue(initialMessages, "OMP initial messages"),
+      }, this.now, this.createEventId);
+      history = readable === undefined ? history : await readEvents(readable, command.runId);
+    }
+    const admittedToolDefinitions = await resolveToolDefinitions(this.options.toolDefinitionsFor, command);
 
     const remainingBeforePreparation = remainingWallTime(command, budgetStartedAt);
     if (remainingBeforePreparation === 0) return appendTerminal("timed_out");
@@ -225,7 +269,9 @@ export class OmpLoopKernel implements LoopKernel {
     if (transcript !== undefined || history.some((event) => event.type === "memory.hit" || event.type === "run.context.ready")) {
       try {
         validatePersistedPreparedEvents(history, command, prepared, renderedSystemPrompt, transcript === undefined);
-        if (transcript !== undefined) validateModelCheckpoints(history, command, transcript, renderedSystemPrompt);
+        if (transcript !== undefined) {
+          validateModelCheckpoints(history, command, transcript, renderedSystemPrompt, initialMessages ?? [], admittedToolDefinitions);
+        }
       } catch (error) {
         if (error instanceof OmpContextReadyMismatchError) return appendTerminal("failed", error.code);
         if (error instanceof OmpModelCheckpointMismatchError) return appendTerminal("failed", error.code);
@@ -265,17 +311,15 @@ export class OmpLoopKernel implements LoopKernel {
     const remainingBeforeWorker = remainingWallTime(command, budgetStartedAt);
     if (remainingBeforeWorker === 0) return appendTerminal("timed_out");
     if (signal.aborted) return appendTerminal("cancelled");
-    if (command.runProfileSnapshot.allowedTools.some((name) => name !== "read_only")) {
-      throw new Error("OMP tool profile is unavailable until its Host proxy is implemented");
-    }
     const gateway = this.options.createToolGateway(command);
     const runtimeRoot = this.options.runtimeRoot;
     let modelRequests = history.filter((event) => event.type === "run.model.requested").length;
-    let toolCalls = restoredToolDispatchCount(history);
+    let toolCalls = restoredToolDispatchCount(history) + restoredNativeTodoCount(transcript);
     let inputTokens = restoredUsage.input ?? 0;
     let outputTokens = restoredUsage.output ?? 0;
     let cost = restoredUsage.cost ?? 0;
     const cumulativeUsage: Record<string, number> = { ...restoredUsage };
+    const gatewayToolCallIds = new Set<string>();
     let transcriptIndex = history.filter((event) => event.type === "omp.transcript.message").length + transcriptRepairs.length;
     const authorizingToolCalls = new Map<string, RestoredToolCall>();
     if (transcript !== undefined) {
@@ -303,9 +347,10 @@ export class OmpLoopKernel implements LoopKernel {
         systemPrompt: renderedSystemPrompt,
         goal: command.goal,
         modelId: command.runProfileSnapshot.model.name,
-        allowedTools: toolDefinitions(command.runProfileSnapshot.allowedTools),
+        allowedTools: admittedToolDefinitions,
         snapshotDigest: prepared.snapshotDigest,
         originalExecutionFingerprint: prepared.originalExecutionFingerprint,
+        ...(initialMessages === undefined || initialMessages.length === 0 ? {} : { initialMessages }),
         ...(transcript === undefined ? {} : { transcript }),
       },
       beforeModel: async (context) => {
@@ -325,6 +370,7 @@ export class OmpLoopKernel implements LoopKernel {
             inputDigest: sha256(stableJson({
               systemPrompt: context.systemPrompt,
               messages: context.messages,
+              tools: context.tools ?? [],
             })),
           },
           this.now,
@@ -333,10 +379,13 @@ export class OmpLoopKernel implements LoopKernel {
         const remainingAfterModelRequest = remainingWallTime(command, budgetStartedAt);
         if (remainingAfterModelRequest === 0) throw new OmpBudgetExceededError("OMP model request wall budget exhausted");
         if (signal.aborted) throw new OmpAttemptCancelledError();
+        await this.options.beforeModel?.(command, context);
+        await this.options.onEvent?.({ type: "model.request", context });
       },
       modelTransport: (async function* (this: OmpLoopKernel, context: ModelContext, modelSignal: AbortSignal) {
         for await (const response of this.options.modelTransport(context, modelSignal)) {
           const message = parseAssistant(response.message);
+          await this.options.onEvent?.({ type: "model.response", message });
           const usage = message.usage;
           const assistantTranscriptIndex = transcriptIndex;
           let toolOrdinal = 0;
@@ -410,6 +459,8 @@ export class OmpLoopKernel implements LoopKernel {
         const remainingBeforeGateway = remainingWallTime(command, budgetStartedAt);
         if (remainingBeforeGateway === 0) throw new OmpBudgetExceededError("OMP tool dispatch wall budget exhausted");
         if (signal.aborted || toolSignal.aborted) throw new OmpAttemptCancelledError();
+        gatewayToolCallIds.add(toolCallId);
+        await this.options.onEvent?.({ type: "tool.request", toolCallId, name, input });
         const dispatchEventId = readable === undefined
           ? undefined
           : await appendEvent(
@@ -464,13 +515,31 @@ export class OmpLoopKernel implements LoopKernel {
             this.createEventId,
           );
         }
+        await this.options.onEvent?.({
+          type: "tool.response",
+          toolCallId,
+          name,
+          result: {
+            status: toolResult.status,
+            ...(toolResult.output === undefined ? {} : { output: toolResult.output }),
+          },
+        });
         return toolResult;
       },
       persistObservation: async (observation) => {
+        await this.options.onEvent?.({ type: "observation", observation });
+        if (observation.type === "message_end" && observation.message.role === "toolResult"
+          && !gatewayToolCallIds.has(observation.message.toolCallId)) {
+          toolCalls += 1;
+          if (command.budget.toolCalls !== undefined && toolCalls > command.budget.toolCalls) {
+            throw new OmpBudgetExceededError("OMP Run tool budget exhausted");
+          }
+        }
         const event = observationEvent(command, observation, await nextSequenceFromSink(readable, command.runId), this.now(), this.createEventId());
         await sink.append(event);
         if (observation.type === "message_end") transcriptIndex += 1;
       },
+      onControlReady,
       });
     } catch (error) {
       if (error instanceof OmpBudgetExceededError || isWallBudgetError(error)) {
@@ -658,7 +727,8 @@ function addUsage(target: Record<string, number>, usage: Usage): void {
 interface ActiveAttempt {
   readonly command: StartRun;
   readonly controller: AbortController;
-  readonly completion: Promise<RunOutcome>;
+  readonly controlReady: Promise<ManagedOmpWorkerControl>;
+  completion: Promise<RunOutcome>;
 }
 
 function readableSink(sink: EventSink): { read(streamId: StreamId): AsyncIterable<CanonicalEvent> } | undefined {
@@ -854,6 +924,8 @@ function validateModelCheckpoints(
   command: StartRun,
   messages: readonly Message[],
   systemPrompt: string,
+  initialMessages: readonly Message[],
+  admittedToolDefinitions: readonly ToolDefinition[],
 ): void {
   const requestIndexes = new Set<number>();
   const transcriptIndexes = new Set<number>();
@@ -892,7 +964,8 @@ function validateModelCheckpoints(
       || history.indexOf(request) >= history.indexOf(checkpoint)
       || requestPayload.inputDigest !== sha256(stableJson({
         systemPrompt,
-        messages: messages.slice(0, transcriptIndex),
+        messages: [...initialMessages, ...messages.slice(0, transcriptIndex)],
+        tools: admittedToolDefinitions.some((tool) => tool.name !== "read_only") ? admittedToolDefinitions : [],
       }))
     ) {
       throw new OmpModelCheckpointMismatchError();
@@ -929,16 +1002,61 @@ function withAttribution(command: StartRun, payload: JsonValue): JsonValue {
 }
 
 function toolDefinitions(names: readonly string[]): ToolDefinition[] {
-  return names.filter((name) => name === "read_only").map((name) => ({
-    name,
-    description: "Read one admitted workspace file.",
-    parameters: {
-      type: "object",
-      properties: { path: { type: "string" } },
-      required: ["path"],
-      additionalProperties: false,
-    },
-  }));
+  return names.map((name) => {
+    if (name !== "read_only") {
+      throw new Error(`OMP tool definition is missing for admitted tool: ${name}`);
+    }
+    return {
+      name,
+      description: "Read one admitted workspace file.",
+      parameters: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+    };
+  });
+}
+
+async function resolveToolDefinitions(
+  provider: OmpLoopKernelOptions["toolDefinitionsFor"],
+  command: StartRun,
+): Promise<readonly ToolDefinition[]> {
+  const definitions = provider === undefined
+    ? toolDefinitions(command.runProfileSnapshot.allowedTools)
+    : await provider(command);
+  const expected = new Set(command.runProfileSnapshot.allowedTools);
+  const seen = new Set<string>();
+  for (const definition of definitions) {
+    if (seen.has(definition.name) || !expected.has(definition.name)) {
+      throw new Error("OMP tool definitions do not match the admitted profile");
+    }
+    seen.add(definition.name);
+  }
+  if (seen.size !== expected.size) throw new Error("OMP tool definitions do not cover the admitted profile");
+  return cloneJson(definitions);
+}
+
+function initialMessagesFromHistory(history: readonly CanonicalEvent[]): Message[] | undefined {
+  const seeds = history.filter((event) => event.type === "omp.context.seed");
+  if (seeds.length === 0) return undefined;
+  if (seeds.length !== 1 || !isRecord(seeds[0]!.payload)) {
+    throw new OmpKernelControlUnavailableError("restore");
+  }
+  const payload = seeds[0]!.payload as Record<string, JsonValue>;
+  if (payload.schemaVersion !== 1 || !Array.isArray(payload.messages)) {
+    throw new OmpKernelControlUnavailableError("restore");
+  }
+  return cloneMessages(payload.messages as unknown as readonly Message[]);
+}
+
+function cloneMessages(messages: readonly Message[]): Message[] {
+  return cloneJson(messages) as Message[];
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function renderSystemPrompt(command: StartRun, context?: RunContext): string {
@@ -1024,7 +1142,9 @@ function restoreTranscript(
   const usedCalls = new Set<string>();
   for (const [index, message] of messages.entries()) {
     if (message.role === "user") {
-      if (index !== 0) throw new OmpKernelControlUnavailableError("restore");
+      if (index > 0 && messages[index - 1]?.role === "user") {
+        throw new OmpKernelControlUnavailableError("restore");
+      }
       continue;
     }
     if (message.role === "assistant") {
@@ -1139,6 +1259,17 @@ function validateToolCheckpoints(
     const dispatch = dispatches.get(id);
     const response = responses.get(id);
     const observed = messages.find((message) => message.role === "toolResult" && message.toolCallId === id);
+    const call = calls.get(id)!;
+    if (call.name === "todo") {
+      // Native TodoTool state is owned by the OMP session. It deliberately has
+      // no Host Gateway dispatch/response pair; the persisted assistant call
+      // plus its phased tool result is the durable checkpoint instead.
+      if (dispatch !== undefined || response !== undefined) throw new OmpToolCheckpointMismatchError();
+      if (observed !== undefined && (!hasTodoPhases(observed) || messages.findIndex((message) => message === observed) !== call.resultTranscriptIndex)) {
+        throw new OmpToolCheckpointMismatchError();
+      }
+      continue;
+    }
     if (dispatch !== undefined && response === undefined) {
       throw new OmpIndeterminateRecoveryError();
     }
@@ -1165,6 +1296,21 @@ function validateToolCheckpoints(
       throw new OmpToolCheckpointMismatchError();
     }
   }
+}
+
+function hasTodoPhases(message: Message): boolean {
+  if (message.role !== "toolResult" || message.toolName !== "todo") return false;
+  const details = message.details;
+  if (!isRecord(details)) return false;
+  const phases = (details as Record<string, unknown>).phases;
+  if (!Array.isArray(phases)) return false;
+  return phases.every((phase) => isRecord(phase)
+    && typeof phase.name === "string"
+    && Array.isArray(phase.tasks)
+    && phase.tasks.every((task) => isRecord(task)
+      && typeof task.content === "string"
+      && (task.status === "pending" || task.status === "in_progress" || task.status === "completed"
+        || task.status === "abandoned" || task.status === "blocked")));
 }
 
 function collectToolCalls(
@@ -1511,6 +1657,10 @@ function restoredToolDispatchCount(history: readonly CanonicalEvent[]): number {
   return toolCallIds.size;
 }
 
+function restoredNativeTodoCount(transcript: readonly Message[] | undefined): number {
+  return transcript?.filter((message) => message.role === "toolResult" && message.toolName === "todo").length ?? 0;
+}
+
 function parseToolResponseCheckpoint(
   response: CanonicalEvent,
   dispatch: CanonicalEvent,
@@ -1590,7 +1740,7 @@ function parseStoredMessage(value: unknown): Message {
     return { role: "user", content: value.content };
   }
   if (value.role === "toolResult") {
-    assertStoredKeys(value, ["role", "toolCallId", "toolName", "content", "status"]);
+    assertStoredKeys(value, ["role", "toolCallId", "toolName", "content", "status", "details"]);
     if (
       typeof value.toolCallId !== "string"
       || typeof value.toolName !== "string"
@@ -1605,10 +1755,11 @@ function parseStoredMessage(value: unknown): Message {
       toolName: value.toolName,
       content: value.content,
       status: value.status,
+      ...(value.details === undefined ? {} : { details: parseJsonValue(value.details, "OMP stored tool details") }),
     };
   }
   if (value.role !== "assistant") throw new OmpKernelControlUnavailableError("restore");
-  assertStoredKeys(value, ["role", "content", "stopReason", "usage"]);
+  assertStoredKeys(value, ["role", "content", "stopReason", "usage", "reasoningContent"]);
   if (!Array.isArray(value.content)) throw new OmpKernelControlUnavailableError("restore");
   if (value.stopReason !== "stop" && value.stopReason !== "length" && value.stopReason !== "toolUse") {
     throw new OmpKernelControlUnavailableError("restore");
@@ -1619,6 +1770,9 @@ function parseStoredMessage(value: unknown): Message {
     role: "assistant",
     content,
     stopReason: value.stopReason,
+    ...(value.reasoningContent === undefined ? {} : typeof value.reasoningContent === "string"
+      ? { reasoningContent: value.reasoningContent }
+      : (() => { throw new OmpKernelControlUnavailableError("restore"); })()),
     ...(usage === undefined ? {} : { usage }),
   };
 }
@@ -1713,5 +1867,9 @@ function isTerminalEvent(type: string): boolean {
 }
 
 function isPreparationEvent(type: string): boolean {
-  return type === "run.queued" || type === "run.started" || type === "memory.hit" || type === "run.context.ready";
+  return type === "run.queued"
+    || type === "run.started"
+    || type === "memory.hit"
+    || type === "run.context.ready"
+    || type === "omp.context.seed";
 }

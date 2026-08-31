@@ -23,7 +23,13 @@ const { version: serviceVersion } = require("../package.json") as {
 
 export const unsupportedV2Surfaces = ["create", "cowork", "hub"] as const;
 
-export type V2SurfaceId = typeof unsupportedV2Surfaces[number] | "preview";
+/** Product surfaces share the same durable Runtime; legacy v2 routes remain additive. */
+export type V2SurfaceId = typeof unsupportedV2Surfaces[number]
+  | "preview"
+  | "chat"
+  | "hiker"
+  | "reimbursement"
+  | "crew";
 type V2RunStatus =
   | "queued"
   | "running"
@@ -54,6 +60,18 @@ export interface HarnessV2Runtime {
     runId: string,
     reason?: string,
   ) => Promise<{ status: V2RunStatus } | undefined>;
+  readonly steer?: (
+    workspaceId: string,
+    channelId: string,
+    runId: string,
+    content: string,
+  ) => Promise<void>;
+  readonly answer?: (
+    workspaceId: string,
+    channelId: string,
+    runId: string,
+    content: string,
+  ) => Promise<void>;
   readonly readEvents?: (
     workspaceId: string,
     channelId: string,
@@ -776,3 +794,21 @@ function responseJson(
   response.writeHead(statusCode, { "content-type": "application/json" });
   response.end(JSON.stringify(body));
 }
+
+export {
+  ProductSessionStore,
+  ProductTaskValidationError,
+  productSurfaces,
+  validatedProductTask,
+  type ProductPermissionMode,
+  type ProductSurface,
+  type ProductTask,
+} from "./product-session";
+export {
+  ProductHttpError,
+  startProductHarnessService,
+  startProductHost,
+  statusFromEvents,
+  type ProductHostOptions,
+  type RunningProductHost,
+} from "./product-facade";

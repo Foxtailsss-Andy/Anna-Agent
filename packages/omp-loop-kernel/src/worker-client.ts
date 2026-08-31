@@ -12,6 +12,11 @@ export interface HostModelResponse {
   readonly message: AssistantMessage;
 }
 
+export interface ManagedOmpWorkerControl {
+  /** Queue a user steer and resolve once OMP emits and the Host ACKs it. */
+  readonly steer: (message: { readonly content: string }) => Promise<void>;
+}
+
 export interface ManagedOmpWorkerOptions extends ManagedWorkerLaunchSpec {
   readonly binding: WorkerBinding;
   readonly input: StartInput;
@@ -21,6 +26,7 @@ export interface ManagedOmpWorkerOptions extends ManagedWorkerLaunchSpec {
   readonly toolGateway: (name: string, input: JsonValue, toolCallId: string, signal: AbortSignal) => Promise<{status: "succeeded" | "failed" | "unknown"; output?: JsonValue}>;
   readonly persistObservation?: (event: Observation) => Promise<void>;
   readonly beforeModel?: (context: ModelContext) => Promise<void>;
+  readonly onControlReady?: (control: ManagedOmpWorkerControl) => void;
   readonly onDiagnostic?: (text: string) => void;
 }
 
@@ -42,10 +48,14 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
   const authorizingCalls = new Map<number, string[]>();
   const acknowledgedToolReplies = new Set<string>();
   const usedCalls = new Set<string>();
-  const expectedMessages: Message[] = options.input.transcript === undefined
-    ? [{ role: "user", content: options.input.goal }]
-    : [...options.input.transcript];
-  let observedMessages = options.input.transcript?.length ?? 0;
+  const initialMessages = options.input.initialMessages ?? [];
+  const expectedMessages: Message[] = [
+    ...initialMessages,
+    ...(options.input.transcript === undefined
+      ? [{ role: "user" as const, content: options.input.goal }]
+      : options.input.transcript),
+  ];
+  let observedMessages = initialMessages.length + (options.input.transcript?.length ?? 0);
   for (const [authorizingIndex, message] of expectedMessages.entries()) {
     if (message.role === "assistant") {
       const callIds: string[] = [];
@@ -84,6 +94,8 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
   let chain = Promise.resolve();
   let failed = false;
   let closed = false;
+  let workerReady = false;
+  const pendingSteers: PendingSteer[] = [];
   let resolveClosed!: () => void;
   const childClosed = new Promise<void>(resolve => { resolveClosed = resolve; });
   worker.child.once("close", () => { closed = true; resolveClosed(); });
@@ -96,6 +108,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
     settled = true;
     failed = true;
     controller.abort();
+    rejectPendingSteers(error instanceof Error ? error : new Error("OMP worker failed"));
     if (!closed && worker.child.stdin.writable && !worker.child.stdin.destroyed) {
       worker.child.stdin.write(encodeFrame({ protocol: OMP_PROTOCOL, kind: "abort", frameId: randomUUID(),
         requestId: bootstrapId, binding: options.binding, workerSeq: sequence, reason: "cancelled" }), () => {});
@@ -125,6 +138,48 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
   function response(frame: WorkerFrame) {
     return { protocol: OMP_PROTOCOL, frameId: randomUUID(), requestId: frame.requestId, binding: options.binding, workerSeq: frame.workerSeq };
   }
+  async function flushSteers(): Promise<void> {
+    if (!workerReady) return;
+    for (const pending of pendingSteers) {
+      if (pending.sent) continue;
+      pending.sent = true;
+      try {
+        await send({
+          protocol: OMP_PROTOCOL,
+          kind: "steer",
+          frameId: randomUUID(),
+          requestId: pending.requestId,
+          binding: options.binding,
+          workerSeq: sequence,
+          message: pending.message,
+        });
+      } catch (error) {
+        pending.sent = false;
+        throw error;
+      }
+    }
+  }
+  function rejectPendingSteers(error: Error): void {
+    for (const pending of pendingSteers) pending.deferred.reject(error);
+    pendingSteers.length = 0;
+  }
+  const control: ManagedOmpWorkerControl = {
+    steer: (message) => {
+      if (typeof message.content !== "string" || message.content.trim().length === 0) {
+        return Promise.reject(new Error("OMP steer content must be non-empty"));
+      }
+      if (settled) return Promise.reject(new Error("OMP worker is stopped"));
+      const pending: PendingSteer = {
+        requestId: randomUUID(),
+        message: { role: "user", content: message.content },
+        sent: false,
+        deferred: deferred<void>(),
+      };
+      pendingSteers.push(pending);
+      void flushSteers().catch(fail);
+      return pending.deferred.promise;
+    },
+  };
   async function handle(frame: WorkerFrame): Promise<void> {
     if (settled) return;
     if (Object.keys(options.binding).some(key => frame.binding[key as keyof WorkerBinding] !== options.binding[key as keyof WorkerBinding])
@@ -138,6 +193,8 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
       ready = frame.runtime;
       clearTimeout(startupTimer);
       await send({ ...response(frame), kind: "receipt", forFrameId: frame.frameId, accepted: true, throughWorkerSeq: sequence });
+      workerReady = true;
+      await flushSteers();
       return;
     }
     if (!ready) throw new Error("OMP worker dispatched before readiness");
@@ -145,8 +202,22 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
       case "event": {
         let observation = frame.event;
         let acknowledgedMessage: Message | undefined;
+        let consumedSteer: PendingSteer | undefined;
         if (observation.type === "message_end") {
-          const expected = expectedMessages[observedMessages];
+          const observedMessage = observation.message;
+          let expected = expectedMessages[observedMessages];
+          consumedSteer = pendingSteers.find((pending) => pending.sent && sameMessages([observedMessage], [pending.message]));
+          if (consumedSteer !== undefined) {
+            expectedMessages.splice(observedMessages, 0, consumedSteer.message);
+            expected = consumedSteer.message;
+          }
+          if (!expected && observation.message.role === "toolResult" && observation.message.toolName === "todo") {
+            const pending = pendingCalls.get(observation.message.toolCallId);
+            if (pending?.name === "todo") {
+              expectedMessages.push(observation.message);
+              expected = observation.message;
+            }
+          }
           if (!expected || !sameMessages([observation.message], [expected])) throw new Error("OMP observation differs from Host history");
           observation = { type: "message_end", message: expected };
           acknowledgedMessage = expected;
@@ -161,34 +232,59 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
               const pending = pendingCalls.get(toolCallId);
               if (pending !== undefined) pending.authorizingObserved = true;
             }
+          } else if (acknowledgedMessage.role === "toolResult" && acknowledgedMessage.toolName === "todo") {
+            // Native OMP TodoTool executes inside the worker and therefore has
+            // no Host `tool.request` frame. Its canonical tool-result message
+            // is still the durable authorization/completion checkpoint.
+            const pending = pendingCalls.get(acknowledgedMessage.toolCallId);
+            if (pending !== undefined && pending.name === acknowledgedMessage.toolName) {
+              pendingCalls.delete(acknowledgedMessage.toolCallId);
+              usedCalls.add(acknowledgedMessage.toolCallId);
+              acknowledgedToolReplies.add(acknowledgedMessage.toolCallId);
+            }
           }
           observedMessages += 1;
+        }
+        if (consumedSteer !== undefined) {
+          const index = pendingSteers.indexOf(consumedSteer);
+          if (index >= 0) pendingSteers.splice(index, 1);
+          consumedSteer.deferred.resolve();
         }
         return;
       }
       case "model.request": {
-        if (frame.modelId !== options.input.modelId || frame.context.systemPrompt !== options.input.systemPrompt) throw new Error("OMP model input mismatch");
-        const projectedExpected = projectedMessagesFor(restoreProjection, options.input.transcript, expectedMessages);
+        if (frame.modelId !== options.input.modelId || frame.context.systemPrompt !== options.input.systemPrompt
+          || !sameToolDefinitions(frame.context.tools, options.input.allowedTools)) throw new Error("OMP model input mismatch");
+        const projectedExpected = projectedMessagesFor(
+          restoreProjection,
+          options.input.transcript,
+          initialMessages,
+          expectedMessages,
+        );
         if (requests.has(frame.requestId) || pendingCalls.size !== 0 || observedMessages !== expectedMessages.length
           || !sameMessages(frame.context.messages, projectedExpected)) {
           throw new Error("OMP model request history mismatch");
         }
         requests.add(frame.requestId);
         // The SDK context is a disposable projection: it may normalize usage
-        // and add runtime-only fields. Host checkpoints authorize the canonical
-        // transcript, so both the admission hook and transport see that exact
-        // history after the projection has been verified.
+        // and add runtime-only fields. Host hooks use the canonical transcript;
+        // the transport keeps provider-visible OMP projections such as the
+        // steering envelope intact after the projection has been verified.
         const canonicalContext: ModelContext = {
           systemPrompt: options.input.systemPrompt,
           messages: [...expectedMessages],
+          ...(options.input.allowedTools.some((tool) => tool.name !== "read_only")
+            ? { tools: [...options.input.allowedTools] }
+            : {}),
         };
+        const providerContext = hasSteeringEnvelope(frame.context.messages) ? frame.context : canonicalContext;
         await options.beforeModel?.(canonicalContext);
         if (settled) return;
         modelRequestCount += 1;
         pendingOperation = true;
         let index = 0;
         let final: AssistantMessage | undefined;
-        for await (const item of options.modelTransport(canonicalContext, controller.signal)) {
+        for await (const item of options.modelTransport(providerContext, controller.signal)) {
           if (final) throw new Error("OMP model transport returned multiple final responses");
           for (const delta of item.deltas) await send({ ...response(frame), kind: "model.delta", index: index++, delta });
           final = item.message;
@@ -250,6 +346,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         if (observedMessages !== expectedMessages.length) throw new Error("OMP terminal precedes durable message observations");
         if (frame.outcome === "completed" && (lastModelStop !== "stop" || pendingCalls.size !== 0)) throw new Error("OMP completion lacks a completed model response");
         settled = true;
+        rejectPendingSteers(new Error("OMP worker ended before steer consumption"));
         resolveResult(frame.outcome);
     }
   }
@@ -278,6 +375,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
     if (byteLength(buffer) >= MAX_FRAME_BYTES) fail(new Error("OMP incomplete frame exceeded limit"));
   });
   try {
+    options.onControlReady?.(control);
     if (options.signal?.aborted) onAbort();
     await send({ protocol: OMP_PROTOCOL, kind: "start", frameId: randomUUID(), requestId: bootstrapId,
       binding: options.binding, workerSeq: -1, input: options.input });
@@ -295,7 +393,32 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
     }
     await worker.close();
     await chain;
+    rejectPendingSteers(new Error("OMP worker stopped before steer consumption"));
   }
+}
+
+interface PendingSteer {
+  readonly requestId: string;
+  readonly message: { readonly role: "user"; readonly content: string };
+  sent: boolean;
+  readonly deferred: Deferred<void>;
+}
+
+interface Deferred<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (error: unknown) => void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolvePromise!: (value: T) => void;
+  let rejectPromise!: (error: unknown) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  void promise.catch(() => undefined);
+  return { promise, resolve: resolvePromise, reject: rejectPromise };
 }
 
 function stableJson(value: unknown): string {
@@ -309,20 +432,49 @@ function stableJson(value: unknown): string {
 
 function sameMessages(actual: readonly Message[], expected: readonly Message[]): boolean {
   const withoutSdkUsage = (messages: readonly Message[]) => messages.map(message => {
-    if (message.role !== "assistant") return message;
-    const { usage: _usage, ...content } = message;
-    return content;
+    if (message.role === "assistant") {
+      const { usage: _usage, ...content } = message;
+      return content;
+    }
+    if (message.role === "user") {
+      const content = stripSteeringEnvelope(message.content);
+      return content === message.content ? message : { ...message, content };
+    }
+    return message;
   });
   return stableJson(withoutSdkUsage(actual)) === stableJson(withoutSdkUsage(expected));
+}
+
+function stripSteeringEnvelope(content: string): string {
+  const marker = "</system-notice>\n";
+  if (!content.startsWith("<system-notice>\nUser interjection during work: ") || !content.includes(marker)) return content;
+  return content.slice(content.indexOf(marker) + marker.length);
+}
+
+function hasSteeringEnvelope(messages: readonly Message[]): boolean {
+  return messages.some((message) => message.role === "user" && stripSteeringEnvelope(message.content) !== message.content);
+}
+
+function sameToolDefinitions(
+  actual: readonly import("./protocol").ToolDefinition[] | undefined,
+  expected: readonly import("./protocol").ToolDefinition[],
+): boolean {
+  if (actual === undefined && expected.every((tool) => tool.name === "read_only")) return true;
+  return stableJson(actual ?? []) === stableJson(expected);
 }
 
 function projectedMessagesFor(
   restoreProjection: ReturnType<typeof projectRestoreTranscript> | undefined,
   transcript: readonly Message[] | undefined,
+  initialMessages: readonly Message[],
   expectedMessages: readonly Message[],
 ): readonly Message[] {
   if (restoreProjection === undefined || transcript === undefined) return expectedMessages;
-  return [...restoreProjection.messages, ...expectedMessages.slice(transcript.length)];
+  return [
+    ...initialMessages,
+    ...restoreProjection.messages,
+    ...expectedMessages.slice(initialMessages.length + transcript.length),
+  ];
 }
 
 function validateToolContext(
@@ -343,9 +495,11 @@ function validateToolContext(
 ): boolean {
   if (input.transcript === undefined) return actual === undefined;
   if (actual === undefined || expected === undefined || !expected.authorizingObserved || restoreProjection === undefined) return false;
+  const initialMessages = input.initialMessages ?? [];
   const initialTranscriptLength = input.transcript.length;
-  const upperMessages = [...restoreProjection.messages, ...expectedMessages.slice(initialTranscriptLength)];
-  const lowerMessages = [...restoreProjection.messages, ...expectedMessages.slice(initialTranscriptLength, observedMessages)];
+  const transcriptOffset = initialMessages.length + initialTranscriptLength;
+  const upperMessages = [...initialMessages, ...restoreProjection.messages, ...expectedMessages.slice(transcriptOffset)];
+  const lowerMessages = [...initialMessages, ...restoreProjection.messages, ...expectedMessages.slice(transcriptOffset, observedMessages)];
   if (actual.systemPrompt !== input.systemPrompt
     || actual.messages.length < lowerMessages.length
     || actual.messages.length > upperMessages.length

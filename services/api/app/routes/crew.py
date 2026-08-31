@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Literal
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 
 from services.crew.app import approvals_projection, inbox as inbox_agg
 from services.crew.app.actors import SYSTEM_ACTOR_IDS
+from services.crew.app.agent_worker import HarnessWorkerExecutor
 from services.crew.app.command_drafting import CommandDraftingService
 from services.crew.app.decomposition import CrewDecompositionService
 from services.crew.app.lifecycle import CrewLifecycleError
@@ -34,6 +36,7 @@ from services.runtime.app.execution import (
 from services.runtime.app.execution.runtime import AgentExecutionRuntime
 from services.runtime.app.execution.store import SQLiteExecutionStore
 from services.runtime.app.config import RuntimeSettings
+from services.business.harness_client import HarnessHostClient, HarnessHostError, ProductTask
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +303,8 @@ def build_router(
     local_session: Callable[[], SessionIdentity] | None = None,
     auto_pilot: bool = False,
     max_queue_depth: int = 500,
+    harness_client: HarnessHostClient | None = None,
+    product_mode: bool = False,
 ) -> APIRouter:
     router = APIRouter()
     if execution_kernel is None and execution_store is not None:
@@ -319,11 +324,95 @@ def build_router(
             return account.kind if account else None
         crew._member_kind = _member_kind
 
+    host_workers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="anna-host-worker") if product_mode and harness_client else None
+    host_runs: dict[tuple[str, str], str] = {}
+
+    def _host_worker_task(
+        project_id: str,
+        task_id: str,
+        actor_user_id: str,
+        source_message_id: str | None = None,
+        source_instruction: str | None = None,
+        *,
+        run_ref: str,
+    ) -> ProductTask:
+        project = crew.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        task = next((item for item in project.tasks if item.id == task_id), None)
+        if task is None:
+            raise HTTPException(status_code=404, detail="task not found")
+        executor = HarnessWorkerExecutor(harness_client, memory_store=memory_store)
+        product_task = executor.build_task(project, task, run_ref)
+        if source_message_id or source_instruction:
+            context = dict(product_task.context)
+            context["source_message_id"] = source_message_id
+            context["source_instruction"] = source_instruction
+            product_task = product_task.model_copy(
+                update={"actor_user_id": actor_user_id, "context": context}
+            )
+        return product_task
+
+    def _dispatch_host_worker(
+        pid: str,
+        tid: str,
+        ws: str,
+        actor: str,
+        source_message_id: str | None = None,
+        source_instruction: str | None = None,
+    ) -> None:
+        if harness_client is None or host_workers is None:
+            return
+        key = (pid, tid)
+        existing_id = host_runs.get(key)
+        if existing_id:
+            try:
+                if not harness_client.get(existing_id).terminal:
+                    return
+            except HarnessHostError:
+                pass
+        project = crew.get_project(pid)
+        if project is None:
+            return
+        run_ref = f"crew:{pid}:{tid}:v{project.project_version}:host"
+        try:
+            submitted = harness_client.submit(
+                _host_worker_task(
+                    pid,
+                    tid,
+                    actor,
+                    source_message_id,
+                    source_instruction,
+                    run_ref=run_ref,
+                )
+            )
+        except Exception:  # dispatch must not break the originating transition
+            logger.warning("crew host worker dispatch failed for %s/%s", pid, tid, exc_info=True)
+            return
+        host_runs[key] = submitted.run_id
+        executor = HarnessWorkerExecutor(
+            harness_client,
+            memory_store=memory_store,
+            submitted_run_id=submitted.run_id,
+        )
+
+        def _finish() -> None:
+            try:
+                crew.run_agent(pid, tid, executor, run_ref=submitted.run_id)
+            except Exception:  # noqa: BLE001 - CrewService records truthful block state
+                logger.warning("crew host worker failed for %s/%s", pid, tid, exc_info=True)
+            finally:
+                host_runs.pop(key, None)
+
+        host_workers.submit(_finish)
+
     # R-B auto-pilot: wire durable auto-trigger/auto-advance collaborators onto
     # the service. Dispatch is synchronously persisted before the lifecycle route
     # returns; runtime wake-up is only a notification to workers.
     if auto_pilot:
-        if getattr(crew, "_agent_dispatcher", None) is None and execution_store is not None:
+        if getattr(crew, "_agent_dispatcher", None) is None and product_mode and harness_client is not None:
+            crew._agent_dispatcher = _dispatch_host_worker
+        elif getattr(crew, "_agent_dispatcher", None) is None and execution_store is not None:
             def _dispatch(
                 pid: str,
                 tid: str,
@@ -349,6 +438,10 @@ def build_router(
             crew._agent_dispatcher = _dispatch
         if getattr(crew, "_propose_assignments", None) is None:
             def _propose(project):
+                if product_mode and matching is not None:
+                    return matching.propose(
+                        project, identity.list_members(project.workspace_id)
+                    )
                 # Deterministic role-match (fast, no model call in the transition
                 # path); the model-backed matcher stays for /suggest-assignments.
                 return deterministic_proposals(
@@ -375,6 +468,25 @@ def build_router(
         if project is None or project.workspace_id != session.workspace_id:
             raise HTTPException(status_code=404, detail="project not found")
         return project
+
+    def _guard_run_ref(run_ref: str, session) -> None:
+        """Resolve a Crew run to a project/task before consulting the Host."""
+        parts = run_ref.split(":")
+        if len(parts) >= 3 and parts[0] == "crew":
+            project = _guard_project(parts[1], session)
+            task = next((item for item in project.tasks if item.id == parts[2]), None)
+            if task is None:
+                raise HTTPException(status_code=404, detail="run not found")
+            expected_prefix = f"crew:{project.id}:{task.id}:"
+            if task.run_ref is not None and task.run_ref != run_ref:
+                raise HTTPException(status_code=404, detail="run not found")
+            if task.run_ref is None and not run_ref.startswith(expected_prefix):
+                raise HTTPException(status_code=404, detail="run not found")
+            return
+        for project in crew.list_workspace_projects(session.workspace_id):
+            if any(task.run_ref == run_ref for task in project.tasks):
+                return
+        raise HTTPException(status_code=404, detail="run not found")
 
     def _is_agent_member(member_id: str | None) -> bool:
         """Whether ``member_id`` is an Agent worker (kind=="agent"). Conservative:
@@ -591,6 +703,13 @@ def build_router(
                     active_by_task.add(":".join(parts[2:]))
         for task in data["tasks"]:
             task["run_inflight"] = task["id"] in active_by_task
+            if product_mode and harness_client is not None and task.get("run_ref"):
+                try:
+                    task["run_inflight"] = not harness_client.get(task["run_ref"]).terminal
+                except HarnessHostError:
+                    # The persisted task remains readable when the Host is down;
+                    # do not turn a status probe failure into fabricated progress.
+                    pass
         return data
 
     @router.post("/api/crew/projects/{project_id}/tasks/{task_id}/assign")
@@ -623,6 +742,10 @@ def build_router(
                 "code": "task_not_assignable",
                 "task_status": task.status,
             })
+        if product_mode:
+            return await asyncio.to_thread(
+                _run, lambda: crew.assign(project_id, task_id, request.member_id)
+            )
         return _run(lambda: crew.assign(project_id, task_id, request.member_id))
 
     @router.post("/api/crew/projects/{project_id}/tasks/{task_id}/start")
@@ -671,6 +794,10 @@ def build_router(
                 "code": "task_is_gate",
                 "task_status": task.status,
             })
+        if product_mode:
+            return await asyncio.to_thread(
+                _run, lambda: crew.submit(project_id, task_id, request.artifact)
+            )
         return _run(lambda: crew.submit(project_id, task_id, request.artifact))
 
     @router.post("/api/crew/projects/{project_id}/tasks/{task_id}/review")
@@ -681,6 +808,11 @@ def build_router(
         # async: approve auto-advances downstream + auto-runs agents (R-B #3).
         session = _session(authorization)
         _guard_project(project_id, session)
+        if product_mode:
+            return await asyncio.to_thread(
+                _run,
+                lambda: crew.review(project_id, task_id, request.approved, request.comment),
+            )
         return _run(lambda: crew.review(project_id, task_id, request.approved, request.comment))
 
     @router.post("/api/crew/projects/{project_id}/tasks/{task_id}/run-agent")
@@ -708,6 +840,41 @@ def build_router(
                 "code": "task_not_runnable",
                 "task_status": task.status,
             })
+        if product_mode:
+            if harness_client is None:
+                raise HTTPException(status_code=503, detail="Harness Host is not configured")
+            run_ref = f"crew:{project_id}:{task_id}:v{project.project_version}:manual"
+            try:
+                submitted = await asyncio.to_thread(
+                    harness_client.submit,
+                    _host_worker_task(
+                        project_id,
+                        task_id,
+                        session.user_id,
+                        run_ref=run_ref,
+                    ),
+                )
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            host_runs[(project_id, task_id)] = submitted.run_id
+            executor = HarnessWorkerExecutor(
+                harness_client,
+                memory_store=memory_store,
+                submitted_run_id=submitted.run_id,
+            )
+
+            def _finish_host_worker() -> None:
+                try:
+                    crew.run_agent(project_id, task_id, executor, run_ref=submitted.run_id)
+                except Exception:  # noqa: BLE001 - service records truthful failure
+                    logger.warning("crew manual host worker failed for %s/%s", project_id, task_id, exc_info=True)
+                finally:
+                    host_runs.pop((project_id, task_id), None)
+
+            if host_workers is None:
+                raise HTTPException(status_code=503, detail="Harness worker manager is not configured")
+            host_workers.submit(_finish_host_worker)
+            return {"run_ref": submitted.run_id, "task_id": task_id, "status": submitted.status}
         if execution_store is None:
             raise HTTPException(status_code=503, detail="execution runtime not configured")
         snapshot = _dispatch_start_execution_sync(
@@ -730,6 +897,16 @@ def build_router(
     ) -> dict:
         """Project durable execution events into the legacy frame polling shape."""
         session = _session(authorization)
+        if product_mode:
+            if harness_client is None:
+                raise HTTPException(status_code=503, detail="Harness Host is not configured")
+            _guard_run_ref(run_ref, session)
+            try:
+                host_run = await asyncio.to_thread(harness_client.get, run_ref)
+                events = await asyncio.to_thread(harness_client.events, run_ref, after_seq=from_seq)
+            except HarnessHostError as exc:
+                raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
+            return {"run_ref": run_ref, "frames": _host_events_to_frames(events), "status": host_run.status}
         if execution_kernel is None:
             raise HTTPException(status_code=503, detail="execution runtime not configured")
         try:
@@ -758,7 +935,15 @@ def build_router(
         # async:「@Agent 再改改」re-dispatches the agent's task on this loop (R-B #2).
         session = _session(authorization)
         _guard_project(project_id, session)
-        message = crew.say(project_id, session.user_id, request.body, request.mentions)
+        if product_mode:
+            # ``crew.say`` may fan out a Host-backed @Worker dispatch. Keep that
+            # synchronous service transition off the event loop so a Host callback
+            # into /_business can be served without deadlock.
+            message = await asyncio.to_thread(
+                crew.say, project_id, session.user_id, request.body, request.mentions
+            )
+        else:
+            message = crew.say(project_id, session.user_id, request.body, request.mentions)
         # C3 coordination card: only @Anna + task intent spawns a DRAFT command
         # card in the background. @Human remains notify-only; @Worker steers the
         # active execution path.
@@ -771,6 +956,65 @@ def build_router(
                 except Exception:  # noqa: BLE001 — drafting must not break the say
                     logger.warning("crew intent drafting failed", exc_info=True)
             asyncio.create_task(_draft_intent())
+        if product_mode and harness_client is not None and crew.is_contextual_question(message):
+            # Ordinary @Anna questions are answered through the same Host loop
+            # and appended to the existing channel; no second UI conversation is
+            # created. The context is assembled from persisted Crew facts only.
+            project = crew.get_project(project_id)
+            if project is not None:
+                memory_items = (
+                    memory_store.list_items(
+                        project.workspace_id,
+                        scope="project",
+                        project_id=project.id,
+                        limit=100,
+                    )
+                    if memory_store is not None
+                    else []
+                )
+                context = {
+                    "source": "crew.contextual_answer",
+                    "project_id": project.id,
+                    "source_message_id": message.id,
+                    "project": project.model_dump(mode="json"),
+                    "channel_messages": [
+                        item.model_dump(mode="json") for item in crew.list_channel(project.id)
+                    ],
+                    "project_memory": [
+                        item.model_dump(mode="json") for item in reversed(memory_items)
+                    ],
+                }
+                task = ProductTask(
+                    run_id=f"crew-context:{project.id}:{message.id}",
+                    workspace_id=project.workspace_id,
+                    actor_user_id=session.user_id,
+                    surface="crew",
+                    prompt=message.body,
+                    channel_id=f"crew_channel:{project.id}",
+                    conversation_id=f"crew_project:{project.id}",
+                    context=context,
+                    permission_mode="readonly",
+                    source_event_id=message.id,
+                )
+                try:
+                    answer_run = await asyncio.to_thread(
+                        harness_client.submit_and_wait, task
+                    )
+                    answer = _host_answer(answer_run)
+                    if answer:
+                        await asyncio.to_thread(
+                            crew.append_anna_message,
+                            project.id,
+                            answer,
+                            run_ref=answer_run.run_id,
+                        )
+                except HarnessHostError:
+                    logger.warning(
+                        "crew contextual answer failed for %s/%s",
+                        project_id,
+                        message.id,
+                        exc_info=True,
+                    )
         return message.model_dump(mode="json")
 
     @router.get("/api/crew/notifications")
@@ -1049,3 +1293,37 @@ def build_router(
         return {"proposals": [p.model_dump(mode="json") for p in proposals], "source": source}
 
     return router
+
+
+def _host_events_to_frames(events: list[dict]) -> list[dict]:
+    frames: list[dict] = []
+    for event in events:
+        event_type = event.get("type")
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+        if event_type in {"run.text.delta", "assistant.text.delta", "text_delta"}:
+            text = payload.get("text") or event.get("text")
+            if isinstance(text, str):
+                frame = {"type": "text_delta", "text": text}
+            else:
+                frame = {"type": "event", "event": event}
+        elif event_type in {"run.tool.started", "tool_start"}:
+            name = payload.get("tool") or payload.get("name") or event.get("name")
+            frame = {"type": "tool_start", "name": name} if isinstance(name, str) else {"type": "event", "event": event}
+        elif event_type in {"run.tool.completed", "tool_done"}:
+            name = payload.get("tool") or payload.get("name") or event.get("name")
+            frame = {"type": "tool_done", "name": name} if isinstance(name, str) else {"type": "event", "event": event}
+        else:
+            frame = {"type": "event", "event": event}
+        if isinstance(event.get("seq"), int):
+            frame["seq"] = event["seq"]
+        frames.append(frame)
+    return frames
+
+
+def _host_answer(run) -> str | None:
+    result = run.result or {}
+    for key in ("answer", "assistant_message", "text", "output"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None

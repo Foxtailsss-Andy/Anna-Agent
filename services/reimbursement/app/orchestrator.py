@@ -12,6 +12,7 @@ from services.reimbursement.app.capability import ReimbursementCapabilityHandler
 from services.reimbursement.app.policy import ReimbursementPolicy
 from services.reimbursement.app.schemas import (
     AttachmentRef,
+    ApprovalRequest,
     ReimbursementDraft,
     ReimbursementRun,
     ReimbursementWriteAction,
@@ -190,6 +191,105 @@ class ReimbursementOrchestrator(BaseOrchestrator):
         """Apply supplied fields, record the event, then run the ReAct loop."""
         self._record_answers(run, answers)
         return self._save_and_return(self._advance_run(run))
+
+    def apply_host_result(
+        self, run: ReimbursementRun, result: dict[str, Any], *, host_status: str
+    ) -> ReimbursementRun:
+        """Project a Host-owned reimbursement task into the business state.
+
+        The Python service keeps draft/approval/readback schemas authoritative;
+        the Host owns the model loop that decides which admitted tool to call.
+        A completed Host run without a valid business state is therefore a
+        failed run, never a fabricated completed reimbursement.
+        """
+        if host_status in {"queued", "running", "resumed"}:
+            return self._save_and_return(run)
+        if host_status in {"awaiting_input", "awaiting_approval"}:
+            try:
+                run.status = self._derive_business_status(run)
+            except ValueError:
+                return self._save_and_return(
+                    self._fail_run(
+                        run,
+                        "harness_result_invalid",
+                        "Host parked reimbursement without a business pause fact",
+                    )
+                )
+            return self._save_and_return(run)
+        if host_status not in {"completed", "succeeded"}:
+            derived = self._derive_business_status(run)
+            if derived not in {"completed", "verify_pending"}:
+                return self._save_and_return(
+                    self._fail_run(
+                        run,
+                        str(result.get("error_code") or result.get("code") or "harness_task_failed"),
+                        str(result.get("error_message") or result.get("message") or "Harness Host reimbursement task failed"),
+                    )
+                )
+            run.status = derived
+            return self._save_and_return(run)
+        try:
+            draft = result.get("draft")
+            if isinstance(draft, dict):
+                # Host/model output is a proposal. External identity/status are
+                # connector-owned and may only be changed by create/submit and
+                # its verified readback, so merge user-editable fields only.
+                proposed = {
+                    key: value
+                    for key, value in draft.items()
+                    if key in USER_EDITABLE_DRAFT_FIELDS
+                }
+                if proposed:
+                    current = run.draft.model_dump(mode="json")
+                    current.update(proposed)
+                    run.draft = ReimbursementDraft.model_validate(current)
+            missing = result.get("missing_fields")
+            if isinstance(missing, list):
+                run.missing_fields = [str(item) for item in missing if isinstance(item, str)]
+            answer = result.get("answer")
+            if answer is None:
+                answer = result.get("agent_message")
+            if isinstance(answer, str):
+                run.answer = answer
+                run.agent_message = answer
+            approval = result.get("approval")
+            if isinstance(approval, dict):
+                proposed_approval = ApprovalRequest.model_validate(approval)
+                if run.approval is None or proposed_approval.id != run.approval.id:
+                    raise ValueError("Host approval must be created by the business adapter")
+            run.status = self._derive_business_status(run)
+        except (TypeError, ValueError) as exc:
+            return self._save_and_return(
+                self._fail_run(run, "harness_result_invalid", str(exc))
+            )
+        self.audit.append(
+            run.audit_events,
+            "harness.task.completed",
+            run.id,
+            {"surface": "reimbursement"},
+        )
+        return self._save_and_return(run)
+
+    def _derive_business_status(self, run: ReimbursementRun) -> str:
+        """Derive state from connector-owned facts, never model prose."""
+        if run.write_action is not None:
+            if run.write_action.status == "failed":
+                return "failed"
+            if run.write_action.verify_status == "verified":
+                if run.draft.external_reimbursement_id and run.draft.external_status:
+                    return "completed"
+                return "verify_pending"
+            if run.write_action.verify_status == "verify_pending":
+                return "verify_pending"
+        if run.approval is not None and run.approval.status == "pending":
+            return "waiting_confirmation"
+        if run.missing_fields:
+            return "collecting"
+        if run.draft.external_reimbursement_id:
+            return "draft_created"
+        if run.status in {"validating", "collecting"}:
+            return "collecting"
+        raise ValueError("Host result omitted reimbursement state")
 
     def _record_answers(self, run: ReimbursementRun, answers: dict[str, Any]) -> None:
         """Record step shared by the streaming / non-streaming answers entries."""

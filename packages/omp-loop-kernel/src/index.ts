@@ -16,6 +16,7 @@ export {
 export {
   runManagedOmpWorker,
   type HostModelResponse,
+  type ManagedOmpWorkerControl,
   type ManagedOmpWorkerOptions,
 } from "./worker-client";
 export * from "./protocol";

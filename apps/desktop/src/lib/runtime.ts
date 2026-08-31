@@ -8,7 +8,7 @@ declare global {
   interface Window {
     __ANNA_RUNTIME__?: {
       apiBase?: string;
-      mode?: "preview";
+      mode?: "product" | "preview";
       /** Legacy renderer surface; the default Preview preload does not set it. */
       v2ApiBase?: string;
       harnessV2ApiBase?: string;

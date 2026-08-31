@@ -33,6 +33,7 @@ test("actual worker restores a consumed transcript and continues without replay"
     { role: "user", content: "read report" },
     {
       role: "assistant",
+      reasoningContent: "I should inspect the report before continuing.",
       content: [{ type: "toolCall", id: "call-1", name: "read_only", arguments: { path: "report.txt" } }],
       stopReason: "toolUse",
       usage: { input: 3, output: 2 },
@@ -58,7 +59,12 @@ test("actual worker restores a consumed transcript and continues without replay"
           ...response(frame),
           kind: "model.end",
           index: 0,
-          message: { role: "assistant", content: [{ type: "text", text: "continued" }], stopReason: "stop" },
+          message: {
+            role: "assistant",
+            reasoningContent: "The restored report is available.",
+            content: [{ type: "text", text: "continued" }],
+            stopReason: "stop",
+          },
         });
       } else if (frame.kind === "tool.request") {
         toolRequests += 1;
@@ -371,6 +377,136 @@ test("actual worker resumes only the pending member of a partially completed too
   expect(observed.at(-1)).toMatchObject({ kind: "terminal.proposed", outcome: "completed" });
 }, 20_000);
 
+test("actual worker executes a non-read-only admitted proxy tool", async () => {
+  const tool = {
+    name: "workspace_read",
+    description: "Read an admitted workspace file.",
+    parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+  };
+  const observed: WorkerFrame[] = [];
+  const modelContexts: Array<unknown> = [];
+  let modelRequests = 0;
+  let toolRequests = 0;
+  const result = await probe({
+    allowedTools: [tool],
+    onFrame: (frame, send) => {
+      if (frame.kind === "ready" || frame.kind === "event") {
+        send(receipt(frame));
+      } else if (frame.kind === "model.request") {
+        modelRequests += 1;
+        modelContexts.push(frame.context);
+        send(modelRequests === 1 ? {
+          ...response(frame),
+          kind: "model.end",
+          index: 0,
+          message: {
+            role: "assistant",
+            reasoningContent: "I need the workspace file.",
+            content: [{ type: "toolCall", id: "workspace-call", name: "workspace_read", arguments: { path: "report.txt" } }],
+            stopReason: "toolUse",
+          },
+        } : {
+          ...response(frame),
+          kind: "model.end",
+          index: 0,
+          message: {
+            role: "assistant",
+            reasoningContent: "The workspace file is ready.",
+            content: [{ type: "text", text: "done" }],
+            stopReason: "stop",
+          },
+        });
+      } else if (frame.kind === "tool.request") {
+        toolRequests += 1;
+        expect(frame.name).toBe("workspace_read");
+        send({ ...response(frame), kind: "tool.result", toolCallId: frame.toolCallId, status: "succeeded", output: "report body" });
+      }
+    },
+    observed,
+  });
+
+  expect(result.code).toBe(0);
+  expect(result.stderr).toBe("");
+  expect(modelRequests).toBe(2);
+  expect(toolRequests, JSON.stringify(observed)).toBe(1);
+  expect(modelContexts[0]).toMatchObject({ tools: [tool] });
+  expect(modelContexts[1]).toMatchObject({ tools: [tool], messages: [
+    { role: "user", content: "do not repeat this goal" },
+    { role: "assistant", content: [{ type: "toolCall", name: "workspace_read" }], stopReason: "toolUse" },
+    { role: "toolResult", toolName: "workspace_read", content: "report body", status: "succeeded" },
+  ] });
+  expect(observed.at(-1)).toMatchObject({ kind: "terminal.proposed", outcome: "completed" });
+}, 20_000);
+
+test("actual worker uses native TodoTool and carries its phases through the loop", async () => {
+  const todo = {
+    name: "todo",
+    description: "Track work.",
+    parameters: { type: "object" },
+  };
+  const observed: WorkerFrame[] = [];
+  const modelContexts: Array<unknown> = [];
+  let modelRequests = 0;
+  let toolRequests = 0;
+  const result = await probe({
+    allowedTools: [todo],
+    onFrame: (frame, send) => {
+      if (frame.kind === "ready" || frame.kind === "event") {
+        send(receipt(frame));
+      } else if (frame.kind === "model.request") {
+        modelRequests += 1;
+        modelContexts.push(frame.context);
+        const message = modelRequests === 1
+          ? {
+              role: "assistant" as const,
+              content: [{ type: "toolCall" as const, id: "todo-init", name: "todo", arguments: {
+                op: "init", list: [{ phase: "Delivery", items: ["Ship parity slice"] }],
+              } }],
+              stopReason: "toolUse" as const,
+            }
+          : modelRequests === 2
+            ? {
+                role: "assistant" as const,
+                content: [{ type: "toolCall" as const, id: "todo-done", name: "todo", arguments: {
+                  op: "done", task: "Ship parity slice",
+                } }],
+                stopReason: "toolUse" as const,
+              }
+            : {
+                role: "assistant" as const,
+                content: [{ type: "text" as const, text: "done" }],
+                stopReason: "stop" as const,
+              };
+        send({ ...response(frame), kind: "model.end", index: 0, message });
+      } else if (frame.kind === "tool.request") {
+        toolRequests += 1;
+      }
+    },
+    observed,
+  });
+
+  expect(result.code, result.stderr).toBe(0);
+  expect(result.stderr).toBe("");
+  expect(modelRequests).toBe(3);
+  expect(toolRequests).toBe(0);
+  expect(modelContexts[0]).toMatchObject({ tools: [todo] });
+  expect(modelContexts[1]).toMatchObject({ tools: [todo] });
+  expect((modelContexts[1] as { messages: Message[] }).messages.at(-1)).toMatchObject({
+    role: "toolResult",
+    toolName: "todo",
+    details: { phases: [{ name: "Delivery", tasks: [{ content: "Ship parity slice", status: "in_progress" }] }] },
+  });
+  const todoResults = observed
+    .filter((frame) => frame.kind === "event" && frame.event.type === "message_end")
+    .map((frame) => frame.kind === "event" && frame.event.type === "message_end" ? frame.event.message : undefined)
+    .filter((message): message is Message => message !== undefined)
+    .filter((message) => message.role === "toolResult" && message.toolName === "todo");
+  expect(todoResults).toHaveLength(2);
+  expect(todoResults[0]).toMatchObject({ details: { phases: [{ name: "Delivery" }] } });
+  expect(todoResults[1]).toMatchObject({ details: { phases: [{ name: "Delivery", tasks: [{ status: "completed" }] }] } });
+  expect(observed.at(-1)).toMatchObject({ kind: "terminal.proposed", outcome: "completed" });
+}, 25_000);
+
 test("actual worker rejects an explicitly empty restore transcript", async () => {
   const observed: WorkerFrame[] = [];
   const result = await probe({
@@ -385,7 +521,12 @@ test("actual worker rejects an explicitly empty restore transcript", async () =>
 }, 15_000);
 
 interface ProbeOptions {
-  readonly transcript: readonly Message[];
+  readonly transcript?: readonly Message[];
+  readonly allowedTools?: readonly {
+    readonly name: string;
+    readonly description: string;
+    readonly parameters: { readonly [key: string]: unknown };
+  }[];
   readonly onFrame: (frame: WorkerFrame, send: (frame: HostFrame) => void) => void;
   readonly observed: WorkerFrame[];
   readonly timeoutMs?: number;
@@ -431,10 +572,10 @@ async function probe(options: ProbeOptions): Promise<{ code: number | null; stde
       protocol: "anna-omp/1", kind: "start", frameId: "start", requestId: "start", workerSeq: -1,
       binding: { workspaceId: "w", channelId: "c", runId: "r", attemptId: "a", commandId: "cmd", profileHash: "hash" },
       input: {
-        systemPrompt: "test", goal: "do not repeat this goal", modelId: "fixture", allowedTools: [
+        systemPrompt: "test", goal: "do not repeat this goal", modelId: "fixture", allowedTools: options.allowedTools ?? [
           { name: "read_only", description: "read", parameters: { type: "object" } },
         ], snapshotDigest: "snapshot", originalExecutionFingerprint: "input",
-        transcript: options.transcript,
+        ...(options.transcript === undefined ? {} : { transcript: options.transcript }),
       },
     } as unknown as HostFrame);
     return { code: await exited, stderr };

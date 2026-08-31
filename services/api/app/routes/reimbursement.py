@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 from typing import Any
 from urllib.parse import unquote
 
@@ -7,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from services.reimbursement.app.orchestrator import ReimbursementOrchestrator
+from services.business.harness_client import HarnessHostClient, HarnessHostError, HarnessRun, ProductTask, result_payload
 from services.runtime.app.event_stream import stream_run_action
 
 from ..schemas import (
@@ -24,8 +28,18 @@ from ..validators.attachments import (
 from ._sse import SSE_HEADERS, sse_frame
 
 
-def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
+def build_router(
+    reimbursement: ReimbursementOrchestrator,
+    *,
+    harness_client: HarnessHostClient | None = None,
+    product_mode: bool = False,
+) -> APIRouter:
     router = APIRouter()
+
+    def require_host() -> HarnessHostClient:
+        if not product_mode or harness_client is None:
+            raise HTTPException(status_code=503, detail="Harness Host is not configured")
+        return harness_client
 
     @router.post("/api/cowork/reimbursements/runs")
     def create_reimbursement_run(
@@ -42,12 +56,29 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
         _assert_imported_attachment_list(
             request.attachments, reimbursement, anna_workspace_id, anna_user_id
         )
-        run = reimbursement.start_run(
-            workspace_id=request.workspace_id,
-            actor_user_id=request.actor_user_id,
-            input_text=request.input_text,
-            attachments=request.attachments,
-        )
+        if product_mode:
+            run = reimbursement.begin_run(
+                workspace_id=request.workspace_id,
+                actor_user_id=request.actor_user_id,
+                input_text=request.input_text,
+                attachments=request.attachments,
+            )
+            reimbursement._record_created(run, request.input_text)
+            try:
+                host_run = require_host().submit_and_wait(_task_for_reimbursement_run(run, stage="create"))
+            except HarnessHostError as exc:
+                run = reimbursement._save_and_return(
+                    reimbursement._fail_run(run, exc.code or "harness_request_failed", "Harness Host reimbursement task failed")
+                )
+            else:
+                run = reimbursement.apply_host_result(run, result_payload(host_run), host_status=host_run.status)
+        else:
+            run = reimbursement.start_run(
+                workspace_id=request.workspace_id,
+                actor_user_id=request.actor_user_id,
+                input_text=request.input_text,
+                attachments=request.attachments,
+            )
         return run.model_dump(mode="json")
 
     @router.get("/api/cowork/reimbursements/runs")
@@ -88,7 +119,24 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
             anna_user_id,
         )
         try:
-            updated = reimbursement.answer_missing_fields(run_id, request.answers)
+            if product_mode:
+                reimbursement._record_answers(run, request.answers)
+                host_run = require_host().submit_and_wait(
+                    _task_for_reimbursement_run(
+                        run,
+                        stage="answers",
+                        answers=request.answers,
+                        host_run_id=_linked_host_run_id(run, "answers", request.answers),
+                        linked_run_id=run.id,
+                    )
+                )
+                updated = reimbursement.apply_host_result(
+                    run, result_payload(host_run), host_status=host_run.status
+                )
+            else:
+                updated = reimbursement.answer_missing_fields(run_id, request.answers)
+        except HarnessHostError as exc:
+            raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return updated.model_dump(mode="json")
@@ -129,8 +177,31 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
                 approval_id=approval_id,
                 approved_by=request.approved_by,
             )
+            if product_mode and updated.write_action is not None:
+                host_run = require_host().submit_and_wait(
+                    _task_for_reimbursement_run(
+                        updated,
+                        stage="approval",
+                        linked_run_id=updated.id,
+                        host_run_id=_linked_host_run_id(
+                            updated,
+                            "approval",
+                            {"approval_id": approval_id, "approved_by": request.approved_by},
+                        ),
+                        continuation_facts={
+                            "approval_id": approval_id,
+                            "approved_by": request.approved_by,
+                            "write_action": updated.write_action.model_dump(mode="json"),
+                        },
+                    )
+                )
+                updated = reimbursement.apply_host_result(
+                    updated, result_payload(host_run), host_status=host_run.status
+                )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except HarnessHostError as exc:
+            raise HTTPException(status_code=502, detail=exc.code or "harness_request_failed") from exc
         return updated.model_dump(mode="json")
 
     @router.post("/api/cowork/reimbursements/approvals/{approval_id}/reject")
@@ -234,6 +305,11 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
         )
 
         async def event_stream():
+            if product_mode:
+                reimbursement._record_created(run, request.input_text)
+                async for frame in _stream_host_reimbursement(reimbursement, run, stage="create", client=require_host()):
+                    yield sse_frame(frame)
+                return
             async for frame in reimbursement.stream_created_advance(
                 run, request.input_text
             ):
@@ -266,6 +342,17 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         async def event_stream():
+            if product_mode:
+                reimbursement._record_answers(run, request.answers)
+                async for frame in _stream_host_reimbursement(
+                    reimbursement,
+                    run,
+                    stage="answers",
+                    answers=request.answers,
+                    client=require_host(),
+                ):
+                    yield sse_frame(frame)
+                return
             async for frame in reimbursement.stream_answers_advance(
                 run, request.answers
             ):
@@ -282,11 +369,9 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
     ) -> StreamingResponse:
-        # Deliberately NOT migrated to the engine: approve_submit is the
-        # RESUME path — a direct adapter.submit() + verify readback with no
-        # model in the loop (spec §2/§4.2), so there are no engine frames to
-        # stream. stream_run_action (retained for not-yet-migrated paths per
-        # spec §5) still streams its audit events live.
+        # The external submit/readback remains a deterministic business effect,
+        # but product mode also records an explicit linked Host continuation so
+        # the approval turn has canonical Host evidence and an assistant tail.
         run = reimbursement.get_run_by_approval_id(approval_id)
         if run is None:
             raise HTTPException(status_code=404, detail="approval request not found")
@@ -295,6 +380,31 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
             raise HTTPException(status_code=403, detail="approved_by must match current user")
 
         async def event_stream():
+            if product_mode:
+                try:
+                    updated = await asyncio.to_thread(
+                        reimbursement.approve_submit,
+                        approval_id=approval_id,
+                        approved_by=request.approved_by,
+                    )
+                    if updated.write_action is None:
+                        yield sse_frame({"type": "done", "run": updated})
+                        return
+                    async for frame in _stream_host_reimbursement(
+                        reimbursement,
+                        updated,
+                        stage="approval",
+                        continuation_facts={
+                            "approval_id": approval_id,
+                            "approved_by": request.approved_by,
+                            "write_action": updated.write_action.model_dump(mode="json"),
+                        },
+                        client=require_host(),
+                    ):
+                        yield sse_frame(frame)
+                except (HarnessHostError, ValueError) as exc:
+                    yield sse_frame({"type": "error", "message": str(exc)})
+                return
             async for event in stream_run_action(
                 run,
                 lambda: reimbursement.approve_submit(
@@ -308,3 +418,160 @@ def build_router(reimbursement: ReimbursementOrchestrator) -> APIRouter:
         )
 
     return router
+
+
+def _task_for_reimbursement_run(
+    run,
+    *,
+    stage: str,
+    answers: dict[str, Any] | None = None,
+    host_run_id: str | None = None,
+    linked_run_id: str | None = None,
+    continuation_facts: dict[str, Any] | None = None,
+) -> ProductTask:
+    if stage != "create":
+        linked_run_id = linked_run_id or run.id
+        host_run_id = host_run_id or _linked_host_run_id(run, stage, answers)
+    context: dict[str, Any] = {
+        "source": "cowork.reimbursement",
+        "stage": stage,
+        "draft": run.draft.model_dump(mode="json"),
+        "missing_fields": list(run.missing_fields),
+    }
+    if answers is not None:
+        context["answers"] = answers
+    if continuation_facts is not None:
+        context["continuation_facts"] = continuation_facts
+    if linked_run_id is not None:
+        context["linked_run_id"] = linked_run_id
+        context["continuation_kind"] = stage
+        context["original_business_state"] = {
+            "run_id": run.id,
+            "status": run.status,
+            "draft": run.draft.model_dump(mode="json"),
+            "missing_fields": list(run.missing_fields),
+            "approval": (
+                run.approval.model_dump(mode="json")
+                if run.approval is not None
+                else None
+            ),
+            "write_action": (
+                run.write_action.model_dump(mode="json")
+                if run.write_action is not None
+                else None
+            ),
+        }
+    run_id = host_run_id or run.id
+    return ProductTask(
+        run_id=run_id,
+        workspace_id=run.workspace_id,
+        actor_user_id=run.actor_user_id,
+        surface="reimbursement",
+        prompt=run.input_text if stage == "create" else "根据补充信息继续处理报销",
+        conversation_id=f"reimbursement:{run.id}",
+        context=context,
+        permission_mode="ask",
+        source_event_id=f"reimbursement:{run.id}:{stage}",
+    )
+
+
+def _linked_host_run_id(
+    run,
+    stage: str,
+    facts: dict[str, Any] | None = None,
+) -> str:
+    # Include the business snapshot in the identity so a repeated answer after
+    # a connector mutation cannot collide with the prior Host task.
+    fingerprint = {
+        "stage": stage,
+        "facts": facts or {},
+        "status": run.status,
+        "draft": run.draft.model_dump(mode="json"),
+        "missing_fields": list(run.missing_fields),
+        "approval_id": run.approval.id if run.approval is not None else None,
+        "write_action_id": run.write_action.id if run.write_action is not None else None,
+    }
+    digest = hashlib.sha256(
+        json.dumps(fingerprint, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    return f"{run.id}:{stage}:{digest}"
+
+
+async def _stream_host_reimbursement(
+    reimbursement: ReimbursementOrchestrator,
+    run,
+    *,
+    stage: str,
+    client: HarnessHostClient,
+    answers: dict[str, Any] | None = None,
+    continuation_facts: dict[str, Any] | None = None,
+):
+    try:
+        linked_run_id = run.id if stage != "create" else None
+        host_run_id = (
+            run.id
+            if linked_run_id is None
+            else _linked_host_run_id(
+                run,
+                stage,
+                {"answers": answers, "facts": continuation_facts},
+            )
+        )
+        submitted = await asyncio.to_thread(
+            client.submit,
+            _task_for_reimbursement_run(
+                run,
+                stage=stage,
+                answers=answers,
+                host_run_id=host_run_id,
+                linked_run_id=linked_run_id,
+                continuation_facts=continuation_facts,
+            ),
+        )
+        for event in run.audit_events:
+            yield {"type": "event", "event": event}
+        after_seq = -1
+        while True:
+            events = await asyncio.to_thread(client.events, submitted.run_id, after_seq=after_seq)
+            for event in events:
+                after_seq = max(after_seq, _event_seq(event))
+                yield _host_event_frame(event)
+            current = await asyncio.to_thread(client.get, submitted.run_id)
+            if current.terminal:
+                updated = reimbursement.apply_host_result(
+                    run, result_payload(current), host_status=current.status
+                )
+                yield {"type": "done", "run": updated}
+                return
+            await asyncio.sleep(0.05)
+    except HarnessHostError as exc:
+        failed = reimbursement._save_and_return(
+            reimbursement._fail_run(
+                run,
+                exc.code or "harness_request_failed",
+                "Harness Host reimbursement task failed",
+            )
+        )
+        yield {"type": "done", "run": failed}
+
+
+def _host_event_frame(event: dict) -> dict:
+    event_type = event.get("type")
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    if event_type in {"run.text.delta", "assistant.text.delta", "text_delta"}:
+        text = payload.get("text") or event.get("text")
+        if isinstance(text, str):
+            return {"type": "text_delta", "text": text}
+    if event_type in {"run.tool.started", "tool_start"}:
+        name = payload.get("tool") or payload.get("name") or event.get("name")
+        if isinstance(name, str):
+            return {"type": "tool_start", "name": name}
+    if event_type in {"run.tool.completed", "tool_done"}:
+        name = payload.get("tool") or payload.get("name") or event.get("name")
+        if isinstance(name, str):
+            return {"type": "tool_done", "name": name}
+    return {"type": "event", "event": event}
+
+
+def _event_seq(event: dict) -> int:
+    return event.get("seq") if isinstance(event.get("seq"), int) else -1
