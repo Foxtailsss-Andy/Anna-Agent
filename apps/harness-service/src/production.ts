@@ -89,6 +89,38 @@ export interface LiveHarnessV2RuntimeOptions {
   readonly agentDirectives?: Readonly<Record<string, string>>;
 }
 
+export interface ProductModelConfig {
+  readonly model_name: string;
+  readonly endpoint: string;
+  readonly api_key: string;
+}
+
+export interface SelectedProductModelConfig {
+  readonly profile_id: string;
+  readonly config: ProductModelConfig;
+}
+
+export function selectProductModelConfig(
+  defaultConfig: ProductModelConfig,
+  modelProfiles: LiveHarnessV2RuntimeOptions["modelProfiles"],
+  task?: ProductTask,
+): SelectedProductModelConfig {
+  const profileId = task?.model_profile_id
+    ?? (typeof task?.context?.model_profile_id === "string" ? task.context.model_profile_id : undefined);
+  const selected = profileId === undefined ? undefined : modelProfiles?.[profileId];
+  if (profileId === undefined || selected === undefined || selected.model_name.trim() === "") {
+    return { profile_id: "default", config: defaultConfig };
+  }
+  return {
+    profile_id: profileId,
+    config: {
+      model_name: selected.model_name.trim(),
+      endpoint: selected.endpoint ?? defaultConfig.endpoint,
+      api_key: selected.api_key ?? defaultConfig.api_key,
+    },
+  };
+}
+
 export interface LiveHarnessV2KernelOptions {
   readonly endpoint: string;
   readonly apiKey: string;
@@ -344,24 +376,11 @@ export async function createLiveHarnessV2Runtime(
     selectedKernelDescriptor,
     options.requireOmp === true,
   );
-  const modelConfigByName = new Map<string, {
-    readonly model_name: string;
-    readonly endpoint: string;
-    readonly api_key: string;
-  }>();
-  modelConfigByName.set(config.model_name, {
+  const defaultModelConfig: ProductModelConfig = {
     model_name: config.model_name,
     endpoint: config.model_endpoint,
     api_key: config.model_api_key,
-  });
-  for (const entry of Object.values(options.modelProfiles ?? {})) {
-    if (entry.model_name.trim() === "") continue;
-    modelConfigByName.set(entry.model_name, {
-      model_name: entry.model_name,
-      endpoint: entry.endpoint ?? config.model_endpoint,
-      api_key: entry.api_key ?? config.model_api_key,
-    });
-  }
+  };
   const reviewGateConfigured = await probeReviewGate(
     options.reviewApprovalOrigin ?? process.env.ANNA_T07_LIVE_APPROVAL_ORIGIN,
     options.reviewOwnerId ?? process.env.ANNA_T07_LIVE_OWNER_ID,
@@ -425,13 +444,9 @@ export async function createLiveHarnessV2Runtime(
     workerProfileId: profile.workerProfileId,
   });
   const ompKernels = new Map<string, OmpLoopKernel>();
-  const createOmpKernel = (selected: {
-    readonly model_name: string;
-    readonly endpoint: string;
-    readonly api_key: string;
-  }): OmpLoopKernel | undefined => {
+  const createOmpKernel = (selected: SelectedProductModelConfig): OmpLoopKernel | undefined => {
     if (ompDescriptor === undefined || ompRuntimeRoot === undefined) return undefined;
-    const existing = ompKernels.get(selected.model_name);
+    const existing = ompKernels.get(selected.profile_id);
     if (existing !== undefined) return existing;
     const kernel = new OmpLoopKernel({
       runtimeRoot: ompRuntimeRoot,
@@ -454,20 +469,22 @@ export async function createLiveHarnessV2Runtime(
             ),
           }),
       modelTransport: options.ompModelTransport ?? createOmpModelTransport({
-        endpoint: selected.endpoint,
-        apiKey: selected.api_key,
-        modelName: selected.model_name,
+        endpoint: selected.config.endpoint,
+        apiKey: selected.config.api_key,
+        modelName: selected.config.model_name,
       }),
     });
-    ompKernels.set(selected.model_name, kernel);
+    ompKernels.set(selected.profile_id, kernel);
     return kernel;
   };
-  const defaultOmpKernel = createOmpKernel(modelConfigByName.get(config.model_name)!);
+  const defaultOmpKernel = createOmpKernel({ profile_id: "default", config: defaultModelConfig });
+  const modelConfigFor = (command: StartRun): SelectedProductModelConfig => selectProductModelConfig(
+    defaultModelConfig,
+    options.modelProfiles,
+    options.productTaskPeek?.(String(command.runId)),
+  );
   const ompKernelFor = (command: StartRun): OmpLoopKernel | undefined =>
-    createOmpKernel(
-      modelConfigByName.get(command.runProfileSnapshot.model.name)
-        ?? modelConfigByName.get(config.model_name)!,
-    );
+    createOmpKernel(modelConfigFor(command)) ?? defaultOmpKernel;
   const owners = new Map<string, { command: StartRun; kernel: LoopKernel }>();
   const ownerFor = (runId: string, scope?: { workspaceId: string; channelId: string }): LoopKernel => {
     const matches = [...owners.values()].filter(owner => owner.command.runId === runId
@@ -534,7 +551,7 @@ export async function createLiveHarnessV2Runtime(
         }
         if (
           command.runProfileSnapshot.model.provider !== profile.model.provider
-          || !modelConfigByName.has(command.runProfileSnapshot.model.name)
+          || command.runProfileSnapshot.model.name !== modelConfigFor(command).config.model_name
         ) {
           throw new KernelSelectionError({
             code: "kernel_unavailable",
@@ -760,7 +777,7 @@ export async function createLiveProfile(
     name: modelName,
     reasoning: "high" as const,
   };
-  const toolNames = toolNamesForSurface(surface, webSearchEnabled);
+  const toolNames = toolNamesForSurface(surface, webSearchEnabled, productMode);
   const budget = productMode
     ? { wallTimeMs: 180_000, turns: 12, toolCalls: 64 }
     : { wallTimeMs: 30_000, turns: 3 };
@@ -782,7 +799,9 @@ export async function createLiveProfile(
     workerProfile: {
       id: (surface === "create"
         ? "worker:harness-v2-create"
-        : `worker:harness-v2-${surface}`) as WorkerProfileId,
+        : productMode
+          ? `worker:harness-v2-${surface}`
+          : "worker:harness-v2-live") as WorkerProfileId,
       version: "1.0.0",
       instructions: surface === "create"
         ? "Create one reviewable artifact with the approved Tool. Do not claim activation."
@@ -796,7 +815,9 @@ export async function createLiveProfile(
     runProfile: {
       id: (surface === "create"
         ? "profile:harness-v2-create"
-        : `profile:harness-v2-${surface}`) as RunProfileId,
+        : productMode
+          ? `profile:harness-v2-${surface}`
+          : "profile:harness-v2-live") as RunProfileId,
       version: "1.0.0",
       model,
       skillIds: [skill.id],
@@ -981,9 +1002,12 @@ function canonicalToolName(name: string): string {
 function toolNamesForSurface(
   surface: "general" | "create" | "chat" | "hiker" | "reimbursement" | "crew",
   webSearchEnabled: boolean,
+  productMode = false,
 ): string[] {
   const names = surface === "create"
-    ? ["todo", "create.emit_skill_draft", "create.emit_prompt_draft", "create.emit_python_tool_draft"]
+    ? productMode
+      ? ["todo", "create.emit_skill_draft", "create.emit_prompt_draft", "create.emit_python_tool_draft"]
+      : ["create_artifact"]
     : surface === "chat"
       ? ["todo", "chat.emit_page", "chat.emit_document", "workdir.read_file"]
       : surface === "hiker"

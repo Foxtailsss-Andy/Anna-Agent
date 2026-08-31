@@ -13,7 +13,7 @@
 - Keep Runtime modules deep behind small interfaces. Treat connectors as adapters at edge seams; tests and callers should cross the same interface.
 - Do not add domain-specific branches to the Harness core when an adapter or run profile can express the variation.
 - Never invent business data, model output, tool output, telemetry, token counts, or success states. Missing evidence stays missing.
-- Windows remains the long-term primary distribution target. The Harness-first Preview is currently validated only on macOS arm64; do not claim Windows/Linux release acceptance.
+- Windows remains the long-term primary distribution target. Current Harness-first product validation is limited to macOS arm64; do not claim Windows/Linux release acceptance.
 
 ## Local development
 
@@ -38,4 +38,4 @@ npm run build
 
 Windows tests that create symbolic links require Developer Mode or the Create symbolic links privilege. Report that environmental limitation; do not weaken the tests.
 
-Python 3.12/3.13 is needed for retained legacy tests, not for the default Preview runtime. Keep the legacy sources and data intact while migration continues.
+Python 3.12/3.13 is needed for the model-less business adapter and retained Python tests. It does not own Agent execution. Keep the original sources and data intact while migration continues.

@@ -167,4 +167,83 @@ describe("Product Host public seams", () => {
     });
     expect(chatSubmit.status).toBe(503);
   });
+
+  test("restores matching conversation history chronologically and keeps the recent tail", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "anna-product-history-"));
+    directories.push(directory);
+    await writeFile(join(directory, "index.html"), '<div id="root"></div>\n');
+    const eventByRun = new Map<string, CanonicalEvent[]>();
+    const starts: Array<Record<string, unknown>> = [];
+    const runtime = {
+      evidenceMode: "test" as const,
+      surfaces: ["chat"] as const,
+      async start(_surface: string, input: unknown) {
+        const body = input as { run_id: string };
+        const turn = Number(body.run_id.split("-").at(-1));
+        starts.push({ ...body });
+        eventByRun.set(body.run_id, [
+          conversationEvent(body.run_id, 0, "user", `user-${turn}`),
+          conversationEvent(body.run_id, 1, "assistant", `assistant-${turn}`),
+        ]);
+        return { runId: body.run_id, status: "queued" as const };
+      },
+      async readEvents(_workspace: string, _channel: string, runId: string, fromSeq = -1) {
+        return (eventByRun.get(runId) ?? []).filter((event) => event.seq > fromSeq);
+      },
+    };
+    const sessions = new ProductSessionStore();
+    const service = await startProductHost({
+      runtime,
+      eventStore: new InMemoryEventStore(),
+      staticRoot: directory,
+      serviceToken: "test-service-token",
+      sessionStore: sessions,
+      now: () => new Date(1_000 + starts.length).toISOString(),
+    });
+    services.push(service);
+
+    for (let turn = 1; turn <= 10; turn += 1) {
+      const response = await fetch(`${service.url}/_harness/runs`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-anna-service-token": "test-service-token" },
+        body: JSON.stringify({
+          run_id: `run-${turn}`,
+          workspace_id: "workspace-1",
+          actor_user_id: "user-1",
+          surface: "chat",
+          prompt: `prompt-${turn}`,
+          channel_id: "channel-1",
+          conversation_id: "conversation-1",
+        }),
+      });
+      expect(response.status).toBe(202);
+    }
+
+    const history = sessions.peek("run-10")?.task.context?.conversation_history;
+    const expected: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (let turn = 2; turn <= 9; turn += 1) {
+      expected.push({ role: "user", content: `user-${turn}` });
+      expected.push({ role: "assistant", content: `assistant-${turn}` });
+    }
+    expect(history).toEqual(expected);
+  });
 });
+
+function conversationEvent(
+  runId: string,
+  seq: number,
+  role: "user" | "assistant",
+  text: string,
+): CanonicalEvent {
+  return {
+    id: `${runId}:message:${seq}` as never,
+    workspaceId: "workspace-1" as never,
+    channelId: "channel-1" as never,
+    streamId: runId as never,
+    seq,
+    type: "omp.transcript.message",
+    timestamp: new Date(2_000 + seq).toISOString(),
+    schemaVersion: 1,
+    payload: { message: { role, content: [{ type: "text", text }] } },
+  };
+}

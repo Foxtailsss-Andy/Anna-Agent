@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { createLiveProfile } from "../src/production";
+import { createLiveProfile, selectProductModelConfig } from "../src/production";
+import { validatedProductTask } from "../src/product-session";
 
 test("product profiles resolve each surface Skill and admitted tools", async () => {
   const cases = [
@@ -32,8 +33,58 @@ test("product profiles resolve each surface Skill and admitted tools", async () 
   ] as const;
 
   for (const [surface, expectedTools] of cases) {
-    const profile = await createLiveProfile("fixture-model", undefined, false, surface);
+    const profile = await createLiveProfile("fixture-model", undefined, false, surface, "none", undefined, true);
     expect(profile.allowedTools).toEqual(expectedTools);
     expect(profile.skills).toHaveLength(1);
   }
+});
+
+test("product model selection preserves profile identity when model names match", () => {
+  const defaultConfig = {
+    model_name: "deepseek-v4-pro",
+    endpoint: "https://default.example/v1/chat/completions",
+    api_key: "default-key",
+  } as const;
+  const modelProfiles = {
+    primary: {
+      model_name: "deepseek-v4-pro",
+      endpoint: "https://primary.example/v1/chat/completions",
+      api_key: "primary-key",
+    },
+    secondary: {
+      model_name: "deepseek-v4-pro",
+      endpoint: "https://secondary.example/v1/chat/completions",
+      api_key: "secondary-key",
+    },
+  } as const;
+
+  const primary = selectProductModelConfig(
+    defaultConfig,
+    modelProfiles,
+    validatedProductTask({
+      run_id: "run-primary",
+      workspace_id: "workspace-1",
+      actor_user_id: "user-1",
+      surface: "chat",
+      prompt: "Use primary.",
+      model_profile_id: "primary",
+    }),
+  );
+  const secondary = selectProductModelConfig(
+    defaultConfig,
+    modelProfiles,
+    validatedProductTask({
+      run_id: "run-secondary",
+      workspace_id: "workspace-1",
+      actor_user_id: "user-1",
+      surface: "chat",
+      prompt: "Use secondary.",
+      model_profile_id: "secondary",
+    }),
+  );
+  const fallback = selectProductModelConfig(defaultConfig, modelProfiles);
+
+  expect(primary).toMatchObject({ profile_id: "primary", config: { endpoint: "https://primary.example/v1/chat/completions", api_key: "primary-key" } });
+  expect(secondary).toMatchObject({ profile_id: "secondary", config: { endpoint: "https://secondary.example/v1/chat/completions", api_key: "secondary-key" } });
+  expect(fallback).toEqual({ profile_id: "default", config: defaultConfig });
 });

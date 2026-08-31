@@ -10,7 +10,14 @@ from fastapi.responses import StreamingResponse
 
 from services.chat.app.orchestrator import ChatOrchestrator, ChatRunNotFoundError
 from services.chat.app.schemas import ChatRun
-from services.business.harness_client import HarnessHostClient, HarnessHostError, HarnessRun, ProductTask, result_payload
+from services.business.harness_client import (
+    HarnessHostClient,
+    HarnessHostError,
+    HarnessRun,
+    ProductTask,
+    native_todo_plan,
+    result_payload,
+)
 from services.reimbursement.app.audit import AuditEvent
 from services.runtime.app.autocompact import clear_autocompact_tracker
 from services.runtime.app.concurrency import WorkspaceRunGate
@@ -772,11 +779,13 @@ def build_router(
                     host_run_ids[run.id] = submitted.run_id
                     yield _json_sse({"type": "event", "event": _host_audit_event(run.id, "harness.task.submitted", {"surface": "chat"})})
                     after_seq = -1
+                    tool_names: dict[str, str] = {}
                     while True:
                         events = await asyncio.to_thread(host.events, submitted.run_id, after_seq=after_seq)
                         for event in events:
                             after_seq = max(after_seq, _event_seq(event))
-                            yield _json_sse(_host_event_frame(event))
+                            for frame in _host_event_frame(event, tool_names):
+                                yield _json_sse(frame)
                         current = await asyncio.to_thread(host.get, submitted.run_id)
                         if current.terminal:
                             _apply_chat_host_run(chat, run, current)
@@ -892,6 +901,7 @@ def build_router(
             # closes ONLY this generator — the background run is untouched.
             if product_mode:
                 after_seq = from_seq
+                tool_names: dict[str, str] = {}
                 while True:
                     try:
                         host_id = host_run_ids.get(run_id, run_id)
@@ -902,7 +912,8 @@ def build_router(
                         return
                     for event in events:
                         after_seq = max(after_seq, _event_seq(event))
-                        yield _json_sse(_host_event_frame(event))
+                        for frame in _host_event_frame(event, tool_names):
+                            yield _json_sse(frame)
                     if host_run.terminal:
                         _apply_chat_host_run(chat, run, host_run)
                         yield _json_sse({"type": "done" if run.status == "ready" else "error", "run": run.model_dump(mode="json")})
@@ -1149,22 +1160,93 @@ def _host_audit_event(run_id: str, event_type: str, payload: dict) -> dict:
     return AuditEvent(type=event_type, run_id=run_id, payload=payload).model_dump(mode="json")
 
 
-def _host_event_frame(event: dict) -> dict:
+def _host_event_frame(
+    event: dict, tool_names: dict[str, str] | None = None
+) -> list[dict]:
     event_type = event.get("type")
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     if event_type in {"run.text.delta", "assistant.text.delta", "text_delta"}:
         text = payload.get("text") or event.get("text")
         if isinstance(text, str):
-            return {"type": "text_delta", "text": text}
-    if event_type in {"run.tool.started", "tool_start"}:
+            return [{"type": "text_delta", "text": text}]
+    if event_type in {"omp.tool.dispatch", "run.tool.started", "tool_start"}:
         name = payload.get("tool") or payload.get("name") or event.get("name")
-        if isinstance(name, str):
-            return {"type": "tool_start", "name": name}
-    if event_type in {"run.tool.completed", "tool_done"}:
+        canonical_name = _host_tool_name(name)
+        call_id = payload.get("toolCallId") or payload.get("tool_call_id")
+        if canonical_name is not None:
+            if tool_names is not None and isinstance(call_id, str) and call_id:
+                tool_names[call_id] = canonical_name
+            return [{"type": "tool_start", "name": canonical_name}]
+    if event_type in {"omp.tool.response", "run.tool.completed", "tool_done"}:
         name = payload.get("tool") or payload.get("name") or event.get("name")
-        if isinstance(name, str):
-            return {"type": "tool_done", "name": name}
-    return {"type": "event", "event": event}
+        call_id = payload.get("toolCallId") or payload.get("tool_call_id")
+        if not isinstance(name, str) and tool_names is not None and isinstance(call_id, str):
+            name = tool_names.get(call_id)
+        canonical_name = _host_tool_name(name)
+        if canonical_name is not None:
+            result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+            status = result.get("status")
+            ok = status == "succeeded" if event_type == "omp.tool.response" else True
+            frames: list[dict] = []
+            if event_type == "omp.tool.response":
+                frames.append(
+                    {
+                        "type": "event",
+                        "event": {
+                            "type": "mcp.tool.called",
+                            "run_id": _host_event_run_id(event),
+                            "created_at": _host_event_timestamp(event),
+                            "payload": {
+                                "tool_name": canonical_name,
+                                "status": "success" if ok else "error",
+                                "result_status": status or "unknown",
+                            },
+                        },
+                    }
+                )
+            frames.append({"type": "tool_done", "name": canonical_name, "ok": ok})
+            return frames
+    if event_type == "omp.transcript.message":
+        plan = native_todo_plan([event])
+        if plan is not None:
+            return [
+                {
+                    "type": "event",
+                    "event": {
+                        "type": "plan.updated",
+                        "run_id": _host_event_run_id(event),
+                        "created_at": _host_event_timestamp(event),
+                        "payload": {
+                            "count": len(plan),
+                            "done_count": sum(item["status"] == "done" for item in plan),
+                            "items": plan,
+                        },
+                    },
+                }
+            ]
+    return [{"type": "event", "event": event}]
+
+
+def _host_tool_name(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value.replace("__", ".")
+
+
+def _host_event_timestamp(event: dict) -> str | None:
+    for key in ("timestamp", "created_at", "ts"):
+        value = event.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_event_run_id(event: dict) -> str:
+    for key in ("run_id", "streamId", "stream_id"):
+        value = event.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
 
 
 def _event_seq(event: dict) -> int:

@@ -5,7 +5,14 @@ import json
 import httpx
 import pytest
 
-from services.business.harness_client import HarnessHostClient, HarnessHostError, ProductTask
+from services.api.app.routes.chat import _host_event_frame
+from services.business.harness_client import (
+    HarnessHostClient,
+    HarnessHostError,
+    HarnessRun,
+    ProductTask,
+    result_payload,
+)
 from services.business.mode import BusinessModeConfig, BusinessModeConfigurationError
 
 
@@ -91,3 +98,159 @@ def test_from_env_accepts_product_launcher_names(monkeypatch):
     assert config.host_origin == "http://127.0.0.1:4311"
     assert config.service_token == "launcher-token"
     assert config.port == 4312
+
+
+def test_result_payload_projects_only_native_todo_phases_to_plan():
+    run = HarnessRun(
+        run_id="host-chat-plan",
+        status="completed",
+        result={"assistant_message": "完成"},
+        events=(
+            {
+                "type": "omp.tool.response",
+                "payload": {"result": {"status": "succeeded", "output": {"plan": [{"title": "ignore"}]}}},
+            },
+            {
+                "type": "omp.transcript.message",
+                "payload": {
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "todo-1",
+                        "toolName": "todo",
+                        "status": "succeeded",
+                        "details": {
+                            "phases": [
+                                {
+                                    "name": "Plan",
+                                    "tasks": [
+                                        {"content": "Draft", "status": "pending"},
+                                        {"content": "Ship", "status": "completed"},
+                                        {"content": "Drop", "status": "abandoned"},
+                                        {"content": "Wait", "status": "blocked"},
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        ),
+    )
+
+    payload = result_payload(run)
+
+    assert payload["plan"] == [
+        {"id": "todo-1-1", "title": "Draft", "status": "pending"},
+        {"id": "todo-1-2", "title": "Ship", "status": "done"},
+        {"id": "todo-1-3", "title": "Drop (abandoned)", "status": "pending"},
+        {"id": "todo-1-4", "title": "Wait", "status": "pending"},
+    ]
+
+
+def test_host_event_frame_maps_omp_tool_lifecycle_and_preserves_failure():
+    tool_names: dict[str, str] = {}
+    dispatch = {
+        "type": "omp.tool.dispatch",
+        "payload": {"toolCallId": "call-1", "tool": "chat__emit_document"},
+    }
+    response = {
+        "type": "omp.tool.response",
+        "payload": {
+            "toolCallId": "call-1",
+            "result": {"status": "unknown", "output": {"reason": "lost"}},
+        },
+    }
+
+    assert _host_event_frame(dispatch, tool_names) == [
+        {"type": "tool_start", "name": "chat.emit_document"},
+    ]
+    frames = _host_event_frame(response, tool_names)
+
+    assert frames[0]["type"] == "event"
+    assert frames[0]["event"]["type"] == "mcp.tool.called"
+    assert frames[0]["event"]["payload"] == {
+        "tool_name": "chat.emit_document",
+        "status": "error",
+        "result_status": "unknown",
+    }
+    assert frames[1] == {
+        "type": "tool_done",
+        "name": "chat.emit_document",
+        "ok": False,
+    }
+
+
+def test_host_event_frame_emits_success_audit_after_a_failed_retry():
+    tool_names: dict[str, str] = {}
+    dispatch = {
+        "type": "omp.tool.dispatch",
+        "payload": {"toolCallId": "call-retry", "tool": "chat__emit_document"},
+    }
+    failed = {
+        "type": "omp.tool.response",
+        "payload": {
+            "toolCallId": "call-retry",
+            "result": {"status": "failed", "output": {"reason": "temporary"}},
+        },
+    }
+    succeeded = {
+        "type": "omp.tool.response",
+        "payload": {
+            "toolCallId": "call-retry",
+            "result": {"status": "succeeded", "output": {"accepted": True}},
+        },
+    }
+
+    _host_event_frame(dispatch, tool_names)
+    failed_frames = _host_event_frame(failed, tool_names)
+    success_frames = _host_event_frame(succeeded, tool_names)
+
+    assert failed_frames[0]["event"]["payload"]["status"] == "error"
+    assert success_frames[0]["event"]["type"] == "mcp.tool.called"
+    assert success_frames[0]["event"]["payload"] == {
+        "tool_name": "chat.emit_document",
+        "status": "success",
+        "result_status": "succeeded",
+    }
+    assert success_frames[1] == {
+        "type": "tool_done",
+        "name": "chat.emit_document",
+        "ok": True,
+    }
+
+
+def test_host_event_frame_emits_plan_update_only_for_native_todo_details():
+    frame = _host_event_frame(
+        {
+            "type": "omp.transcript.message",
+            "timestamp": "2026-09-01T00:00:00.000Z",
+            "streamId": "chat-run",
+            "payload": {
+                "message": {
+                    "role": "toolResult",
+                    "toolName": "todo",
+                    "details": {
+                        "phases": [
+                            {"name": "Delivery", "tasks": [{"content": "Publish", "status": "in_progress"}]},
+                        ],
+                    },
+                },
+            },
+        },
+    )
+
+    assert frame == [
+        {
+            "type": "event",
+            "event": {
+                "type": "plan.updated",
+                "run_id": "chat-run",
+                "created_at": "2026-09-01T00:00:00.000Z",
+                "payload": {
+                    "count": 1,
+                    "done_count": 0,
+                    "items": [{"id": "todo-1-1", "title": "Publish", "status": "in_progress"}],
+                },
+            },
+        },
+    ]

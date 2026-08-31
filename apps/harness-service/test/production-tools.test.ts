@@ -100,6 +100,114 @@ test("production read_only uses the scoped durable ToolGateway lifecycle", async
   }
 });
 
+test("production Gateway keeps Hiker reads direct and keys local artifact writes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "anna-production-tools-local-write-"));
+  const store = new SqliteEventStore(join(directory, "events.sqlite"));
+  const readProfile = await createLiveProfile("fixture-model", undefined, false, "hiker", "channel", undefined, true);
+  const readCommand = parseStartRun({
+    commandId: "command:production-tools-hiker-read",
+    runId: "run:production-tools-hiker-read",
+    surfaceId: "hiker",
+    goal: "Read the approved Hiker capability.",
+    workspaceId: "workspace:production-tools",
+    channelId: "channel:production-tools-hiker",
+    source: { eventId: "event:production-tools-hiker-source" },
+    runProfile: { id: readProfile.id, version: readProfile.version },
+    runProfileSnapshot: readProfile,
+    budget: readProfile.budget,
+    permissionScope: "permission:production-tools-hiker",
+    stopCondition: readProfile.terminalRules.stopCondition,
+  });
+  const writeProfile = await createLiveProfile("fixture-model", undefined, false, "chat", "channel", undefined, true);
+  const writeCommand = parseStartRun({
+    commandId: "command:production-tools-chat-write",
+    runId: "run:production-tools-chat-write",
+    surfaceId: "chat",
+    goal: "Write the approved document artifact.",
+    workspaceId: "workspace:production-tools",
+    channelId: "channel:production-tools-chat",
+    source: { eventId: "event:production-tools-chat-source" },
+    runProfile: { id: writeProfile.id, version: writeProfile.version },
+    runProfileSnapshot: writeProfile,
+    budget: writeProfile.budget,
+    permissionScope: "permission:production-tools-chat",
+    stopCondition: writeProfile.terminalRules.stopCondition,
+  });
+  const readRequests: unknown[] = [];
+  const writeRequests: unknown[] = [];
+  const readTool = {
+    name: "hiker.system.list_capabilities",
+    replayPolicy: "safe" as const,
+    inputSchema: { parse(input: unknown) { return input; } },
+  };
+  const writeTool = {
+    name: "chat.emit_document",
+    replayPolicy: "never" as const,
+    inputSchema: { parse(input: unknown) { return input; } },
+  };
+
+  try {
+    const readGateway = createProductionToolGateway({
+      eventStore: store,
+      command: readCommand,
+      workspaceRoot: directory,
+      dynamicTools: [readTool],
+      dynamicToolCall: async (request) => {
+        readRequests.push(request);
+        return { status: "succeeded", output: { write_tools_enabled: false } };
+      },
+    });
+    await expect(readGateway.execute({
+      workspaceId: readCommand.workspaceId,
+      channelId: readCommand.channelId,
+      runId: readCommand.runId,
+      workerProfileId: readCommand.runProfileSnapshot.workerProfileId,
+      name: readTool.name,
+      input: {},
+      toolCallId: "tool-call-hiker-capabilities",
+    }, new AbortController().signal)).resolves.toEqual({
+      status: "succeeded",
+      output: { write_tools_enabled: false },
+    });
+    expect(readRequests).toHaveLength(1);
+    expect(readRequests[0]).not.toHaveProperty("effectKey");
+
+    const writeGateway = createProductionToolGateway({
+      eventStore: store,
+      command: writeCommand,
+      workspaceRoot: directory,
+      dynamicTools: [writeTool],
+      dynamicToolCall: async (request) => {
+        writeRequests.push(request);
+        return { status: "succeeded", output: { artifact: { kind: "doc", title: "Brief", content: "# Brief" } } };
+      },
+    });
+    const writeRequest = {
+      workspaceId: writeCommand.workspaceId,
+      channelId: writeCommand.channelId,
+      runId: writeCommand.runId,
+      workerProfileId: writeCommand.runProfileSnapshot.workerProfileId,
+      name: writeTool.name,
+      input: { title: "Brief", markdown: "# Brief" },
+      toolCallId: "tool-call-chat-document",
+    } as const;
+    const first = await writeGateway.execute(writeRequest, new AbortController().signal);
+    const second = await writeGateway.execute(writeRequest, new AbortController().signal);
+    expect(first).toEqual({
+      status: "succeeded",
+      output: { artifact: { kind: "doc", title: "Brief", content: "# Brief" } },
+    });
+    expect(second).toEqual(first);
+    expect(writeRequests).toHaveLength(1);
+    expect(writeRequests[0]).toMatchObject({
+      effectKey: "product-local-write:run:production-tools-chat-write:chat.emit_document:tool-call-chat-document",
+    });
+  } finally {
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("production read_only rejects invalid input before the filesystem adapter", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-production-tools-invalid-"));
   const store = new SqliteEventStore(join(directory, "events.sqlite"));

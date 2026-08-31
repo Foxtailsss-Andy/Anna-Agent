@@ -113,6 +113,8 @@ class HikerToolRegistry:
                 "description": _TOOL_DESCRIPTIONS[name],
                 "input_schema": _input_schema(name),
                 "schema_source": "registry",
+                "effect": "read",
+                "replay_policy": "safe",
             }
             for name in self._model_visible_tool_names(skill)
         ]

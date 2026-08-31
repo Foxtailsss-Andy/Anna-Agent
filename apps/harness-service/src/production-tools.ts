@@ -158,7 +158,7 @@ export function createProductionToolGateway(
   );
   const events = options.eventStore.scope(scope);
 
-  return createToolGateway({
+  const gateway = createToolGateway({
     catalog,
     scope,
     workerProfileId: boundWorkerProfileId,
@@ -248,6 +248,24 @@ export function createProductionToolGateway(
     ...(options.now === undefined ? {} : { now: options.now }),
     ...(options.createEventId === undefined ? {} : { createEventId: options.createEventId }),
   });
+  return {
+    ...gateway,
+    execute(request, signal) {
+      if (request.effectKey !== undefined || !isLocalArtifactTool(request.name)) {
+        return gateway.execute(request, signal);
+      }
+      return gateway.execute({
+        ...request,
+        effectKey: `product-local-write:${request.runId}:${request.name}:${request.toolCallId}`,
+      }, signal);
+    },
+  };
+}
+
+function isLocalArtifactTool(name: string): boolean {
+  return name === "chat.emit_page"
+    || name === "chat.emit_document"
+    || name.startsWith("create.emit_");
 }
 
 function strictObjectSchema(

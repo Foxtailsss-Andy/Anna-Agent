@@ -16,6 +16,7 @@ test("concurrent close calls share completion while Host preparation is active",
   const profile = resolvedRunProfileFixture({
     budget: { turns: 1 },
     memoryPolicy: { read: "channel", write: "disabled" },
+    allowedTools: ["read_only"],
   });
   const command = parseStartRun({
     workspaceId: "workspace:omp-close",

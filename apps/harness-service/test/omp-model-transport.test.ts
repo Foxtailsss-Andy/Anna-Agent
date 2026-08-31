@@ -93,3 +93,77 @@ test("Host transport rejects provider failure without retrying", async () => {
   })()).rejects.toThrow();
   expect(calls).toBe(1);
 });
+
+test("Host transport aliases dotted tools on the provider wire and restores them across turns", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const responses = [
+    new Response([
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-hiker","type":"function","function":{"name":"hiker__report__get_dashboard_summary","arguments":"{}"}}]}}]}\n\n',
+      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join(""), { headers: { "content-type": "text/event-stream" } }),
+    new Response(JSON.stringify({
+      choices: [{ finish_reason: "stop", message: { role: "assistant", content: "done" } }],
+    })),
+  ];
+  const tools = [
+    { name: "todo", description: "Track work", parameters: { type: "object" } },
+    {
+      name: "hiker.report.get_dashboard_summary",
+      description: "Read the Hiker dashboard.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  ];
+  const transport = createOmpModelTransport({
+    endpoint: "https://provider.invalid/v1/chat/completions", apiKey: "fixture-only", modelName: "fixture-model",
+    fetchImpl: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return responses.shift()!;
+    },
+  });
+  const first = [];
+  for await (const item of transport({
+    systemPrompt: "Anna",
+    messages: [{ role: "user", content: "Read the dashboard." }],
+    tools,
+  }, new AbortController().signal)) first.push(item);
+  const second = [];
+  for await (const item of transport({
+    systemPrompt: "Anna",
+    messages: [
+      { role: "user", content: "Read the dashboard." },
+      {
+        role: "assistant",
+        reasoningContent: "inspect the dashboard",
+        content: [{ type: "toolCall", id: "call-hiker", name: "hiker.report.get_dashboard_summary", arguments: {} }],
+        stopReason: "toolUse",
+      },
+      { role: "toolResult", toolCallId: "call-hiker", toolName: "hiker.report.get_dashboard_summary", content: "{}", status: "succeeded" },
+    ],
+    tools,
+  }, new AbortController().signal)) second.push(item);
+
+  const firstBody = requests[0]!;
+  const firstTools = firstBody.tools as Array<{ function: { name: string } }>;
+  expect(firstTools.map((tool) => tool.function.name)).toEqual(["todo", "hiker__report__get_dashboard_summary"]);
+  expect(first[0]?.message.content).toEqual([{
+    type: "toolCall",
+    id: "call-hiker",
+    name: "hiker.report.get_dashboard_summary",
+    arguments: {},
+  }]);
+  expect(first[0]?.deltas).toEqual([{
+    type: "toolCall",
+    contentIndex: 0,
+    id: "call-hiker",
+    name: "hiker.report.get_dashboard_summary",
+    argumentsDelta: "{}",
+  }]);
+
+  const secondBody = requests[1]!;
+  const secondMessages = secondBody.messages as Array<Record<string, unknown>>;
+  expect((secondMessages[2]?.tool_calls as Array<{ function: { name: string } }>)[0]?.function.name)
+    .toBe("hiker__report__get_dashboard_summary");
+  expect((secondMessages[2]?.reasoning_content)).toBe("inspect the dashboard");
+  expect(second[0]?.message.content).toEqual([{ type: "text", text: "done" }]);
+});

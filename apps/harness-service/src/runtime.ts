@@ -175,6 +175,7 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
   return {
     async start(command, sink, signal): Promise<RunOutcome> {
       let terminalEvent: CanonicalEvent | undefined;
+      let failureCode: string | undefined;
       const durableSink = sink as EventSink & {
         read?: (streamId: never, afterSeq?: number) => AsyncIterable<CanonicalEvent>;
       };
@@ -195,7 +196,8 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
       let outcome: RunOutcome;
       try {
         outcome = await kernel.start(command, evalSink, signal);
-      } catch {
+      } catch (error) {
+        failureCode = sanitizedRuntimeFailureCode(error);
         outcome = { status: "failed" };
       }
       let events: CanonicalEvent[] = [];
@@ -232,6 +234,7 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
           passed: result.passed,
           version: result.version,
           failedRules: [...result.failedRules],
+          ...(failureCode === undefined ? {} : { error_code: failureCode }),
         },
       });
       if (terminalEvent !== undefined) {
@@ -243,6 +246,22 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
             ? terminalEvent.payload
             : { outcome: "failed", reason: "contract_eval_failed" },
         });
+      } else if (failureCode !== undefined) {
+        await sink.append({
+          id: crypto.randomUUID() as CanonicalEvent["id"],
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          streamId: command.runId as never,
+          seq: nextSeq + 1,
+          type: "run.failed",
+          timestamp: new Date().toISOString(),
+          schemaVersion: 1,
+          payload: {
+            outcome: "failed",
+            errorType: failureCode ?? "runtime_bridge_failed",
+            ...(failureCode === undefined ? {} : { error_code: failureCode }),
+          },
+        });
       }
       return result.passed ? outcome : { status: "failed" };
     },
@@ -250,6 +269,30 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
     answer: (runId, answer) => kernel.answer(runId, answer),
     abort: (runId, reason) => kernel.abort(runId, reason),
   };
+}
+
+function sanitizedRuntimeFailureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  const admittedTool = message.match(/^business tool catalog does not offer admitted tool: ([A-Za-z0-9_.-]+)$/);
+  if (admittedTool !== null) return `business_tool_catalog_missing:${admittedTool[1]}`;
+  const known: Record<string, string> = {
+    "OMP model input mismatch": "omp_model_input_mismatch",
+    "OMP model request history mismatch": "omp_model_request_history_mismatch",
+    "OMP readiness identity mismatch": "omp_readiness_identity_mismatch",
+    "OMP frame binding or sequence mismatch": "omp_frame_binding_mismatch",
+    "OMP tool request raw context mismatch": "omp_tool_request_context_mismatch",
+    "OMP undeclared tool request": "omp_undeclared_tool_request",
+    "OMP model returned invalid tool identity": "omp_invalid_tool_identity",
+    "OMP model transport returned no final response": "omp_model_no_response",
+    "OMP model transport returned multiple final responses": "omp_model_multiple_responses",
+    "OMP worker closed before terminal proposal": "omp_worker_closed_before_terminal",
+    "OMP worker readiness timed out": "omp_worker_readiness_timeout",
+    "OMP worker wall budget exhausted": "omp_worker_wall_budget_exhausted",
+    "OMP runtime source identity mismatch": "omp_runtime_source_identity_mismatch",
+    "OMP tool definitions do not match the admitted profile": "omp_tool_definitions_mismatch",
+    "OMP tool definitions do not cover the admitted profile": "omp_tool_definitions_incomplete",
+  };
+  return known[message] ?? "runtime_bridge_failed";
 }
 
 function isTerminalEvent(type: string): boolean {

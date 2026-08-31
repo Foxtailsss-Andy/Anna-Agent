@@ -18,6 +18,7 @@ test("turns an abort after durable context ready into a cancelled Run", async ()
   const profile = resolvedRunProfileFixture({
     budget: { turns: 1 },
     memoryPolicy: { read: "none", write: "disabled" },
+    allowedTools: ["read_only"],
   });
   const command = parseStartRun({
     workspaceId: "workspace:omp-ready-abort",

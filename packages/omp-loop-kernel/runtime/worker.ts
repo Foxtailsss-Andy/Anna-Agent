@@ -7,6 +7,7 @@ import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessageEventStream as OmpAssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import type { AuthStorage as OmpAuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
 import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
+import type { TodoPhase } from "@oh-my-pi/pi-coding-agent/tools/todo";
 
 import {
   OMP_PROTOCOL,
@@ -41,6 +42,8 @@ const { ModelRegistry } = (await import(new URL("./node_modules/@oh-my-pi/pi-cod
 const { Settings } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/config/settings.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/config/settings");
 const { createAgentSession } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/sdk.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/sdk");
 const { SessionManager } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/session/session-manager.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/session/session-manager");
+const { ThinkingLevel } = (await import(new URL("./node_modules/@oh-my-pi/pi-agent-core/src/thinking.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-agent-core/thinking");
+const { isTodoPhase } = (await import(new URL("./node_modules/@oh-my-pi/pi-coding-agent/src/tools/todo.ts", import.meta.url).href)) as unknown as typeof import("@oh-my-pi/pi-coding-agent/tools/todo");
 
 const configuredAttemptRoot = process.env.ANNA_OMP_ATTEMPT_ROOT;
 if (configuredAttemptRoot === undefined) throw new Error("managed launcher attempt root is required");
@@ -214,7 +217,7 @@ class WorkerRuntime {
         id: input.modelId,
         name: input.modelId,
         reasoning: true,
-        thinking: { mode: "effort", efforts: ["high"], defaultLevel: "high" },
+        thinking: { mode: "effort", efforts: [ThinkingLevel.High], defaultLevel: ThinkingLevel.High },
         supportsTools: true,
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -236,7 +239,7 @@ class WorkerRuntime {
       settings,
       sessionManager,
       systemPrompt: input.systemPrompt,
-      thinkingLevel: "high",
+      thinkingLevel: ThinkingLevel.High,
       skills: [],
       rules: [],
       contextFiles: [],
@@ -279,10 +282,10 @@ class WorkerRuntime {
     // on the live admitted proxies through the public Agent API so a single
     // Host gateway call is in flight at a time for this bounded profile.
     const admittedToolNames = new Set(input.allowedTools.map((tool) => tool.name));
-    const serializedTools = created.session.agent.state.tools.map((tool) => {
+    const serializedTools: AgentTool[] = created.session.agent.state.tools.map((tool): AgentTool => {
       if (!admittedToolNames.has(tool.name)) return tool;
       if (tool.concurrency === "exclusive") return tool;
-      return { ...tool, concurrency: "exclusive" };
+      return { ...tool, concurrency: "exclusive" as const };
     });
     created.session.agent.setTools(serializedTools);
     this.session.subscribe((event) => this.onSessionEvent(event));
@@ -832,18 +835,20 @@ function restoreTodoState(
   for (const message of [...messages].reverse()) {
     if (message.role !== "toolResult" || message.toolName !== "todo" || !isRecord(message.details)) continue;
     const phases = message.details.phases;
-    if (!Array.isArray(phases) || !phases.every(isTodoPhase)) continue;
-    session.setTodoPhases(phases as Parameters<typeof session.setTodoPhases>[0]);
+    if (!Array.isArray(phases)) continue;
+    const todoPhases: TodoPhase[] = [];
+    let valid = true;
+    for (const phase of phases) {
+      if (!isTodoPhase(phase)) {
+        valid = false;
+        break;
+      }
+      todoPhases.push(phase);
+    }
+    if (!valid) continue;
+    session.setTodoPhases(todoPhases);
     return;
   }
-}
-
-function isTodoPhase(value: unknown): boolean {
-  if (!isRecord(value) || typeof value.name !== "string" || !Array.isArray(value.tasks)) return false;
-  return value.tasks.every((task) => isRecord(task)
-    && typeof task.content === "string"
-    && (task.status === "pending" || task.status === "in_progress" || task.status === "completed"
-      || task.status === "abandoned" || task.status === "blocked"));
 }
 
 function toNeutralMessage(value: unknown): Message | undefined {

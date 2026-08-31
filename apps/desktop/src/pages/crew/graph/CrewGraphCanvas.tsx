@@ -3,12 +3,12 @@
  *
  * - 制图桌五层(纸面渐变/双尺网格羽化/双辉光漂移/灯下白纱/工作框+四角规矩线);
  * - React Flow + elkjs 分层 LR(并行段纵向展开,长链保持水平·可横向平移;#5 去强制折返);
- * - 轮询 3s(getProject + listChannel)→ diff 驱动动效:生长四幕(一次性)、
+ * - 父页轮询 3s(getProject + listChannel)→ props diff 驱动动效:生长四幕(一次性)、
  *   完成落笔、布局滑移 240ms 吸收跳变;
  * - P1 焦点呼吸唯一(频道 seq 判定;无 running 全静);P6 点名环(crew:ring-call);
  * - 底栏:缩放条 0.5-1.5 + 计数 mono「节点 N · 门 M · R 行」/「图例」pill +
  *   mono「同步 HH:MM:SS · 轮询 3s」(全部真值);
- * - 空态即空态;数据单源:轮询结果经 onSnapshot 交还父级,再由 props 流回。
+ * - 空态即空态;数据单源:父页快照经 props 流入,图只负责呈现与动效。
  */
 
 import {
@@ -23,8 +23,6 @@ import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  getProject,
-  listChannel,
   type ChannelMessage,
   type CrewProject,
   type TeamMember,
@@ -74,12 +72,11 @@ function hhmmss(d: Date): string {
 }
 
 export interface CrewGraphCanvasProps {
-  projectId: string;
   project: CrewProject;
   channel: ChannelMessage[];
   members: TeamMember[];
-  /** 轮询快照交还父级(健康条/频道列同源刷新);props 流回即单一事实源 */
-  onSnapshot: (project: CrewProject, channel: ChannelMessage[] | null) => void;
+  /** 父页生命周期内的轮询时间,图/列表/阅读器切换时保持不丢失 */
+  lastSync: Date | null;
   /** F4 单击任务节点 → 轻检视(锚点为节点视口矩形) */
   onInspect?: (taskId: string, anchor: { left: number; top: number; width: number; height: number }) => void;
   /** F4 双击任务节点 → 任务抽屉 */
@@ -131,11 +128,10 @@ function ZoomBar() {
 /* ---------------- 画布本体 ---------------- */
 
 function CanvasInner({
-  projectId,
   project,
   channel,
   members,
-  onSnapshot,
+  lastSync,
   onInspect,
   onOpenDrawer,
   selectedTaskId,
@@ -143,7 +139,6 @@ function CanvasInner({
   onNodePrimary,
 }: CrewGraphCanvasProps) {
   const rf = useReactFlow();
-  const [lastSync, setLastSync] = useState<Date | null>(null);
   const [motion, setMotion] = useState<MotionState | null>(null);
   const [ring, setRing] = useState<{ taskId: string; at: number } | null>(null);
   const [, setPurgeTick] = useState(0);
@@ -198,30 +193,6 @@ function CanvasInner({
   }, [layout]);
 
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
-
-  /* -- 轮询 3s:真快照交还父级(props 流回,单源) -- */
-  useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      try {
-        const [p, ch] = await Promise.all([
-          getProject(projectId),
-          listChannel(projectId).catch(() => null),
-        ]);
-        if (!alive) return;
-        setLastSync(new Date());
-        onSnapshot(p, ch);
-      } catch {
-        /* 网络抖动:保留上一个真快照,不造数 */
-      }
-    };
-    const iv = setInterval(tick, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(iv);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onSnapshot 由父级 useCallback 稳定
-  }, [projectId]);
 
   /* -- diff → 动效 reducer(初载 seed 不动画;新 id 才生长) -- */
   const snapKey = useMemo(() => {

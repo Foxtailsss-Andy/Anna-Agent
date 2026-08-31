@@ -6,6 +6,11 @@ const DEFAULT_REASONING_EFFORT = "high" as const;
 
 type DeepSeekReasoningEffort = "low" | "high" | "max";
 
+interface ProviderToolNameAliases {
+  readonly wireByCanonical: ReadonlyMap<string, string>;
+  readonly canonicalByWire: ReadonlyMap<string, string>;
+}
+
 export function createOmpModelTransport(options: {
   endpoint: string;
   apiKey: string;
@@ -25,8 +30,9 @@ export function createOmpModelTransport(options: {
 
   return async function* (context: ModelContext, signal: AbortSignal) {
     signal.throwIfAborted();
-    const messages = context.messages.map(toDeepSeekMessage);
     const tools = context.tools ?? options.tools;
+    const aliases = providerToolNameAliases(tools);
+    const messages = context.messages.map((message) => toDeepSeekMessage(message, aliases));
     const body = {
       model: options.modelName,
       stream: true,
@@ -34,7 +40,7 @@ export function createOmpModelTransport(options: {
       messages: [{ role: "system", content: context.systemPrompt }, ...messages],
       thinking: { type: thinking },
       reasoning_effort: reasoningEffort,
-      ...(tools !== undefined && tools.length > 0 ? { tools: tools.map(toDeepSeekTool) } : {}),
+      ...(tools !== undefined && tools.length > 0 ? { tools: tools.map((tool) => toDeepSeekTool(tool, aliases)) } : {}),
     };
     const response = await fetchImpl(endpoint, {
       method: "POST",
@@ -48,16 +54,39 @@ export function createOmpModelTransport(options: {
 
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
     if (contentType.includes("text/event-stream")) {
-      yield parseStreamingResponse(response.body, signal);
+      yield parseStreamingResponse(response.body, signal, aliases);
       return;
     }
 
     const payload = await readJsonResponse(response.body, signal);
-    yield parseCompletionPayload(payload);
+    yield parseCompletionPayload(payload, aliases);
   };
 }
 
-function toDeepSeekMessage(message: Message): Record<string, unknown> {
+function providerToolNameAliases(tools: readonly ToolDefinition[] | undefined): ProviderToolNameAliases {
+  const wireByCanonical = new Map<string, string>();
+  const canonicalByWire = new Map<string, string>();
+  for (const tool of tools ?? []) {
+    const wireName = tool.name.replace(/\./g, "__");
+    const existing = canonicalByWire.get(wireName);
+    if (existing !== undefined && existing !== tool.name) {
+      throw new Error("OMP provider tool name alias collision");
+    }
+    wireByCanonical.set(tool.name, wireName);
+    canonicalByWire.set(wireName, tool.name);
+  }
+  return { wireByCanonical, canonicalByWire };
+}
+
+function toProviderToolName(name: string, aliases: ProviderToolNameAliases): string {
+  return aliases.wireByCanonical.get(name) ?? name.replace(/\./g, "__");
+}
+
+function fromProviderToolName(name: string, aliases: ProviderToolNameAliases): string {
+  return aliases.canonicalByWire.get(name) ?? name;
+}
+
+function toDeepSeekMessage(message: Message, aliases: ProviderToolNameAliases): Record<string, unknown> {
   if (message.role === "user") return { role: "user", content: message.content };
   if (message.role === "toolResult") {
     return {
@@ -76,7 +105,7 @@ function toDeepSeekMessage(message: Message): Record<string, unknown> {
     .map((block) => ({
       id: block.id,
       type: "function",
-      function: { name: block.name, arguments: JSON.stringify(block.arguments) },
+      function: { name: toProviderToolName(block.name, aliases), arguments: JSON.stringify(block.arguments) },
     }));
   return {
     role: "assistant",
@@ -89,11 +118,11 @@ function toDeepSeekMessage(message: Message): Record<string, unknown> {
   };
 }
 
-function toDeepSeekTool(tool: ToolDefinition): Record<string, unknown> {
+function toDeepSeekTool(tool: ToolDefinition, aliases: ProviderToolNameAliases): Record<string, unknown> {
   return {
     type: "function",
     function: {
-      name: tool.name,
+      name: toProviderToolName(tool.name, aliases),
       description: tool.description,
       parameters: tool.parameters,
     },
@@ -175,15 +204,16 @@ function decodeSseData(lines: readonly string[]): Record<string, unknown> | "don
 async function parseStreamingResponse(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
+  aliases: ProviderToolNameAliases,
 ): Promise<HostModelResponse> {
   const accumulator = createAccumulator();
-  for await (const payload of readServerSentEvents(body, signal)) accumulatePayload(accumulator, payload);
+  for await (const payload of readServerSentEvents(body, signal)) accumulatePayload(accumulator, payload, aliases);
   return finishAccumulator(accumulator);
 }
 
-function parseCompletionPayload(payload: Record<string, unknown>): HostModelResponse {
+function parseCompletionPayload(payload: Record<string, unknown>, aliases: ProviderToolNameAliases): HostModelResponse {
   const accumulator = createAccumulator();
-  accumulatePayload(accumulator, payload);
+  accumulatePayload(accumulator, payload, aliases);
   return finishAccumulator(accumulator);
 }
 
@@ -216,7 +246,11 @@ function createAccumulator(): CompletionAccumulator {
   return { deltas: [], blocks: [], toolBlocks: new Map(), reasoningContent: "", reasoningSeen: false };
 }
 
-function accumulatePayload(accumulator: CompletionAccumulator, payload: Record<string, unknown>): void {
+function accumulatePayload(
+  accumulator: CompletionAccumulator,
+  payload: Record<string, unknown>,
+  aliases: ProviderToolNameAliases,
+): void {
   if (payload.error !== undefined) throw new Error("OMP provider returned an in-band error");
   if (payload.usage !== undefined && payload.usage !== null) accumulator.usage = parseUsage(payload.usage);
   if (payload.choices === undefined) return;
@@ -229,14 +263,18 @@ function accumulatePayload(accumulator: CompletionAccumulator, payload: Record<s
     accumulator.finishReason = parseFinishReason(choice.finish_reason);
   }
   if (choice.message !== undefined && choice.message !== null) {
-    accumulateMessage(accumulator, object(choice.message));
+    accumulateMessage(accumulator, object(choice.message), aliases);
   }
   if (choice.delta !== undefined && choice.delta !== null) {
-    accumulateDelta(accumulator, object(choice.delta));
+    accumulateDelta(accumulator, object(choice.delta), aliases);
   }
 }
 
-function accumulateMessage(accumulator: CompletionAccumulator, message: Record<string, unknown>): void {
+function accumulateMessage(
+  accumulator: CompletionAccumulator,
+  message: Record<string, unknown>,
+  aliases: ProviderToolNameAliases,
+): void {
   if (message.role !== "assistant") throw new Error("OMP provider message role is invalid");
   if (typeof message.reasoning_content === "string") {
     accumulator.reasoningSeen = true;
@@ -256,12 +294,16 @@ function accumulateMessage(accumulator: CompletionAccumulator, message: Record<s
         throw new Error("OMP provider tool call is invalid");
       }
       const streamIndex = typeof call.index === "number" ? call.index : accumulator.toolBlocks.size;
-      appendTool(accumulator, streamIndex, call.id, fn.name, fn.arguments);
+      appendTool(accumulator, streamIndex, call.id, fromProviderToolName(fn.name, aliases), fn.arguments);
     }
   }
 }
 
-function accumulateDelta(accumulator: CompletionAccumulator, delta: Record<string, unknown>): void {
+function accumulateDelta(
+  accumulator: CompletionAccumulator,
+  delta: Record<string, unknown>,
+  aliases: ProviderToolNameAliases,
+): void {
   const reasoning = firstString(delta, ["reasoning_content", "reasoning", "reasoning_text"]);
   if (reasoning !== undefined) {
     accumulator.reasoningSeen = true;
@@ -287,10 +329,11 @@ function accumulateDelta(accumulator: CompletionAccumulator, delta: Record<strin
       const existing = accumulator.toolBlocks.get(streamIndex);
       if (existing === undefined) {
         if (id === undefined || name === undefined) throw new Error("OMP provider tool call identity is incomplete");
-        appendTool(accumulator, streamIndex, id, name, argumentsDelta);
+        appendTool(accumulator, streamIndex, id, fromProviderToolName(name, aliases), argumentsDelta);
       } else {
         if (id !== undefined && id !== existing.id) throw new Error("OMP provider tool call identity changed");
-        if (name !== undefined && name !== existing.name) throw new Error("OMP provider tool name changed");
+        const canonicalName = name === undefined ? undefined : fromProviderToolName(name, aliases);
+        if (canonicalName !== undefined && canonicalName !== existing.name) throw new Error("OMP provider tool name changed");
         if (argumentsDelta.length > 0) {
           existing.argumentsText += argumentsDelta;
           accumulator.deltas.push({

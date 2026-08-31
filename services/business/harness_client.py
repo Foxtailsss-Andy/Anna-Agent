@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 from urllib.parse import quote
@@ -90,6 +90,74 @@ class HarnessRun:
         }
 
 
+_NATIVE_TODO_PLAN_STATUS = {
+    "pending": "pending",
+    "in_progress": "in_progress",
+    "completed": "done",
+    "abandoned": "pending",
+    # The legacy PlanItem contract has no blocked state; keep it open rather
+    # than presenting blocked work as complete.
+    "blocked": "pending",
+}
+
+
+def native_todo_plan(events: Iterable[Mapping[str, Any]]) -> list[dict[str, str]] | None:
+    """Return the latest valid plan represented by a canonical native Todo result.
+
+    Only durable ``omp.transcript.message`` tool results named exactly ``todo``
+    are admitted. Other result payloads, including arbitrary ``plan`` fields,
+    never become a Chat PlanRail projection.
+    """
+    latest: list[dict[str, str]] | None = None
+    for event in events:
+        if event.get("type") != "omp.transcript.message":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, Mapping):
+            continue
+        message = payload.get("message")
+        if not isinstance(message, Mapping):
+            continue
+        if message.get("role") != "toolResult" or message.get("toolName") != "todo":
+            continue
+        details = message.get("details")
+        plan = _native_todo_plan_from_details(details)
+        if plan is not None:
+            latest = plan
+    return latest
+
+
+def _native_todo_plan_from_details(details: object) -> list[dict[str, str]] | None:
+    if not isinstance(details, Mapping):
+        return None
+    phases = details.get("phases")
+    if not isinstance(phases, list):
+        return None
+    plan: list[dict[str, str]] = []
+    for phase_index, phase in enumerate(phases):
+        if not isinstance(phase, Mapping) or not isinstance(phase.get("name"), str):
+            return None
+        tasks = phase.get("tasks")
+        if not isinstance(tasks, list):
+            return None
+        for task_index, task in enumerate(tasks):
+            if not isinstance(task, Mapping):
+                return None
+            content = task.get("content")
+            status = task.get("status")
+            mapped_status = _NATIVE_TODO_PLAN_STATUS.get(status) if isinstance(status, str) else None
+            if not isinstance(content, str) or mapped_status is None:
+                return None
+            plan.append(
+                {
+                    "id": f"todo-{phase_index + 1}-{task_index + 1}",
+                    "title": f"{content} (abandoned)" if status == "abandoned" else content,
+                    "status": mapped_status,
+                }
+            )
+    return plan
+
+
 def result_payload(run: HarnessRun) -> dict[str, Any]:
     """Project Host result plus canonical events into a small business payload.
 
@@ -159,6 +227,9 @@ def result_payload(run: HarnessRun) -> dict[str, Any]:
     if artifacts:
         result["artifacts"] = artifacts
         result.setdefault("artifact", artifacts[-1])
+    plan = native_todo_plan(run.events)
+    if plan is not None:
+        result["plan"] = plan
     if tool_calls:
         result["tool_calls"] = tool_calls
     return result

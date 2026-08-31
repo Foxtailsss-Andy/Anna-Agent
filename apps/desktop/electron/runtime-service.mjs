@@ -145,6 +145,8 @@ export function createProductRuntimeConfig({
   const hostOrigin = `http://${host}:${port}`;
   const businessOrigin = env.ANNA_HARNESS_BUSINESS_ORIGIN
     ?? (businessEnabled ? `http://${host}:${resolvedBusinessPort}` : undefined);
+  const pythonExecutable = resolvePythonExecutable(projectRoot, env);
+  const pythonHome = resolveBundledPythonHome(projectRoot, env, pythonExecutable);
 
   // Do not inherit the old Python Agent selectors into the Node Host.
   const {
@@ -238,6 +240,8 @@ export function createProductRuntimeConfig({
     ANNA_SERVICE_TOKEN: serviceToken,
     ANNA_HARNESS_SERVICE_TOKEN: serviceToken,
     ANNA_HARNESS_BUSINESS_SERVICE_TOKEN: serviceToken,
+    PYTHONPATH: resolvePythonPath(projectRoot, env),
+    ...(pythonHome === undefined ? {} : { PYTHONHOME: pythonHome }),
   };
   return {
     projectRoot,
@@ -248,7 +252,7 @@ export function createProductRuntimeConfig({
     apiPort: port,
     apiBase: hostOrigin,
     nodeExecutable: resolveNodeExecutable(env),
-    pythonExecutable: resolvePythonExecutable(projectRoot, env),
+    pythonExecutable,
     entryPath: hostEntryPath,
     args: [hostEntryPath],
     env: hostEnv,
@@ -283,6 +287,31 @@ export function resolvePythonExecutable(projectRoot, env = process.env, platform
     ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
     : path.join(projectRoot, ".venv", "bin", "python");
   return existsSync(venv) ? venv : platform === "win32" ? "python" : "python3";
+}
+
+function resolvePythonPath(projectRoot, env = process.env) {
+  const entries = [projectRoot];
+  const bundledSitePackages = path.join(projectRoot, "build", "python-runtime", "site-packages");
+  // An explicit interpreter (usually a developer .venv) owns its dependency
+  // set. The packaged interpreter gets the copied dependency tree below.
+  if (!env.ANNA_PYTHON_BIN && existsSync(bundledSitePackages)) {
+    entries.push(bundledSitePackages);
+  }
+  if (env.PYTHONPATH) entries.push(env.PYTHONPATH);
+  return entries.join(path.delimiter);
+}
+
+function resolveBundledPythonHome(projectRoot, env, pythonExecutable) {
+  if (env.PYTHONHOME) return env.PYTHONHOME;
+  if (env.ANNA_PYTHON_BIN) return undefined;
+  const bundledRoot = path.join(projectRoot, "build", "python-runtime", "python");
+  const bundledExecutable = process.platform === "win32"
+    ? path.join(bundledRoot, "python.exe")
+    : path.join(bundledRoot, "bin", "python3.12");
+  if (path.resolve(pythonExecutable) !== path.resolve(bundledExecutable) || !existsSync(bundledRoot)) {
+    return undefined;
+  }
+  return bundledRoot;
 }
 
 // The stable launcher factory now points to the original-product Host.
@@ -350,18 +379,16 @@ export async function startPreviewRuntimeService(config, options = {}) {
     env: childEnv,
     stdio: options.stdio ?? "pipe",
   });
-  let stderr = "";
-  child.stderr?.on("data", (chunk) => {
-    stderr += chunk.toString();
-  });
+  const readStderr = monitorChildOutput(child);
 
   let startupComplete = false;
-  observeRuntimeExit(child, options, () => stderr, () => startupComplete);
+  observeRuntimeExit(child, options, readStderr, () => startupComplete);
   const startupFailure = new Promise((_, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (!startupComplete && !child.__annaIntentionalStop) {
-        reject(new Error(`Anna Preview Host exited with ${formatRuntimeExitReason(code, signal)}`));
+        const details = readStderr();
+        reject(new Error(`Anna Preview Host exited with ${formatRuntimeExitReason(code, signal)}${details ? `: ${details}` : ""}`));
       }
     });
   });
@@ -408,13 +435,10 @@ export async function startProductRuntimeService(config, options = {}) {
     },
     stdio: options.stdio ?? "pipe",
   });
-  let hostStderr = "";
-  host.stderr?.on("data", (chunk) => {
-    hostStderr += chunk.toString();
-  });
+  const readHostStderr = monitorChildOutput(host);
   let hostStarted = false;
-  observeRuntimeExit(host, options, () => hostStderr, () => hostStarted);
-  const hostFailure = processFailure(host, "Anna Product Host", () => hostStderr, () => hostStarted);
+  observeRuntimeExit(host, options, readHostStderr, () => hostStarted);
+  const hostFailure = processFailure(host, "Anna Product Host", readHostStderr, () => hostStarted);
   const businessFailure = business === undefined
     ? undefined
     : processFailure(business.child, "Anna business service", () => business.stderr, () => business.started);
@@ -468,11 +492,22 @@ function spawnBusinessService(config, options) {
     env: config.businessEnv,
     stdio: options.stdio ?? "pipe",
   });
+  const readStderr = monitorChildOutput(child);
+  return { child, apiBase: config.businessApiBase, get stderr() { return readStderr(); }, started: false };
+}
+
+function monitorChildOutput(child, maxStderrBytes = 64 * 1024) {
+  // Always consume both pipes. Uvicorn access logs are stdout; leaving that
+  // pipe unread eventually blocks the Python event loop on a busy desktop.
+  child.stdout?.on("data", () => {});
   let stderr = "";
   child.stderr?.on("data", (chunk) => {
     stderr += chunk.toString();
+    if (Buffer.byteLength(stderr, "utf8") > maxStderrBytes) {
+      stderr = stderr.slice(-maxStderrBytes);
+    }
   });
-  return { child, apiBase: config.businessApiBase, get stderr() { return stderr; }, started: false };
+  return () => stderr;
 }
 
 function processFailure(child, label, readStderr, started) {

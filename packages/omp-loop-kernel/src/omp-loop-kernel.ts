@@ -367,11 +367,11 @@ export class OmpLoopKernel implements LoopKernel {
             phase: "model_requested",
             model: command.runProfileSnapshot.model.name,
             requestIndex: modelRequests,
-            inputDigest: sha256(stableJson({
-              systemPrompt: context.systemPrompt,
-              messages: context.messages,
-              tools: context.tools ?? [],
-            })),
+            inputDigest: modelInputDigest(
+              context.systemPrompt,
+              context.messages,
+              context.tools,
+            ),
           },
           this.now,
           this.createEventId,
@@ -962,11 +962,13 @@ function validateModelCheckpoints(
       || requestPayload.model !== command.runProfileSnapshot.model.name
       || typeof requestPayload.inputDigest !== "string"
       || history.indexOf(request) >= history.indexOf(checkpoint)
-      || requestPayload.inputDigest !== sha256(stableJson({
+      || requestPayload.inputDigest !== modelInputDigest(
         systemPrompt,
-        messages: [...initialMessages, ...messages.slice(0, transcriptIndex)],
-        tools: admittedToolDefinitions.some((tool) => tool.name !== "read_only") ? admittedToolDefinitions : [],
-      }))
+        [...initialMessages, ...messages.slice(0, transcriptIndex)],
+        admittedToolDefinitions.some((tool) => tool.name !== "read_only")
+          ? admittedToolDefinitions
+          : undefined,
+      )
     ) {
       throw new OmpModelCheckpointMismatchError();
     }
@@ -999,6 +1001,18 @@ function withAttribution(command: StartRun, payload: JsonValue): JsonValue {
     parentEventId: command.parentEventId!,
     ...(command.laneId === undefined ? {} : { laneId: command.laneId }),
   };
+}
+
+function modelInputDigest(
+  systemPrompt: string,
+  messages: readonly Message[],
+  tools: readonly ToolDefinition[] | undefined,
+): string {
+  return sha256(stableJson({
+    systemPrompt,
+    messages,
+    ...(tools === undefined ? {} : { tools }),
+  }));
 }
 
 function toolDefinitions(names: readonly string[]): ToolDefinition[] {

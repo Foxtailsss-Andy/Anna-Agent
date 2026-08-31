@@ -44,7 +44,9 @@ test("reopen validates native Todo phases and counts the consumed Todo against b
     const manifestDigest = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     const baseProfile = await createLiveProfile("fixture-model", undefined, false, "chat", "none");
-    const profile = withBudget(baseProfile, { wallTimeMs: 30_000, turns: 3, toolCalls: 1 });
+    // This fixture exercises the native Todo path only; admit exactly the
+    // definition supplied below so Core's coverage guard remains meaningful.
+    const profile = withBudget(baseProfile, { wallTimeMs: 30_000, turns: 3, toolCalls: 1 }, ["todo"]);
     const command = commandFor(profile, "native-todo-reopen");
 
     firstStore = new SqliteEventStore(eventStorePath);
@@ -259,11 +261,15 @@ test("reopen accepts a consumed steer before the next model checkpoint", async (
   }
 }, 120_000);
 
-function withBudget(profile: ResolvedRunProfile, budget: ResolvedRunProfile["budget"]): ResolvedRunProfile {
+function withBudget(
+  profile: ResolvedRunProfile,
+  budget: ResolvedRunProfile["budget"],
+  allowedTools: readonly string[] = profile.allowedTools,
+): ResolvedRunProfile {
   return resolveRunProfile({
     catalog: profile.skills,
     channelPolicy: {
-      toolPolicy: { allowedTools: profile.allowedTools },
+      toolPolicy: { allowedTools },
       allowedSkillIds: profile.skills.map((skill) => skill.id),
       allowedModels: [profile.model],
       budgetLimits: budget,
@@ -272,7 +278,7 @@ function withBudget(profile: ResolvedRunProfile, budget: ResolvedRunProfile["bud
     workerProfile: {
       ...profile.workerProfile,
       allowedSkillIds: profile.skills.map((skill) => skill.id),
-      allowedTools: profile.allowedTools,
+      allowedTools,
       modelPolicy: { allowedModels: [profile.model] },
       budgetDefaults: budget,
       artifactContract: profile.artifactContract,
@@ -283,7 +289,7 @@ function withBudget(profile: ResolvedRunProfile, budget: ResolvedRunProfile["bud
       model: profile.model,
       skillIds: profile.skills.map((skill) => skill.id),
       contextTransforms: profile.contextTransforms,
-      toolPolicy: { allowedTools: profile.allowedTools },
+      toolPolicy: { allowedTools },
       budget,
       memoryPolicy: profile.memoryPolicy,
       evalPolicy: profile.evalPolicy,

@@ -446,15 +446,18 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
   async function withConversationContext(task: ProductTask): Promise<ProductTask> {
     if (task.conversation_id === undefined) return task;
     const prior: Array<{ role: "user" | "assistant"; content: string }> = [];
-    for (const record of await sessions.list()) {
-      if (
-        record.task.run_id === task.run_id
-        || record.task.workspace_id !== task.workspace_id
-        || record.task.actor_user_id !== task.actor_user_id
-        || record.task.conversation_id !== task.conversation_id
-        || channelIdFor(record.task) !== channelIdFor(task)
-        || record.task.surface !== task.surface
-      ) continue;
+    const matchingRecords = (await sessions.list()).filter((record) =>
+      record.task.run_id !== task.run_id
+      && record.task.workspace_id === task.workspace_id
+      && record.task.actor_user_id === task.actor_user_id
+      && record.task.conversation_id === task.conversation_id
+      && channelIdFor(record.task) === channelIdFor(task)
+      && record.task.surface === task.surface,
+    ).sort((left, right) =>
+      left.created_at.localeCompare(right.created_at)
+      || left.task.run_id.localeCompare(right.task.run_id),
+    );
+    for (const record of matchingRecords) {
       const events = await readTaskEvents(record.task);
       prior.push(...conversationHistoryFromEvents(events));
     }

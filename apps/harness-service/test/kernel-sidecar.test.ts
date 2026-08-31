@@ -10,6 +10,7 @@ import { expect, test } from "vitest";
 const execFile = promisify(execFileCallback);
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const serviceRoot = resolve(repositoryRoot, "apps/harness-service");
+const ompRuntimeSource = resolve(repositoryRoot, "build/omp-runtime/darwin-arm64");
 
 test("built service reads the sidecar without source fallback", async () => {
   await execFile("npm", ["run", "build", "--workspace=@anna/harness-service"], {
@@ -21,6 +22,7 @@ test("built service reads the sidecar without source fallback", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-kernel-sidecar-"));
   const packagedService = join(directory, "apps/harness-service");
   const packagedDist = join(packagedService, "dist");
+  const packagedOmpRuntime = join(directory, "build/omp-runtime/darwin-arm64");
   const configPath = join(directory, "runtime.json");
   const eventStorePath = join(directory, "events.sqlite");
   const workspaceRoot = join(directory, "workspace");
@@ -29,6 +31,7 @@ test("built service reads the sidecar without source fallback", async () => {
     await cp(join(serviceRoot, "dist"), packagedDist, { recursive: true });
     await cp(join(serviceRoot, "package.json"), join(packagedService, "package.json"));
     await cp(join(repositoryRoot, "skills"), join(directory, "skills"), { recursive: true });
+    await cp(ompRuntimeSource, packagedOmpRuntime, { recursive: true });
     await writeFile(configPath, JSON.stringify({
       model_provider: "openai-compatible",
       model_name: "fixture-model",
@@ -39,34 +42,26 @@ test("built service reads the sidecar without source fallback", async () => {
 
     const environment = {
       PATH: process.env.PATH ?? "",
-      NODE_ENV: "development",
+      NODE_ENV: "production",
       ANNA_RUNTIME_CONFIG_PATH: configPath,
-      ANNA_HARNESS_V2_EVENT_STORE_PATH: eventStorePath,
-      ANNA_HARNESS_V2_WORKSPACE_ROOT: workspaceRoot,
+      ANNA_HARNESS_HOST_EVENT_STORE_PATH: eventStorePath,
+      ANNA_HARNESS_HOST_WORKSPACE_ROOT: workspaceRoot,
+      ANNA_HARNESS_OMP_RUNTIME_ROOT: packagedOmpRuntime,
     };
     const ready = await runService(
       join(packagedDist, "main.js"),
       directory,
       environment,
       async (url) => {
-        const response = await fetch(`${url}/v2/surfaces/cowork/runs`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            workspace_id: "workspace-kernel-sidecar",
-            channel_id: "channel-kernel-sidecar",
-            command_id: "command-kernel-sidecar",
-            run_id: "run-kernel-sidecar",
-            source_event_id: "event-kernel-sidecar-source",
-            goal: "The sidecar-backed service must reject unavailable OMP.",
-          }),
+        const health = await fetch(`${url}/health`);
+        expect(health.status).toBe(200);
+        expect(await health.json()).toMatchObject({
+          status: "ok",
+          protocol: "anna-harness-product/1",
+          host: "node",
         });
-        expect(response.status).toBe(503);
-        expect(await response.json()).toEqual({
-          code: "kernel_unavailable",
-          requested_adapter: "omp",
-          reason: "managed_runtime_unavailable",
-        });
+        const unauthorized = await fetch(`${url}/_harness/capabilities`);
+        expect(unauthorized.status).toBe(401);
       },
     );
     expect(ready).toMatchObject({
@@ -88,7 +83,7 @@ test("built service reads the sidecar without source fallback", async () => {
     }), "utf8");
     const corruptIntegrity = await runService(
       join(packagedDist, "main.js"),
-      repositoryRoot,
+      directory,
       environment,
     );
     expect(corruptIntegrity.code).not.toBe(0);
@@ -99,7 +94,7 @@ test("built service reads the sidecar without source fallback", async () => {
     }), "utf8");
     const corruptSourceIdentity = await runService(
       join(packagedDist, "main.js"),
-      repositoryRoot,
+      directory,
       environment,
     );
     expect(corruptSourceIdentity.code).not.toBe(0);
@@ -107,7 +102,7 @@ test("built service reads the sidecar without source fallback", async () => {
     await rm(sidecarPath);
     const missingSidecar = await runService(
       join(packagedDist, "main.js"),
-      repositoryRoot,
+      directory,
       environment,
     );
     expect(missingSidecar.code).not.toBe(0);
