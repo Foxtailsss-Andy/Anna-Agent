@@ -102,19 +102,15 @@ test.skipIf(process.platform !== "darwin" || process.arch !== "arm64" || !exists
   "runs the pinned OMP SDK/native canary through the managed launcher",
   async () => {
     const container = await mkdtemp(join(tmpdir(), "anna-omp-sdk-canary-"));
-    const entryRoot = join(container, "runtime");
-    const entryPath = join(entryRoot, "canary.ts");
+    const attemptParent = join(container, "attempt-parent");
+    const entryPath = join(runtimeRoot, "canary.ts");
     let worker: Awaited<ReturnType<typeof launchManagedWorker>> | undefined;
     try {
-      await mkdir(entryRoot);
-      await cp(bunPath, join(entryRoot, "bun"));
-      await cp(join(runtimeRoot, "node_modules"), join(entryRoot, "node_modules"), { recursive: true });
-      await rm(join(entryRoot, "node_modules/.bin"), { recursive: true, force: true });
-      await cp(join(repositoryRoot, "packages/omp-loop-kernel/runtime/canary.ts"), entryPath);
+      await mkdir(attemptParent);
       worker = await launchManagedWorker({
-        runtimeRoot: entryRoot,
+        runtimeRoot,
         entryPath,
-        attemptParent: container,
+        attemptParent,
         workspaceRoot: repositoryRoot,
       });
       const output = await collectWorkerOutput(worker.child, 20_000);
@@ -135,7 +131,7 @@ test.skipIf(process.platform !== "darwin" || process.arch !== "arm64" || !exists
       await rm(container, { recursive: true, force: true });
     }
   },
-  30_000,
+  120_000,
 );
 
 interface ProbeResult {

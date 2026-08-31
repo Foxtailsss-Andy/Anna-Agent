@@ -157,7 +157,7 @@ test("reopen accepts a consumed steer before the next model checkpoint", async (
     const manifestDigest = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     const baseProfile = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const profile = withBudget(baseProfile, { wallTimeMs: 30_000, turns: 3 });
+    const profile = withBudget(baseProfile, { wallTimeMs: 120_000, turns: 3 });
     const command = commandFor(profile, "steer-reopen");
 
     firstStore = new SqliteEventStore(eventStorePath);

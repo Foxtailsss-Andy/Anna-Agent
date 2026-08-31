@@ -22,6 +22,7 @@ business APIs, identity, stores, state machines and connector operations.
 | Home Create | `create_run_001` used the original Prompt creation path and produced a reviewable meeting-note Prompt through OMP/DeepSeek; the final UI readback showed validation passed and the Prompt registered in the artifact center | Only the Prompt path was exercised; this is not live coverage of every Create kind or executable capability activation |
 | Crew contextual Anna | A new real Anna response identified the approved v2, the instruction not to claim external reminders/synchronization, and the newly unlocked follow-up task | The project seed is synthetic; the added response is an actual model execution |
 | Crew Worker and review | Original UI reassignment and execution produced real v1; rejection with explicit criteria led to real v2, which passed the original review and unlocked the next node (8/9). The list automatically displayed v2 after the polling fix | Model usage v1 input 4725/output 712, v2 input 7857/output 1673. These are local demonstration documents, not external synchronization |
+| Crew task proposal | On `4e6b977`, the original task-drafting control completed Run `crew_showcase_770cc1b39661:host:18e1175fef6f` with two model responses, one successful tool response and Contract Eval passed | The proposal remained pending confirmation; graph progress stayed 8/9 and no external write was requested |
 | Hiker dashboard | Public Product API returned HTTP 200/ready, seven KPI fields and three audited MCP read calls; business mode reported Host execution and absent model credentials | Genuine connector reads; no write was performed |
 | Hiker Agent loop | Fresh UUID Run `hiker_assistant_run_d744fe62a50145a5af85f937484cb04f` completed two model turns around a successful real `hiker.system.list_capabilities` call | Canonical tool result was succeeded/success=true and returned `write_tools_enabled=false`; this does not prove a write |
 | Native Todo and steer restore | After aligning the test's admitted Todo profile, `omp-resume-native-steer.test.ts` passed both real SDK/kernel restore cases on the corrected worker | Bounded restore evidence, not an exhaustive fault matrix |
@@ -52,6 +53,18 @@ startup now has a thirty-second deadline; integrity checks, fail-closed child
 exits and model Run budgets are unchanged. The focused sidecar test, a fresh
 package and its ASAR smoke passed locally with the adjusted startup allowance.
 The subsequent commit must still pass its own complete CI.
+
+On `4e6b977`, both GitHub Product package jobs passed. Both complete-check jobs
+were cancelled at the twenty-minute job limit while tests were still advancing.
+The SDK canary also exposed a thirty-second outer test timeout around a redundant
+425 MiB dependency copy. It now uses the prepared read-only runtime with an
+independent writable attempt directory; all launcher isolation/result assertions
+remain, and its focused suite passed 3/3 in 6.96 seconds. A controlled thirty-five
+second reopen delay reproduced the native-steer fixture returning `timed_out`
+instead of `completed`; only that fixture's wall allowance changed to 120 seconds.
+The temporary delay was removed and the focused test passed. The checks job now
+has thirty minutes; no checks were removed and no production Run budget changed.
+The new commit still requires its own full CI result.
 
 Subsequent live failures found provider-incompatible dotted function names,
 process-local Hiker Run ID reuse, missing read metadata and missing local Artifact
