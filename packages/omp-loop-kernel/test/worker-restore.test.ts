@@ -9,17 +9,24 @@ import { encodeFrame, type HostFrame, type Message, type WorkerFrame } from "../
 const repository = resolve(import.meta.dirname, "../../..");
 let root: string;
 let runtime: string;
+let setupPromise: Promise<void> | undefined;
 
-beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), "anna-omp-restore-"));
-  runtime = join(root, "runtime");
-  await cp(join(repository, "build/omp-runtime/darwin-arm64"), runtime, { recursive: true });
-  for (const file of ["worker.ts", "protocol.ts"]) {
-    await cp(join(repository, "packages/omp-loop-kernel/runtime", file), join(runtime, file));
-  }
-}, 30_000);
+beforeAll(() => {
+  setupPromise = (async () => {
+    root = await mkdtemp(join(tmpdir(), "anna-omp-restore-"));
+    runtime = join(root, "runtime");
+    await cp(join(repository, "build/omp-runtime/darwin-arm64"), runtime, { recursive: true });
+    for (const file of ["worker.ts", "protocol.ts"]) {
+      await cp(join(repository, "packages/omp-loop-kernel/runtime", file), join(runtime, file));
+    }
+  })();
+  return setupPromise;
+}, 120_000);
 
-afterAll(async () => { if (root !== undefined) await rm(root, { recursive: true, force: true }); });
+afterAll(async () => {
+  await setupPromise?.catch(() => undefined);
+  if (root !== undefined) await rm(root, { recursive: true, force: true });
+}, 120_000);
 
 test("actual worker restores a consumed transcript and continues without replay", async () => {
   const transcript: readonly Message[] = [

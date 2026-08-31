@@ -1,7 +1,7 @@
 # HF-02 S2 Canonical Restore Evidence
 
 Date: 2026-08-31
-Status: CI test correction passed full local gates and both review axes; replacement exact-SHA CI is pending, so S2 publication acceptance remains open.
+Status: lifecycle fixes passed full local gates and final independent source review; new exact-SHA CI remains pending, so S2 publication acceptance is open.
 Contract: [frozen S2](../plans/2026-08-30-harness-first/HF-02-S2-canonical-restore.md).
 Product base: `c030246d90fca322717e6d20d2af07a2ee5866bc`.
 Initial S2 document commit: `cb96a8d`.
@@ -126,9 +126,117 @@ gates. Both protected worktrees retain the recorded HEAD, tracked-diff, status
 and untracked-content digests. The pinned runtime and production source are
 unchanged by the correction.
 
-Replacement exact-SHA CI remains pending. No corrected CI GREEN, default
-30-second latency or live-provider performance is claimed. S3 remains planning
-only until publication acceptance.
+Replacement candidate: `8af7d7cfbc27b586318cb41ee92a8de9806aaa7a`.
+Push `33344090915` and PR `33344092419` both ended cancelled after 20 minutes
+19 seconds, with the job annotation identifying the 20-minute execution limit.
+No corrected CI GREEN, default 30-second latency or live-provider performance
+is claimed. S3 remains planning only until publication acceptance.
+
+### Corrective CI Follow-Up
+
+- Push: `worker-restore` setup exceeded its 30-second hook watchdog, all seven
+  bodies were skipped, and cleanup also reported ENOTEMPTY while recursive
+  copying could still be active. The OMP workspace reported 32 passed / 7
+  skipped with a failed suite. PR's OMP workspace passed all 39 tests instead.
+- Both: the blocked Host preparation cancellation case failed at approximately
+  30 seconds. Its fixture has a 10-second Run budget and an unbounded entry
+  wait. This requires a controlled entry/settlement diagnosis.
+- Both: resume-budget passed 10 tests, multitool passed 2, scope passed 1 and
+  model-selection passed 5. The main resume file never produced its final
+  summary before cancellation; its remaining verdicts cannot be counted.
+- Three main tests release paused ACKs only after successful entry assertions.
+  Read-only review identified that failure cleanup could wait indefinitely in
+  `close()`. This is not yet proof of which path caused the missing CI summary.
+- Subsequent frontend smoke, build and Python CI steps were skipped. Their
+  local results above remain local evidence only.
+
+The next reviewed amendment is limited to test setup/drain/entry lifecycles.
+Production, runtime verification, workflow limits and S3 source remain frozen
+while controlled public-boundary reproductions distinguish the failures.
+
+## Lifecycle Fix Input
+
+Frozen local input: 31 non-document files, aggregate
+`a41e6aebc6a1db935f21b66f27ce5fe9b2da9c66e1b589c6ad836f70fd47aef2`.
+The delta from `8af7d7c` changes only three test files. Luna Max implemented
+the fixes; production, Worker source, dependencies, runtime verification,
+concurrency and workflow limits are unchanged.
+
+- Worker restore setup tracks the complete copy Promise. Setup and cleanup
+  have finite 120-second watchdogs; cleanup waits for copying to settle before
+  removing its own directory, without suppressing the original setup failure.
+- The blocked-preparation cancellation fixture admits 180 seconds through its
+  existing public resolver. Entry races completion and a 120-second deadline;
+  cleanup aborts and drains the Run. The test watchdog is 180 seconds.
+- Three main resume fixtures race gate entry against settlement/deadline and
+  always abort, release the paused append, drain and close on failure. Their
+  actual expiry budgets, original clocks and forced transitions are retained.
+
+Root TypeScript-AST checks confirmed all seven Worker test calls, seventeen
+unaffected main resume calls and four unaffected budget calls are byte-identical
+to `8af7d7c`. The two changed ACK-wall fixtures retain identical profile,
+command, queued-event and clock expressions. The separate resume-budget file
+is unchanged.
+
+### Controlled Failure Evidence
+
+Luna ran temporary variants of the actual OMP/SQLite cancellation fixture,
+injecting the same failure after the sink append gate was entered, before
+`durable.append`. This is a pending append, not an already committed receipt.
+Both variants retained the injected test failure and expected exit code 1.
+
+| Cleanup variant | Model / Gateway calls | Rescue fired | Close duration |
+| --- | --- | --- | --- |
+| Old direct-close ordering | 1 / 0 | Yes | 3,008 ms |
+| Abort, release, drain, close | 1 / 0 | No | 26 ms |
+
+The old variant required its outer rescue to release the held append. The
+fixed variant preserved the original failure while closing without extra I/O.
+Temporary flags and instrumentation were removed and the final file digests
+restored. A separate 1-ms entry-deadline probe proved finite pre-entry failure;
+it is not counted as the paused-append proof.
+
+Root independently reran the setup-timeout experiment in a temporary clone of
+the current Worker test file, changing only its hooks. Real Vitest and real
+runtime `cp` were used, with a 100-ms hook watchdog and a 250-ms delay in the
+root copy filter so copying remained pending. All seven test bodies were
+skipped by the failed hook; neither probe is seven successful SDK executions.
+
+| Hook variant | Copy settled at first rm | Directory present after copy drained | Result |
+| --- | --- | --- | --- |
+| Old rm-before-settle ordering | No | Yes, recreated after removal | Expected hook failure plus cleanup-order assertion failure; 8.27 seconds |
+| Wait for setup before rm | Yes | No | Expected hook failure retained, cleanup assertions passed; 8.00 seconds |
+
+Both probes returned exit code 1 intentionally. The outer rescue drained all
+copying and removed its own root in both cases. The temporary clone was deleted;
+the original test file and frozen aggregate remained unchanged. These are
+controlled lifecycle experiments, not an unchanged-CI replay.
+
+### Local Verification
+
+| Check at the frozen lifecycle input | Result |
+| --- | --- |
+| `npm test -- --reporter=dot` | 1,136 passed / 7 skipped; service 144 / 1 skipped in 424.61 seconds; OMP 39 passed |
+| Full Python | 1,048 passed, 53 existing warnings in 32.61 seconds |
+| Configured workspace and independent Worker typechecks | Passed |
+| Scoped strict check | Ten test files plus the shared profile helper passed; not a whole-service-test strict-clean claim |
+| Web, service and approval bridge builds | Passed; 523, 1,120 and 2 modules; existing web chunk-size warning retained |
+| Maintained frontend smoke | 5 passed |
+| Selected application, managed-runtime and Python dependency audits | No known vulnerabilities reported for the same selections used above |
+| Public candidate scan | 1,145 files, zero violations |
+| Local links and existing evidence manifests | 9 documents / 36 links passed; 7 manifests retain integrity, not new live executions |
+
+The lifecycle amendment had independent Standards and Spec design approval.
+Final source review was retried, and both independent Sol Ultra axes accepted
+the exact 31-input aggregate above with no remaining P0/P1/P2. They performed
+read-only source review; the probe executions and full local gates remain
+attributed to their actual runners, not an independent reviewer rerun.
+
+This records the reviewed local input before publication. PR 1 tracks its
+published SHA and CI results. The earlier `8af7d7c` cancellations remain
+historical failures; complete new exact-SHA CI is still required. Both protected
+worktrees retain their recorded HEAD, diff, status and untracked-content hashes.
+S3 and the full Harness-first migration remain unfinished.
 
 ## Host Ownership and Shutdown
 

@@ -76,7 +76,7 @@ test("expires before model startup without invoking the Host transport", async (
 }, 30_000);
 
 test("cancels a blocked Host preparation without invoking the worker", async () => {
-  const profile = fixtureProfile({ wallTimeMs: 10_000 }, "channel");
+  const profile = fixtureProfile({ wallTimeMs: 180_000 }, "channel");
   const command = fixtureCommand(profile, "preparation-cancelled");
   const sink = new RecordingSink();
   const controller = new AbortController();
@@ -97,14 +97,42 @@ test("cancels a blocked Host preparation without invoking the worker", async () 
   });
 
   const completion = kernel.start(command, sink, controller.signal);
-  await started;
-  controller.abort("test-cancel");
-  await expect(completion).resolves.toEqual({ status: "cancelled" });
-  expect(preparationCalls).toBe(1);
-  expect(modelCalls).toBe(0);
-  expect(sink.events.map((event) => event.type)).toEqual(["run.started", "run.cancelled"]);
-  await kernel.close();
-}, 30_000);
+  let entryTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const entry = await Promise.race([
+      started.then(() => ({ kind: "started" as const })),
+      completion.then(
+        (outcome) => ({ kind: "settled" as const, outcome }),
+        (error) => ({ kind: "rejected" as const, error }),
+      ),
+      new Promise<{ kind: "deadline" }>((resolveDeadline) => {
+        entryTimer = setTimeout(() => resolveDeadline({ kind: "deadline" }), 120_000);
+      }),
+    ]);
+    if (entry.kind === "rejected") throw entry.error;
+    if (entry.kind === "settled") {
+      throw new Error(`Host preparation Run settled before entry: ${JSON.stringify({
+        outcome: entry.outcome,
+        events: sink.events.map((event) => event.type),
+      })}`);
+    }
+    if (entry.kind === "deadline") {
+      throw new Error(`Host preparation did not start within 120000ms: ${JSON.stringify(
+        sink.events.map((event) => event.type),
+      )}`);
+    }
+    controller.abort("test-cancel");
+    await expect(completion).resolves.toEqual({ status: "cancelled" });
+    expect(preparationCalls).toBe(1);
+    expect(modelCalls).toBe(0);
+    expect(sink.events.map((event) => event.type)).toEqual(["run.started", "run.cancelled"]);
+  } finally {
+    if (entryTimer !== undefined) clearTimeout(entryTimer);
+    controller.abort("test-cleanup");
+    await completion.catch(() => undefined);
+    await kernel.close();
+  }
+}, 180_000);
 
 test("stops before a second Host transport when the turn budget is exhausted", async () => {
   const profile = fixtureProfile({ turns: 1 });

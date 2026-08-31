@@ -613,6 +613,12 @@ test("does not enter Gateway when cancellation wins after the dispatch fence", a
   const fencePaused = new Promise<void>((resolve) => {
     releaseFence = resolve;
   });
+  let resolveFenceEntered!: () => void;
+  const fenceEnteredPromise = new Promise<void>((resolve) => {
+    resolveFenceEntered = resolve;
+  });
+  const controller = new AbortController();
+  let completion: Promise<unknown> | undefined;
 
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
@@ -665,13 +671,13 @@ test("does not enter Gateway when cancellation wins after the dispatch fence", a
         },
       }),
     });
-    const controller = new AbortController();
     const sink: EventSink & {
       read: (streamId: StreamId, afterSeq?: number) => AsyncIterable<CanonicalEvent>;
     } = {
       async append(event) {
         if (event.type === "omp.tool.dispatch") {
           fenceEntered = true;
+          resolveFenceEntered();
           await fencePaused;
         }
         await durable.append(event);
@@ -680,10 +686,13 @@ test("does not enter Gateway when cancellation wins after the dispatch fence", a
         return durable.read(streamId, afterSeq);
       },
     };
-    const completion = kernel.start(command, sink, controller.signal);
-    for (let attempt = 0; attempt < 2_000 && !fenceEntered; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
+    completion = kernel.start(command, sink, controller.signal);
+    await waitForGateEntry(
+      fenceEnteredPromise,
+      completion,
+      "dispatch cancellation",
+      () => ({ fenceEntered }),
+    );
     expect(fenceEntered).toBe(true);
     controller.abort("cancelled");
     releaseFence();
@@ -695,11 +704,14 @@ test("does not enter Gateway when cancellation wins after the dispatch fence", a
     expect(events.at(-1)?.type).toBe("run.cancelled");
     expect(events.some((event) => event.type === "run.completed")).toBe(false);
   } finally {
+    controller.abort("test-cleanup");
+    releaseFence();
+    await completion?.catch(() => undefined);
     await kernel?.close().catch(() => undefined);
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 180_000);
 
 test("does not enter Gateway when the wall budget expires after the dispatch fence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-dispatch-timeout-"));
@@ -719,6 +731,12 @@ test("does not enter Gateway when the wall budget expires after the dispatch fen
   const fencePaused = new Promise<void>((resolve) => {
     releaseFence = resolve;
   });
+  let resolveFenceEntered!: () => void;
+  const fenceEnteredPromise = new Promise<void>((resolve) => {
+    resolveFenceEntered = resolve;
+  });
+  const controller = new AbortController();
+  let completion: Promise<unknown> | undefined;
 
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
@@ -775,6 +793,7 @@ test("does not enter Gateway when the wall budget expires after the dispatch fen
       async append(event) {
         if (event.type === "omp.tool.dispatch") {
           fenceEntered = true;
+          resolveFenceEntered();
           await fencePaused;
         }
         await durable.append(event);
@@ -783,10 +802,13 @@ test("does not enter Gateway when the wall budget expires after the dispatch fen
         return durable.read(streamId, afterSeq);
       },
     };
-    const completion = kernel.start(command, sink, new AbortController().signal);
-    for (let attempt = 0; attempt < 2_000 && !fenceEntered; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
+    completion = kernel.start(command, sink, controller.signal);
+    await waitForGateEntry(
+      fenceEnteredPromise,
+      completion,
+      "dispatch wall expiry",
+      () => ({ fenceEntered }),
+    );
     expect(fenceEntered).toBe(true);
     dateNowSpy.mockImplementation(() => realDateNow() + (command.budget.wallTimeMs ?? 0) + 1);
     releaseFence();
@@ -803,12 +825,15 @@ test("does not enter Gateway when the wall budget expires after the dispatch fen
       "run.cancelled",
     ].includes(event.type))).toHaveLength(1);
   } finally {
+    controller.abort("test-cleanup");
+    releaseFence();
+    await completion?.catch(() => undefined);
     dateNowSpy.mockRestore();
     await kernel?.close().catch(() => undefined);
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 180_000);
 
 test("rejects a malformed Host model reply before persisting its response checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-invalid-model-response-"));
@@ -1198,6 +1223,12 @@ test("rechecks the wall budget after the model-request checkpoint ACK", async ()
   const requestPaused = new Promise<void>((resolve) => {
     releaseRequest = resolve;
   });
+  let resolveRequestEntered!: () => void;
+  const requestEnteredPromise = new Promise<void>((resolve) => {
+    resolveRequestEntered = resolve;
+  });
+  const controller = new AbortController();
+  let completion: Promise<unknown> | undefined;
 
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
@@ -1248,6 +1279,7 @@ test("rechecks the wall budget after the model-request checkpoint ACK", async ()
       async append(event) {
         if (event.type === "run.model.requested") {
           requestEntered = true;
+          resolveRequestEntered();
           await requestPaused;
         }
         await durable.append(event);
@@ -1256,10 +1288,13 @@ test("rechecks the wall budget after the model-request checkpoint ACK", async ()
         return durable.read(streamId, afterSeq);
       },
     };
-    const completion = kernel.start(command, sink, new AbortController().signal);
-    for (let attempt = 0; attempt < 2_000 && !requestEntered; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
+    completion = kernel.start(command, sink, controller.signal);
+    await waitForGateEntry(
+      requestEnteredPromise,
+      completion,
+      "model request wall expiry",
+      () => ({ requestEntered }),
+    );
     expect(requestEntered).toBe(true);
     dateNowSpy.mockImplementation(() => realDateNow() + (command.budget.wallTimeMs ?? 0) + 1);
     releaseRequest();
@@ -1277,12 +1312,15 @@ test("rechecks the wall budget after the model-request checkpoint ACK", async ()
     ].includes(event.type))).toHaveLength(1);
     expect(events.at(-1)?.type).toBe("run.timed_out");
   } finally {
+    controller.abort("test-cleanup");
+    releaseRequest();
+    await completion?.catch(() => undefined);
     dateNowSpy.mockRestore();
     await kernel?.close().catch(() => undefined);
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 120_000);
+}, 180_000);
 
 type PreparedRestoreState = "started-only" | "projection-only" | "partial-hit" | "ready-before-user";
 type OmpTestDescriptor = Awaited<ReturnType<typeof materializeRuntime>>;
@@ -3268,4 +3306,36 @@ async function readRunEvents(
     events.push(event);
   }
   return events;
+}
+
+async function waitForGateEntry(
+  entered: Promise<void>,
+  completion: Promise<unknown>,
+  label: string,
+  details: () => unknown,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      entered.then(() => ({ kind: "entered" as const })),
+      completion.then(
+        (outcome) => ({ kind: "settled" as const, outcome }),
+        (error) => ({ kind: "rejected" as const, error }),
+      ),
+      new Promise<{ kind: "deadline" }>((resolveDeadline) => {
+        timer = setTimeout(() => resolveDeadline({ kind: "deadline" }), 120_000);
+      }),
+    ]);
+    if (result.kind === "entered") return;
+    if (result.kind === "rejected") throw result.error;
+    if (result.kind === "settled") {
+      throw new Error(`${label} Run settled before entry: ${JSON.stringify({
+        outcome: result.outcome,
+        details: details(),
+      })}`);
+    }
+    throw new Error(`${label} did not enter within 120000ms: ${JSON.stringify(details())}`);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }

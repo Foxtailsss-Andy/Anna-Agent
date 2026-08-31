@@ -426,6 +426,79 @@ were P2 findings and are closed at this input. The four intentional-expiry
 test bodies remain byte-identical to the published candidate. This review
 freeze does not replace the remaining full gates or exact-SHA CI acceptance.
 
+### CI Fixture Lifecycle Amendment
+
+The correction at `8af7d7cfbc27b586318cb41ee92a8de9806aaa7a` passed full local
+gates, but push `33344090915` and PR `33344092419` were both cancelled after
+20 minutes 19 seconds. The job annotation identifies the unchanged outer
+20-minute limit. Neither service suite produced a final summary; subsequent
+smoke/build/Python CI steps were skipped. These runs are not acceptance.
+
+Both logs report the blocked Host preparation cancellation test failing at
+about 30 seconds. It admits only 10 seconds for the Run and awaits its entry
+Promise without racing completion. Push also reports `worker-restore` setup
+timing out at 30 seconds, with all seven tests skipped, followed by ENOTEMPTY
+during cleanup. The recursive copy is not cancelled by the Vitest watchdog;
+cleanup must not race that still-running operation. PR's seven worker-restore
+tests did pass, so that setup failure does not explain the entire service tail.
+
+Read-only review found three main resume tests that assert entry after a
+20-second poll but release their paused ACK only on the happy path. A failed
+entry assertion can leave `close()` waiting for a never-released test gate.
+This is a hypothesis for the missing main-file summary, not a proven
+production-kernel deadlock or proof that every expiry branch was reached.
+
+Before changing code, independently review these narrow diagnostic/fix bounds:
+
+- `packages/omp-loop-kernel/test/worker-restore.test.ts`: give setup and cleanup
+  finite watchdogs up to 120,000 ms and explicitly track the setup Promise.
+  Cleanup waits for copying to settle before removing its directory, including
+  the setup-timeout path. Preserve failures; do not turn a failed setup into
+  passing or deliberately skipped tests. Retain actual runtime copying and
+  source installation, and do not change manifest verification or Worker code.
+- `apps/harness-service/test/omp-budget.test.ts`: only the blocked-preparation
+  cancellation case may admit 180,000 ms before parsing/claim through its
+  existing public resolver. Race entry against Run completion and a finite
+  entry deadline, then always abort and drain the Run in cleanup. Preserve one
+  preparation call, zero model calls and the exact cancelled lifecycle. The
+  other four test behaviors and budgets are unchanged.
+- `apps/harness-service/test/omp-resume.test.ts`: only the cancellation,
+  dispatch-wall and model-request-ACK gates may change their fixture lifecycle.
+  Use entry deadlines up to 120,000 ms, surface early Run settlement, and
+  unconditionally abort/release paused ACKs before awaiting close. Their
+  targeted test watchdogs may be at most 300,000 ms. Keep the two wall tests'
+  original Run caps, queued/start clocks and forced expiry transitions; they
+  must still reach the named ACK and prove zero post-expiry provider/Gateway
+  work. The queued-only and completed-tail wall tests remain unchanged.
+
+Use a small local test helper only if the repeated entry/drain pattern requires
+it; no general fixture framework. First obtain a controlled RED for early Run
+settlement or assertion-failure cleanup at the public kernel/sink boundary,
+then verify that corrected fixtures settle and clean up while retaining the
+failure signal. Exercise setup-timeout cleanup as well as normal setup. Do not
+infer those paths passed from a normal happy-path rerun.
+
+Production source, dependencies, runtime identity checks, file concurrency,
+workflow timeout and S3 implementation remain outside this amendment. If the
+original Run cap prevents a target ACK from being reached, report that
+separate RED instead of silently widening an expiry case. If the complete
+suite still exceeds the job limit after lifecycle repair, measure and review
+that independently. Require exact-source dual review, targeted and complete
+local gates, and new complete push/PR CI before S2 acceptance.
+
+Both independent Sol Ultra axes accepted this lifecycle amendment at document
+SHA-256 `cb71db29aab40ed55710a999ff9144836733962480406beb6b6b9a4547052f53`,
+before the review stamp was added. This freezes diagnostic/coding scope only;
+it does not establish the controlled probes, fixes or CI as passed.
+
+Lifecycle implementation review subsequently accepted the exact 31-file
+non-document aggregate
+`a41e6aebc6a1db935f21b66f27ce5fe9b2da9c66e1b589c6ad836f70fd47aef2`.
+Both independent Sol Ultra axes reported no remaining P0/P1/P2. Root's complete
+local gates and the controlled failure evidence are recorded in the
+[S2 handoff](../../handoff/2026-08-31-hf-02-s2-canonical-restore.md).
+This does not waive the still-required complete exact-SHA CI gate.
+
 ## Vertical Verification Order
 
 1. Real consumed transcript and Host Memory snapshot, real SQLite reopen,
