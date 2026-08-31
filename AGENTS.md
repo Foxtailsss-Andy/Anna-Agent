@@ -13,12 +13,13 @@
 - Keep Runtime modules deep behind small interfaces. Treat connectors as adapters at edge seams; tests and callers should cross the same interface.
 - Do not add domain-specific branches to the Harness core when an adapter or run profile can express the variation.
 - Never invent business data, model output, tool output, telemetry, token counts, or success states. Missing evidence stays missing.
-- Windows is the primary distribution target. Windows and macOS local development both use Python 3.12 or 3.13.
+- Windows remains the long-term primary distribution target. The Harness-first Preview is currently validated only on macOS arm64; do not claim Windows/Linux release acceptance.
 
 ## Local development
 
-- Runtime configuration and secrets live in `.anna/runtime.json`; `.anna/` must stay out of Git and must not be printed in logs.
-- The desktop shell starts the Python backend. Hiker, reimbursement, and the optional Associate ERP connector are configured as external MCP endpoints. Normal launch: `npm run desktop:run`.
+- Preview configuration and state must remain separate from legacy `.anna/runtime.json` and Python databases. `.anna/` must stay out of Git; never print credentials.
+- The normal Preview desktop shell starts one Node Harness Host with the verified Oh-my-Pi runtime. It must not start or fall back to the Python Agent backend. Normal launch: `npm run desktop:run`.
+- The current scope is `docs/product/anna-harness-first-preview-goal-2026-08-31.md`. Hiker/MCP business writes and unmigrated legacy surfaces stay closed in this Preview.
 - Detailed setup and recovery commands are in `DEVELOPMENT.md`.
 
 ## Required validation
@@ -36,3 +37,5 @@ npm run build
 ```
 
 Windows tests that create symbolic links require Developer Mode or the Create symbolic links privilege. Report that environmental limitation; do not weaken the tests.
+
+Python 3.12/3.13 is needed for retained legacy tests, not for the default Preview runtime. Keep the legacy sources and data intact while migration continues.

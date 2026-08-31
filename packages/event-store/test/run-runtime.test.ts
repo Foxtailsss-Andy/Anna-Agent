@@ -307,3 +307,66 @@ test.each(["admitting", "active"] as const)("close aborts and drains an %s Run b
     } finally { release(); await runtime.close(); }
   });
 });
+
+test("stops only the admitted Run matching the complete Channel scope", async () => {
+  await withDatabase(async (path, stores) => {
+    const store = new SqliteEventStore(path);
+    stores.push(store);
+    const entered = new Map<string, () => void>();
+    const signals = new Map<string, AbortSignal>();
+    const kernel: LoopKernel = {
+      async start(run, sink, signal) {
+        signals.set(`${run.workspaceId}:${run.channelId}`, signal);
+        await sink.append(eventFor(run, 1, "run.started", { phase: "started" }));
+        entered.get(`${run.workspaceId}:${run.channelId}`)?.();
+        await new Promise<void>((resolveAbort) => {
+          if (signal.aborted) {
+            resolveAbort();
+            return;
+          }
+          signal.addEventListener("abort", () => resolveAbort(), { once: true });
+        });
+        await sink.append(eventFor(run, 2, "run.cancelled", { outcome: "cancelled" }));
+        return { status: "cancelled" };
+      },
+      async steer() {},
+      async answer() {},
+      async abort() {},
+    };
+    const runtime = new DurableRunRuntime(store, kernel);
+    const firstCommand = command("shared-run", "command-a", {
+      workspaceId: "workspace-a" as ChannelScope["workspaceId"],
+      channelId: "channel-a" as ChannelScope["channelId"],
+    });
+    const secondCommand = command("shared-run", "command-b", {
+      workspaceId: "workspace-b" as ChannelScope["workspaceId"],
+      channelId: "channel-b" as ChannelScope["channelId"],
+    });
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    entered.set("workspace-a:channel-a", () => releaseFirst());
+    entered.set("workspace-b:channel-b", () => releaseSecond());
+    const firstReady = new Promise<void>((resolveReady) => { releaseFirst = resolveReady; });
+    const secondReady = new Promise<void>((resolveReady) => { releaseSecond = resolveReady; });
+    try {
+      const first = await runtime.start(firstCommand);
+      const second = await runtime.start(secondCommand);
+      await Promise.all([firstReady, secondReady]);
+
+      await expect(runtime.stop({
+        workspaceId: firstCommand.workspaceId,
+        channelId: firstCommand.channelId,
+      }, firstCommand.runId, "preview stop")).resolves.toEqual({ status: "cancelled" });
+      expect(signals.get("workspace-a:channel-a")?.aborted).toBe(true);
+      expect(signals.get("workspace-b:channel-b")?.aborted).toBe(false);
+
+      await expect(runtime.stop({
+        workspaceId: secondCommand.workspaceId,
+        channelId: secondCommand.channelId,
+      }, secondCommand.runId, "preview stop")).resolves.toEqual({ status: "cancelled" });
+      await expect(second.completion).resolves.toEqual({ status: "cancelled" });
+    } finally {
+      await runtime.close();
+    }
+  });
+});

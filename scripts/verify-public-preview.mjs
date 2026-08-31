@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const generatedPath = /^(?:dist|release|node_modules|\.venv|\.pytest_cache|\.tmp-tests|build\/python-runtime)(?:\/|$)/;
+const generatedPath = /^(?:dist|release|node_modules|\.venv|\.pytest_cache|\.tmp-tests|build\/(?:python|omp)-runtime)(?:\/|$)/;
 const localStatePath = /^(?:\.anna(?:\/|$)|.*(?:^|\/)runtime\.json$)/;
 const runtimeDatabasePath = /(?:\.sqlite3?|\.db|\.jsonl)$/i;
 const absolutePathMarker = /(?:^|[\s"'`=(,:])(?:\/Users\/|\/home\/|[A-Za-z]:(?:[\\/]|\\\\)(?:Users|home)(?:[\\/]|\\\\))/;

@@ -22,7 +22,22 @@
 | 权限 | **permission mode**（readonly / ask / contained-write / full）；审批 = **human-in-the-loop** | ADLC 原文 "Permissioned: graduated access escalation" |
 | 给 agent 看的运行时仪表 | **agent-facing telemetry** | ADLC 原文 "giving agents the same observability they have in production" |
 
-## 2. 从点击提交到终局：九跳链路
+## 2. Harness-first Preview 默认链路（2026-08-31）
+
+本分支的当前交付范围以 [HF-PREVIEW-1.0](docs/product/anna-harness-first-preview-goal-2026-08-31.md) 为准。
+
+| # | 跳 | 所有权 |
+|---|---|---|
+| 1 | Desktop → Node Preview Host | 默认启动单一 Harness Host；不启动 Python Agent，不做 Pi/Python fallback |
+| 2 | Preview 任务界面 → `/api/preview/runs` | Host 生成受限的本地工作区/频道作用域和 Run Profile；先持久化再执行 |
+| 3 | Host Context/Skill/Memory preparation → 实际 Oh-my-Pi | Harness 固定输入、预算与资源快照，OMP 拥有模型/工具循环 |
+| 4 | OMP → Host model transport / ToolGateway | 凭据留在 Host；仅暴露本版准入的只读工作区工具 |
+| 5 | Canonical events → SSE / SQLite history | 界面展示真实事件；重连只读取，不重新创建 Run |
+| 6 | Contract Eval → 唯一终态 | 停止通过该 Run 的 Host AbortController；结果与历史来自同一事件源 |
+
+完整业务迁移、交互控制和多平台工作列在 [社区 Backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md)。下节保留旧实现的术语和证据映射，不代表 Preview 的默认运行链路。
+
+### 2.1 Legacy Python 九跳链路（非 Preview 默认入口）
 
 | # | 跳 | 模块 · 位置 |
 |---|---|---|
@@ -38,7 +53,7 @@
 
 观测双通道贯穿 3-9：过程帧 + audit 事件 → `FrameJournal.append` 盖 `seq`+毫秒 `ts` → 内存环 + SQLite `run_frames` 写穿；audit 另经 `AuditFrameWatermark` 以 `{"type":"event"}` 帧混入同一 journal。帧词表事实源 = [A2](docs/superpowers/plans/2026-07-09-iris-rebuild/A2-frame-contract.md)。
 
-## 3. TraceDoc 契约（`GET /api/chat/runs/{run_id}/trace`）
+## 3. Legacy TraceDoc 契约（`GET /api/chat/runs/{run_id}/trace`）
 
 装配器 = `services/runtime/app/trace_assembler.py`（纯读、确定性、无墙钟），契约 gate = `tests/gates/test_gate_trace.py`（9 条）。
 

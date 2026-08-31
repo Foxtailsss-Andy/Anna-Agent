@@ -45,7 +45,10 @@ export {
 } from "./production-tools";
 import { createProductionToolGateway } from "./production-tools";
 import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
-import { verifyOmpKernelIdentity } from "../../../packages/omp-loop-kernel/src/kernel-identity";
+import {
+  currentOmpImplementation,
+  verifyOmpKernelIdentity,
+} from "../../../packages/omp-loop-kernel/src/kernel-identity";
 import type { OmpHostModelTransport } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 import { createOmpModelTransport } from "./omp-model-transport";
 
@@ -84,6 +87,45 @@ export interface LiveHarnessV2Runtime {
     readonly ownerId: string;
   };
   close(): void | Promise<void>;
+}
+
+export async function createOmpKernelDescriptor(
+  runtimeRoot: string,
+): Promise<OmpKernelDescriptorV1> {
+  if (process.platform !== "darwin" || process.arch !== "arm64") {
+    throw new Error("OMP runtime unavailable on this platform");
+  }
+  const manifest = JSON.parse(await readFile(resolve(runtimeRoot, "manifest.json"), "utf8")) as {
+    sha256?: unknown;
+  };
+  if (typeof manifest.sha256 !== "string" || !/^sha256:[0-9a-f]{64}$/.test(manifest.sha256)) {
+    throw new Error("OMP runtime manifest identity unavailable");
+  }
+  const implementation = currentOmpImplementation();
+  return parseOmpKernelDescriptor({
+    schemaVersion: 1,
+    adapterId: "omp",
+    protocolVersion: "anna-omp/1",
+    adapterSource: {
+      packageName: "@anna/omp-loop-kernel",
+      sha256: implementation.sourceSha256,
+    },
+    upstream: {
+      packageName: "@oh-my-pi/pi-coding-agent",
+      version: "18.0.11",
+      sourceCommit: "b8ce33a58911c26bed1d84f0db9a5e2e727c49a2",
+      integrity: "sha512-3H90cCc+3yLtvSKM2RooIvkhG+77OFFoXD6+9GPZDF3PQ3FF6uCnPP57OaUa8VZ8YwOm9Eio5ZmfdFuvwLn+VA==",
+    },
+    runtime: {
+      platform: "darwin",
+      arch: "arm64",
+      bunVersion: "1.3.14",
+      bunSha256: "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
+      nativeSha256: "e4e59e6cdaf475d2484755e237490f0637c937dfa06b48fcc59e25103e6c8b8b",
+      dependencyLockSha256: implementation.dependencyLockSha256,
+      runtimeManifestSha256: manifest.sha256.slice("sha256:".length),
+    },
+  });
 }
 
 interface RuntimeConfig {

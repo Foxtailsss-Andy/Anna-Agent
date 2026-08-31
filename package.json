@@ -20,12 +20,12 @@
     "test": "vitest run && npm run harness:v2:test",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "desktop:run": "npm run build && npm run harness:v2:build && electron .",
-    "desktop:prepare-python": "node scripts/prepare-python-runtime.mjs",
-    "harness:omp:prepare": "node scripts/prepare-omp-runtime.mjs",
-    "desktop:package": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && electron-builder --dir",
+    "desktop:run": "npm run build && npm run harness:v2:build && npm run harness:omp:prepare && electron .",
+    "harness:omp:prepare": "node scripts/ensure-omp-runtime.mjs",
+    "desktop:package": "npm run build && npm run harness:v2:build && npm run harness:omp:prepare && electron-builder --dir",
     "desktop:smoke-asar": "electron scripts/smoke-packaged-asar.mjs",
     "frontend:smoke": "node --test tests/frontend/app_shell_smoke.mjs",
+    "preview:smoke": "node --test tests/frontend/electron_runtime.test.mjs tests/frontend/preview_desktop.test.mjs tests/frontend/preview_ui.test.mjs",
     "release:verify": "node scripts/verify-public-preview.mjs",
     "live:e2e": "node scripts/live-reimbursement-e2e.mjs",
     "live:associate": "node scripts/live-associate-e2e.mjs",
@@ -77,10 +77,8 @@
     "asarUnpack": [
       "dist/**",
       "apps/harness-service/dist/**",
-      "services/**",
       "skills/**",
-      "build/python-runtime/**",
-      "pyproject.toml",
+      "build/omp-runtime/darwin-arm64/**",
       "package.json"
     ],
     "directories": {
@@ -91,36 +89,18 @@
       "apps/desktop/electron/**/*",
       "apps/harness-service/dist/**/*",
       "apps/harness-service/package.json",
-      "services/**/*",
       "skills/**/*",
-      "build/python-runtime/**/*",
-      "pyproject.toml",
+      "build/omp-runtime/darwin-arm64/**/*",
       "package.json"
     ],
     "mac": {
       "icon": "build/icon.icns",
       "target": [
-        "dir"
-      ]
-    },
-    "win": {
-      "icon": "build/icon.ico",
-      "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "target": "dir",
+          "arch": ["arm64"]
         }
       ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Anna"
     }
   }
 }

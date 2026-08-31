@@ -1,12 +1,12 @@
 export function runtimeFailureHtml({ message, details } = {}) {
-  const safeMessage = escapeHtml(redactSecrets(message || "Anna runtime could not start"));
+  const safeMessage = escapeHtml(redactSecrets(message || "Anna Preview Host could not start"));
   const safeDetails = escapeHtml(redactSecrets(details || ""));
   return `<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Anna runtime 启动失败</title>
+    <title>Anna Preview 启动失败</title>
     <style>
       body {
         margin: 0;
@@ -73,16 +73,16 @@ export function runtimeFailureHtml({ message, details } = {}) {
   </head>
   <body>
     <main>
-      <h1>Anna runtime 启动失败</h1>
+      <h1>Anna Preview 启动失败</h1>
       <p>${safeMessage}</p>
       ${safeDetails ? `<pre>${safeDetails}</pre>` : ""}
-      <button id="restart-runtime" type="button">重启运行时</button>
+      <button id="restart-runtime" type="button">重启 Preview</button>
       <p id="restart-status" role="status"></p>
-      <p>请检查本地 Python runtime、端口占用和配置文件路径。</p>
+      <p>请检查 Preview Host、端口占用和本地配置路径。</p>
       <ul>
-        <li><code>ANNA_PYTHON_BIN</code> 可指定 Python 可执行文件。</li>
-        <li><code>ANNA_RUNTIME_CONFIG_PATH</code> 可指定模型和 MCP 的本地配置文件。</li>
-        <li><code>ANNA_STATE_DB_PATH</code> 可指定 Anna 状态数据库。</li>
+        <li><code>ANNA_PREVIEW_ENTRY_PATH</code> 可指定 Preview Host 入口。</li>
+        <li><code>ANNA_PREVIEW_CONFIG_PATH</code> 可指定 Preview 模型配置文件。</li>
+        <li><code>ANNA_PREVIEW_STATE_ROOT</code> 可指定 Preview 本地状态目录。</li>
       </ul>
     </main>
     <script>
@@ -90,7 +90,7 @@ export function runtimeFailureHtml({ message, details } = {}) {
       const restartStatus = document.getElementById("restart-status");
       restartButton.addEventListener("click", async () => {
         restartButton.disabled = true;
-        restartButton.textContent = "重启中……";
+          restartButton.textContent = "重启中...";
         restartStatus.textContent = "";
         try {
           if (!window.__ANNA_RUNTIME__ || typeof window.__ANNA_RUNTIME__.restartRuntime !== "function") {

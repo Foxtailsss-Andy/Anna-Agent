@@ -23,7 +23,7 @@ const { version: serviceVersion } = require("../package.json") as {
 
 export const unsupportedV2Surfaces = ["create", "cowork", "hub"] as const;
 
-export type V2SurfaceId = typeof unsupportedV2Surfaces[number];
+export type V2SurfaceId = typeof unsupportedV2Surfaces[number] | "preview";
 type V2RunStatus =
   | "queued"
   | "running"
@@ -48,6 +48,12 @@ export interface HarnessV2Runtime {
     runId: string,
     body: unknown,
   ) => Promise<{ runId: string; status: V2RunStatus }>;
+  readonly stop?: (
+    workspaceId: string,
+    channelId: string,
+    runId: string,
+    reason?: string,
+  ) => Promise<{ status: V2RunStatus } | undefined>;
   readonly readEvents?: (
     workspaceId: string,
     channelId: string,
@@ -222,7 +228,7 @@ export async function startHarnessService(
     const resumeMatch = request.url?.match(/^\/v2\/surfaces\/([^/]+)\/runs\/([^/]+)\/resume$/);
     if (request.method === "POST" && resumeMatch) {
       const surfaceId = resumeMatch[1] as V2SurfaceId;
-      if (!unsupportedV2Surfaces.includes(surfaceId)) {
+      if (!isLegacyV2Surface(surfaceId)) {
         responseJson(response, 404, { code: "unknown_v2_surface" });
         return;
       }
@@ -243,7 +249,7 @@ export async function startHarnessService(
     const surfaceMatch = request.url?.match(/^\/v2\/surfaces\/([^/]+)\/runs$/);
     if (request.method === "POST" && surfaceMatch) {
       const surfaceId = surfaceMatch[1] as V2SurfaceId;
-      if (!unsupportedV2Surfaces.includes(surfaceId)) {
+      if (!isLegacyV2Surface(surfaceId)) {
         response.writeHead(404, { "content-type": "application/json" });
         response.end(JSON.stringify({ code: "unknown_v2_surface" }));
         return;
@@ -632,6 +638,12 @@ function decodePathSegment(value: string | undefined): string | undefined {
 
 function isLoopbackHost(host: string): boolean {
   return host === "127.0.0.1" || host === "::1" || host === "localhost";
+}
+
+function isLegacyV2Surface(
+  surfaceId: V2SurfaceId,
+): surfaceId is typeof unsupportedV2Surfaces[number] {
+  return (unsupportedV2Surfaces as readonly string[]).includes(surfaceId);
 }
 
 async function handleRuntimeEvents(

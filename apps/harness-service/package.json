@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build --config vite.config.ts && vite build --config vite.approval.config.ts",
+    "build": "vite build --config vite.config.ts && vite build --config vite.approval.config.ts && vite build --config vite.preview.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

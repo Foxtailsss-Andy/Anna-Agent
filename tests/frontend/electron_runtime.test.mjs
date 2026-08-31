@@ -9,15 +9,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import {
-  createRuntimeConfig,
+  createPreviewRuntimeConfig,
   observeRuntimeExit,
   parseApiBaseFromArgv,
-  parseRuntimeBaseFromArgv,
-  resolvePythonExecutable,
   resolveProjectRoot,
   restartDesktopRuntime,
   startRuntimeService,
@@ -28,106 +26,65 @@ import {
   runtimeFailureHtml,
 } from "../../apps/desktop/electron/runtime-failure-page.mjs";
 
-test("Electron runtime config starts Anna API with local user state database", () => {
+test("Electron runtime config starts one Preview Host with isolated local state", () => {
   const projectRoot = mkdtempSync(join(tmpdir(), "anna-project-"));
   const userDataPath = mkdtempSync(join(tmpdir(), "anna-user-data-"));
-  // Sidecar layout differs per platform: python.exe on Windows, bin/python3.12 elsewhere.
-  const sidecarPython =
-    process.platform === "win32"
-      ? join(projectRoot, "build", "python-runtime", "python", "python.exe")
-      : join(projectRoot, "build", "python-runtime", "python", "bin", "python3.12");
-  mkdirSync(dirname(sidecarPython), { recursive: true });
-  mkdirSync(join(projectRoot, "build", "python-runtime", "site-packages"), {
-    recursive: true,
-  });
-  writeFileSync(sidecarPython, "#!/bin/sh\n");
 
   try {
-    const config = createRuntimeConfig({
+    const config = createPreviewRuntimeConfig({
       projectRoot,
       userDataPath,
       apiPort: 18765,
+      platform: "darwin",
+      arch: "arm64",
       env: {
-        ANNA_MODEL_ENDPOINT: "https://model.example/v1/chat/completions",
-        ANNA_MODEL_API_KEY: "secret",
-        ANNA_REIMBURSEMENT_MCP_SERVER: "https://mcp.example/rpc",
+        ANNA_RUNTIME_CONFIG_PATH: "/legacy/runtime.json",
+        ANNA_HARNESS_V2_BRIDGE_ENABLED: "1",
+        ANNA_PYTHON_BIN: "/legacy/python",
       },
     });
 
     assert.equal(config.apiBase, "http://127.0.0.1:18765");
-    assert.equal(config.pythonExecutable, sidecarPython);
-    assert.equal(config.moduleName, "uvicorn");
-    assert.deepEqual(config.args, [
-      "-m",
-      "uvicorn",
-      "services.api.app.main:app",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      "18765",
-    ]);
-    assert.equal(
-      config.env.ANNA_STATE_DB_PATH,
-      join(userDataPath, "state", "anna-state.sqlite3"),
-    );
-    assert.equal(
-      config.env.ANNA_RUNTIME_CONFIG_PATH,
-      join(userDataPath, "config", "runtime.json"),
-    );
-    assert.equal(config.env.ANNA_MODEL_ENDPOINT, "https://model.example/v1/chat/completions");
-    assert.equal(config.env.ANNA_REIMBURSEMENT_MCP_SERVER, "https://mcp.example/rpc");
-    assert.equal(config.harnessV2Enabled, false);
-    assert.equal(config.harnessV2Managed, false);
-    assert.equal(
-      config.env.PYTHONPATH,
-      [
-        projectRoot,
-        join(projectRoot, "build", "python-runtime", "site-packages"),
-      ].join(delimiter),
-    );
+    assert.equal(config.nodeExecutable, process.execPath);
+    assert.deepEqual(config.args, [join(projectRoot, "apps", "harness-service", "dist", "preview-main.js")]);
+    assert.equal(config.env.ANNA_PREVIEW_CONFIG_PATH, join(userDataPath, "preview", "config.json"));
+    assert.equal(config.env.ANNA_PREVIEW_STATE_ROOT, join(userDataPath, "preview"));
+    assert.equal(config.env.ANNA_PREVIEW_WORKSPACE_ROOT, join(userDataPath, "preview", "workspace"));
+    assert.equal(config.env.ANNA_RUNTIME_CONFIG_PATH, undefined);
+    assert.equal(config.env.ANNA_HARNESS_V2_BRIDGE_ENABLED, undefined);
+    assert.equal(config.env.ANNA_PYTHON_BIN, undefined);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
     rmSync(userDataPath, { recursive: true, force: true });
   }
 });
 
-test("Electron runtime opt-in provisions a managed Harness v2 sidecar", () => {
-  const config = createRuntimeConfig({
+test("Electron Preview runtime honors explicit Host paths", () => {
+  const config = createPreviewRuntimeConfig({
     projectRoot: "/project",
     userDataPath: "/user-data",
     apiPort: 18002,
-    harnessV2Port: 18003,
-    env: { ANNA_HARNESS_V2_BRIDGE_ENABLED: "1" },
-  });
-
-  assert.equal(config.harnessV2Enabled, true);
-  assert.equal(config.harnessV2Managed, true);
-  assert.equal(config.harnessV2ApiBase, "http://127.0.0.1:18003");
-  assert.equal(config.harnessV2Port, 18003);
-  assert.equal(
-    config.env.ANNA_HARNESS_V2_EVENT_STORE_PATH,
-    join("/user-data", "state", "harness-v2.sqlite3"),
-  );
-  assert.equal(config.env.ANNA_HARNESS_V2_BRIDGE_ORIGIN, "http://127.0.0.1:18003");
-});
-
-test("Electron runtime config honors explicit Python and state db settings", () => {
-  const config = createRuntimeConfig({
-    projectRoot: "/project",
-    userDataPath: "/user-data",
-    apiPort: 18000,
+    platform: "darwin",
+    arch: "arm64",
     env: {
-      ANNA_PYTHON_BIN: "/custom/python",
-      ANNA_STATE_DB_PATH: "/custom/anna.sqlite3",
+      ANNA_PREVIEW_CONFIG_PATH: "/preview/config.json",
+      ANNA_PREVIEW_STATE_ROOT: "/preview/state",
+      ANNA_PREVIEW_WORKSPACE_ROOT: "/workspace",
+      ANNA_PREVIEW_STATIC_ROOT: "/preview/dist",
+      ANNA_PREVIEW_OMP_RUNTIME_ROOT: "/omp",
+      ANNA_PREVIEW_ENTRY_PATH: "/preview/preview-main.js",
     },
   });
 
-  assert.equal(config.pythonExecutable, "/custom/python");
-  assert.equal(config.env.ANNA_STATE_DB_PATH, "/custom/anna.sqlite3");
-  assert.equal(config.env.ANNA_RUNTIME_CONFIG_PATH, join("/user-data", "config", "runtime.json"));
+  assert.equal(config.entryPath, "/preview/preview-main.js");
+  assert.equal(config.configPath, "/preview/config.json");
+  assert.equal(config.stateRoot, "/preview/state");
+  assert.equal(config.workspaceRoot, "/workspace");
+  assert.equal(config.staticRoot, "/preview/dist");
+  assert.equal(config.ompRuntimeRoot, "/omp");
 });
 
-test("Electron runtime config uses an ignored project-local Anna state bundle when present", () => {
+test("Electron Preview runtime does not reuse project-local legacy state", () => {
   const projectRoot = mkdtempSync(join(tmpdir(), "anna-project-local-state-"));
   const userDataPath = mkdtempSync(join(tmpdir(), "anna-user-data-fallback-"));
   const localStatePath = join(projectRoot, ".anna");
@@ -135,23 +92,43 @@ test("Electron runtime config uses an ignored project-local Anna state bundle wh
   writeFileSync(join(localStatePath, "runtime.json"), "{}\n");
 
   try {
-    const config = createRuntimeConfig({
+    const config = createPreviewRuntimeConfig({
       projectRoot,
       userDataPath,
       apiPort: 18001,
+      platform: "darwin",
+      arch: "arm64",
       env: {},
     });
 
-    assert.equal(config.runtimeConfigPath, join(localStatePath, "runtime.json"));
-    assert.equal(config.stateDbPath, join(localStatePath, "state", "anna-state.sqlite3"));
-    assert.equal(config.runtimeInfoPath, join(localStatePath, "runtime-info-electron.json"));
+    assert.equal(config.configPath, join(userDataPath, "preview", "config.json"));
+    assert.equal(config.stateRoot, join(userDataPath, "preview"));
+    assert.equal(config.runtimeInfoPath, join(userDataPath, "preview-runtime-info.json"));
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
     rmSync(userDataPath, { recursive: true, force: true });
   }
 });
 
-test("Electron preload argument parser exposes runtime API base", () => {
+test("Electron Preview runtime config rejects old Python-only overrides", () => {
+  const config = createPreviewRuntimeConfig({
+    projectRoot: "/project",
+    userDataPath: "/user-data",
+    apiPort: 18000,
+    platform: "darwin",
+    arch: "arm64",
+    env: {
+      ANNA_PYTHON_BIN: "/custom/python",
+      ANNA_STATE_DB_PATH: "/custom/anna.sqlite3",
+    },
+  });
+
+  assert.equal("pythonExecutable" in config, false);
+  assert.equal(config.env.ANNA_STATE_DB_PATH, undefined);
+  assert.equal(config.env.ANNA_PYTHON_BIN, undefined);
+});
+
+test("Electron preload argument parser exposes only the Preview API base", () => {
   const preloadSource = readFileSync(
     new URL("../../apps/desktop/electron/preload.mjs", import.meta.url),
     "utf8",
@@ -162,18 +139,8 @@ test("Electron preload argument parser exposes runtime API base", () => {
     "http://127.0.0.1:18888",
   );
   assert.equal(parseApiBaseFromArgv(["electron"]), "");
-  assert.equal(
-    parseRuntimeBaseFromArgv(
-      ["electron", "--anna-harness-v2-api-base=http://127.0.0.1:18889"],
-      "--anna-harness-v2-api-base=",
-    ),
-    "http://127.0.0.1:18889",
-  );
-  assert.equal(
-    parseRuntimeBaseFromArgv(["electron"], "--anna-harness-v2-api-base="),
-    "",
-  );
-  assert.match(preloadSource, /parseRuntimeBaseFromArgv/);
+  assert.doesNotMatch(preloadSource, /harness-v2-api-base/);
+  assert.match(preloadSource, /mode:\s*["']preview["']/);
 });
 
 test("package scripts include real Electron app and packaging commands", async () => {
@@ -186,14 +153,17 @@ test("package scripts include real Electron app and packaging commands", async (
   assert.deepEqual(packageJson.default.build.asarUnpack, [
     "dist/**",
     "apps/harness-service/dist/**",
-    "services/**",
     "skills/**",
-    "build/python-runtime/**",
-    "pyproject.toml",
+    "build/omp-runtime/darwin-arm64/**",
     "package.json",
   ]);
-  assert.match(packageJson.default.scripts["desktop:package"], /desktop:prepare-python/);
-  assert.ok(packageJson.default.build.files.includes("build/python-runtime/**/*"));
+  assert.match(packageJson.default.scripts["desktop:run"], /harness:omp:prepare/);
+  assert.match(packageJson.default.scripts["desktop:package"], /harness:omp:prepare/);
+  assert.doesNotMatch(packageJson.default.scripts["desktop:run"], /desktop:prepare-python|uvicorn/);
+  assert.doesNotMatch(packageJson.default.scripts["desktop:package"], /desktop:prepare-python|uvicorn/);
+  assert.ok(packageJson.default.build.files.includes("build/omp-runtime/darwin-arm64/**/*"));
+  assert.ok(packageJson.default.build.files.includes("apps/harness-service/dist/**/*"));
+  assert.equal(packageJson.default.build.files.some((entry) => entry.includes("python-runtime")), false);
   assert.equal(packageJson.default.build.files.includes(".venv/**/*"), false);
   assert.match(packageJson.default.scripts["desktop:run"], /electron/);
   assert.match(packageJson.default.scripts["desktop:package"], /electron-builder/);
@@ -247,29 +217,29 @@ test("package metadata defines Anna desktop identity and macOS icon asset", asyn
 
 test("Electron runtime failure page explains startup failure without exposing a blank window", () => {
   const html = runtimeFailureHtml({
-    message: "Anna runtime health check timed out",
-    details: "uvicorn could not start",
+    message: "Anna Preview Host health check timed out",
+    details: "Preview Host could not start",
   });
   const dataUrl = runtimeFailureDataUrl({
     message: "Anna runtime health check timed out",
   });
 
-  assert.ok(html.includes("Anna runtime 启动失败"));
-  assert.ok(html.includes("Anna runtime health check timed out"));
-  assert.ok(html.includes("ANNA_PYTHON_BIN"));
-  assert.ok(html.includes("ANNA_RUNTIME_CONFIG_PATH"));
+  assert.ok(html.includes("Anna Preview 启动失败"));
+  assert.ok(html.includes("Anna Preview Host health check timed out"));
+  assert.ok(html.includes("ANNA_PREVIEW_ENTRY_PATH"));
+  assert.ok(html.includes("ANNA_PREVIEW_CONFIG_PATH"));
   assert.ok(dataUrl.startsWith("data:text/html;charset=utf-8,"));
 });
 
 test("Electron runtime failure page exposes a restart action and returns to the app", () => {
   const html = runtimeFailureHtml({
-    message: "Harness v2 sidecar exited with code 42",
+    message: "Anna Preview Host exited with code 42",
   });
 
   assert.match(html, /id="restart-runtime"/);
   assert.match(html, /__ANNA_RUNTIME__\.restartRuntime/);
   assert.match(html, /location\.assign/);
-  assert.match(html, /重启运行时/);
+  assert.match(html, /重启 Preview/);
 });
 
 test("Electron runtime failure page redacts likely secrets", () => {
@@ -304,32 +274,34 @@ test("Electron runtime exit callback distinguishes crashes from intentional stop
   assert.equal(child.__annaIntentionalStop, true);
 });
 
-test("Electron runtime startup rejects missing Python executable", async () => {
-  const root = mkdtempSync(join(tmpdir(), "anna-runtime-missing-python-"));
+test("Electron Preview startup rejects a missing Host entry", async () => {
+  const root = mkdtempSync(join(tmpdir(), "anna-preview-missing-entry-"));
 
   try {
     await assert.rejects(
       startRuntimeService(
         {
           projectRoot: root,
-          pythonExecutable: join(root, "missing-python"),
-          args: ["-V"],
+          entryPath: join(root, "missing-preview-main.js"),
+          args: [join(root, "missing-preview-main.js")],
+          nodeExecutable: process.execPath,
           env: process.env,
           apiBase: "http://127.0.0.1:9",
-          stateDbPath: join(root, "state", "anna.sqlite3"),
-          runtimeConfigPath: join(root, "config", "runtime.json"),
+          stateRoot: join(root, "state"),
+          configPath: join(root, "state", "config.json"),
+          workspaceRoot: join(root, "workspace"),
         },
         { healthTimeoutMs: 50 },
       ),
-      /ENOENT|spawn/,
+      /Preview Host entry is missing/,
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("Electron runtime writes API base runtime info after startup", async () => {
-  const root = mkdtempSync(join(tmpdir(), "anna-runtime-info-"));
+test("Electron Preview writes API base runtime info after startup", async () => {
+  const root = mkdtempSync(join(tmpdir(), "anna-preview-info-"));
   const runtimeInfoPath = join(root, "runtime-info.json");
   const childScript = join(root, "child.mjs");
   writeFileSync(childScript, "setInterval(() => {}, 1000);\n");
@@ -341,14 +313,18 @@ test("Electron runtime writes API base runtime info after startup", async () => 
       {
         projectRoot: root,
         userDataPath: root,
-        pythonExecutable: process.execPath,
+        entryPath: childScript,
+        nodeExecutable: process.execPath,
         args: [childScript],
         env: process.env,
         apiBase: "http://127.0.0.1:19001",
         apiHost: "127.0.0.1",
         apiPort: 19001,
-        stateDbPath: join(root, "state", "anna.sqlite3"),
-        runtimeConfigPath: join(root, "config", "runtime.json"),
+        stateRoot: join(root, "state"),
+        configPath: join(root, "config", "config.json"),
+        workspaceRoot: join(root, "workspace"),
+        staticRoot: join(root, "dist"),
+        ompRuntimeRoot: join(root, "omp"),
         runtimeInfoPath,
       },
       { healthTimeoutMs: 50 },
@@ -359,7 +335,8 @@ test("Electron runtime writes API base runtime info after startup", async () => 
       assert.equal(info.apiPort, 19001);
       assert.equal(info.pid, runtime.child.pid);
       assert.equal(info.projectRoot, root);
-      assert.equal(info.stateDbPath, join(root, "state", "anna.sqlite3"));
+      assert.equal(info.configPath, join(root, "config", "config.json"));
+      assert.equal(info.stateRoot, join(root, "state"));
     } finally {
       await runtime.stop();
     }
@@ -369,8 +346,8 @@ test("Electron runtime writes API base runtime info after startup", async () => 
   }
 });
 
-test("Electron runtime startup stops child when health check never becomes ready", async () => {
-  const root = mkdtempSync(join(tmpdir(), "anna-runtime-health-timeout-"));
+test("Electron Preview startup stops child when health check never becomes ready", async () => {
+  const root = mkdtempSync(join(tmpdir(), "anna-preview-health-timeout-"));
   const heartbeatPath = join(root, "heartbeat.txt");
   const childScript = join(root, "child.mjs");
   // SIGTERM handlers never run on Windows (kill() uses TerminateProcess), so the
@@ -391,12 +368,14 @@ test("Electron runtime startup stops child when health check never becomes ready
       startRuntimeService(
         {
           projectRoot: root,
-          pythonExecutable: process.execPath,
+          entryPath: childScript,
+          nodeExecutable: process.execPath,
           args: [childScript],
           env: process.env,
           apiBase: "http://127.0.0.1:9",
-          stateDbPath: join(root, "state", "anna.sqlite3"),
-          runtimeConfigPath: join(root, "config", "runtime.json"),
+          stateRoot: join(root, "state"),
+          configPath: join(root, "config", "config.json"),
+          workspaceRoot: join(root, "workspace"),
         },
         { healthTimeoutMs: 50 },
       ),
@@ -507,19 +486,19 @@ test("Electron runtime restart waits for current runtime stop before starting ag
   assert.deepEqual(events, ["stop-called", "stop-resolved", "start-called"]);
 });
 
-test("Electron runtime restart keeps a managed Harness v2 sidecar managed", async () => {
+test("Electron Preview restart preserves the explicit Host configuration", async () => {
   let restartOptions;
   const currentRuntime = {
     apiPort: 18888,
-    harnessV2Port: 18889,
-    harnessV2Managed: true,
     projectRoot: "/project",
     userDataPath: "/user-data",
     env: {
-      ANNA_HARNESS_V2_BRIDGE_ENABLED: "1",
-      ANNA_HARNESS_V2_BRIDGE_MANAGED: "1",
-      ANNA_HARNESS_V2_BRIDGE_ORIGIN: "http://127.0.0.1:18889",
-      ANNA_HARNESS_V2_PORT: "18889",
+      ANNA_PREVIEW_CONFIG_PATH: "/preview/config.json",
+      ANNA_PREVIEW_STATE_ROOT: "/preview/state",
+      ANNA_PREVIEW_WORKSPACE_ROOT: "/preview/workspace",
+      ANNA_PREVIEW_STATIC_ROOT: "/preview/dist",
+      ANNA_PREVIEW_OMP_RUNTIME_ROOT: "/preview/omp",
+      ANNA_PREVIEW_ENTRY_PATH: "/preview/preview-main.js",
     },
     stop: async () => {},
   };
@@ -532,9 +511,10 @@ test("Electron runtime restart keeps a managed Harness v2 sidecar managed", asyn
     },
   });
 
-  assert.equal(restartOptions.harnessV2Port, 18889);
-  assert.equal(restartOptions.env.ANNA_HARNESS_V2_BRIDGE_MANAGED, "1");
-  assert.equal("ANNA_HARNESS_V2_BRIDGE_ORIGIN" in restartOptions.env, false);
+  assert.equal(restartOptions.apiPort, 18888);
+  assert.equal(restartOptions.env.ANNA_PREVIEW_CONFIG_PATH, "/preview/config.json");
+  assert.equal(restartOptions.env.ANNA_PREVIEW_OMP_RUNTIME_ROOT, "/preview/omp");
+  assert.equal("ANNA_HARNESS_V2_BRIDGE_ENABLED" in restartOptions.env, false);
 });
 
 function delay(ms) {

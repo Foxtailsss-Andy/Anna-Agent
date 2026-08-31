@@ -103,6 +103,17 @@ export function createDurableHarnessV2Runtime(
         return { runId: command.runId, status: handle.run.status };
       });
     },
+    stop(workspaceId, channelId, runId, reason = "Stopped by user") {
+      return track(async () => {
+        const outcome = await runtime.stop({
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        }, runId as never, reason);
+        return outcome === undefined
+          ? undefined
+          : { status: outcome.status };
+      });
+    },
     readEvents(workspaceId, channelId, runId, fromSeq = -1) {
       return track(async () => {
         if (!Number.isSafeInteger(fromSeq) || fromSeq < -1) {

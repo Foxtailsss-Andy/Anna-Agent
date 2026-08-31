@@ -1,5 +1,6 @@
 import type {
   CanonicalEvent,
+  ChannelScope,
   EventId,
   EventStore,
   LoopKernel,
@@ -64,6 +65,7 @@ export class DurableRunRuntime {
   private readonly now: () => string;
   private readonly createEventId: () => EventId;
   private readonly active = new Map<string, DurableRunHandle>();
+  private readonly activeControllers = new Map<string, AbortController>();
   private readonly inFlight = new Map<string, Promise<DurableRunHandle>>();
   private readonly controllers = new Set<AbortController>();
   private closing = false;
@@ -91,6 +93,29 @@ export class DurableRunRuntime {
     signal: AbortSignal = new AbortController().signal,
   ): Promise<DurableRunHandle> {
     return this.begin(command, signal, true);
+  }
+
+  /**
+   * Abort one admitted Run by its complete Channel scope. A terminal Run is
+   * returned as-is; an unknown or non-active Run has no controller to abort.
+   */
+  async stop(
+    scope: ChannelScope,
+    runId: RunId,
+    reason = "Stopped by user",
+  ): Promise<RunOutcome | undefined> {
+    if (this.closing) return undefined;
+    const runtimeKey = `${scope.workspaceId}\u0000${scope.channelId}\u0000${runId}`;
+    const controller = this.activeControllers.get(runtimeKey);
+    const active = this.active.get(runtimeKey);
+    if (controller === undefined || active === undefined) {
+      const scoped = this.eventStore.scope(scope);
+      const command = await scoped.getRunCommand(runId);
+      if (command === undefined) return undefined;
+      return new RunManager(scoped).get(runId).then((run) => run?.outcome);
+    }
+    controller.abort(reason);
+    return active.completion;
   }
 
   close(): Promise<void> {
@@ -125,8 +150,11 @@ export class DurableRunRuntime {
     const cleanup = () => {
       signal.removeEventListener("abort", onAbort);
       this.controllers.delete(controller);
+      if (this.activeControllers.get(runtimeKey) === controller) {
+        this.activeControllers.delete(runtimeKey);
+      }
     };
-    const pending = this.beginOnce(command, controller.signal, allowRunning);
+    const pending = this.beginOnce(command, controller, allowRunning);
     this.inFlight.set(runtimeKey, pending);
     void pending.then(
       (handle) => { void handle.completion.then(cleanup, cleanup); },
@@ -147,9 +175,10 @@ export class DurableRunRuntime {
 
   private async beginOnce(
     command: StartRun,
-    signal: AbortSignal,
+    controller: AbortController,
     allowRunning: boolean,
   ): Promise<DurableRunHandle> {
+    const signal = controller.signal;
     const store = this.eventStore.scope(command);
     const manager = new RunManager(store, {
       now: this.now,
@@ -196,6 +225,7 @@ export class DurableRunRuntime {
     const completion = this.drive(command, store, signal);
     const handle: DurableRunHandle = { run: queued, completion };
     this.active.set(runtimeKey, handle);
+    this.activeControllers.set(runtimeKey, controller);
     void completion.then(
       () => this.clearActive(runtimeKey, handle),
       () => this.clearActive(runtimeKey, handle),
