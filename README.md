@@ -52,6 +52,13 @@ Prepare the fixed Bun/OMP runtime once per fresh checkout. A worker source chang
 | **Crew** | Graph x Channel x Memory, assignment, Worker execution, artifact versions, review, and Showcase. |
 | **Harness** | OMP model/tool iteration with Host-owned context, permissions, Memory, canonical events, and Eval. |
 
+This update brings the preserved product onto the new execution path:
+
+- **Home:** Chat/Create tasks can run through verified OMP with the configured DeepSeek model, using native Todo, scoped tools, Stop, Trace, durable next-turn context, and reviewable artifacts.
+- **Cowork:** Hiker dashboards and the Agent assistant share the Harness path. The current connected service supports scoped reads; writes still depend on server capability and approval.
+- **Crew:** Contextual Anna and specialist Workers can use project and channel context to draft tasks, produce artifacts, and enter the existing review and rework flow.
+- **Harness:** The Node Host and OMP own model/tool iteration, Memory loading, canonical events, and Eval. Python remains a model-less business and connector adapter.
+
 Each surface is subject to the current Goal's live acceptance gates. Deterministic tests and demonstration fixtures are not evidence of a live provider or external business operation.
 
 ## Channels and business systems

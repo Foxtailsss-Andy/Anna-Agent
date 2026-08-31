@@ -52,6 +52,13 @@ npm run desktop:run
 | **Crew** | Graph x Channel x Memory、指派、Worker 执行、产物版本、评审和 Showcase。 |
 | **Harness** | OMP 驱动模型/工具循环，Host 负责上下文、权限、Memory、规范事件与 Eval。 |
 
+本次更新将原有产品能力接入新的执行链路：
+
+- **Home：** Chat/Create 任务可通过受验证的 OMP 路径使用已配置的 DeepSeek 模型执行，并支持原生 Todo、受范围约束的工具、停止控制、Trace、可持续的下一轮上下文和可审阅产物。
+- **Cowork：** Hiker 看板与 Agent 助手共享 Harness 执行路径。当前连接的服务支持受范围约束的读取；写入仍取决于服务端能力与授权。
+- **Crew：** 理解上下文的 Anna 与专业 Worker 可使用项目和频道信息起草任务、生成产物，并进入原有评审与返工流程。
+- **Harness：** Node Host 与 OMP 负责模型/工具循环、Memory 装载、规范事件和 Eval；Python 继续作为不持有模型凭据的业务与连接器适配器。
+
 各产品面需通过当前 Goal 中的真实验收。确定性测试和演示 fixture 均不作为真实 Provider 或外部业务操作的证据。
 
 ## 频道与业务系统
