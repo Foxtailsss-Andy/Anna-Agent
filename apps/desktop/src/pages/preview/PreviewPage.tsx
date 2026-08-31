@@ -136,6 +136,24 @@ function formatError(error: unknown): string {
   return "Preview Host 请求失败";
 }
 
+export function isPreviewStreamCurrent(
+  activeRunId: string | null,
+  activeAttempt: number,
+  streamRunId: string,
+  streamAttempt: number,
+): boolean {
+  return activeRunId === streamRunId && activeAttempt === streamAttempt;
+}
+
+export function stopResponseStatus(
+  activeRunId: string | null,
+  requestedRunId: string,
+  responseStatus: PreviewRunStatus | "cancelling",
+): PreviewRunStatus | undefined {
+  if (activeRunId !== requestedRunId || responseStatus === "cancelling") return undefined;
+  return responseStatus;
+}
+
 function PreviewIcon({ name }: { name: "refresh" | "chevron" | "stop" | "close" }) {
   if (name === "refresh") {
     return (
@@ -173,10 +191,13 @@ export function PreviewPage() {
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [stopping, setStopping] = useState(false);
+  const [stoppingRunId, setStoppingRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const activeRunIdRef = useRef<string | null>(null);
+  const streamAttemptRef = useRef(0);
 
+  const stopping = selectedRun !== null && stoppingRunId === selectedRun.run_id;
   const running = selectedRun !== null
     && (selectedRun.status === "queued" || selectedRun.status === "running" || stopping);
   const finalMessage = useMemo(() => {
@@ -196,15 +217,37 @@ export function PreviewPage() {
     });
   }, []);
 
-  const applyEvent = useCallback((event: PreviewCanonicalEvent) => {
+  const invalidateActiveStream = useCallback((runId?: string) => {
+    if (runId !== undefined && activeRunIdRef.current !== runId) return false;
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    streamAttemptRef.current += 1;
+    return true;
+  }, []);
+
+  const activateRun = useCallback((runId: string | null) => {
+    invalidateActiveStream();
+    activeRunIdRef.current = runId;
+    setStoppingRunId(null);
+    setEvents([]);
+    return streamAttemptRef.current;
+  }, [invalidateActiveStream]);
+
+  const applyEvent = useCallback((
+    runId: string,
+    streamAttempt: number,
+    event: PreviewCanonicalEvent,
+  ) => {
+    if (!isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, runId, streamAttempt)) return;
     setEvents((current) => mergeEvent(current, event));
     const nextStatus = previewStatusFromEvent(event);
     if (nextStatus) {
       setSelectedRun((current) => current
+        && current.run_id === runId
         ? { ...current, status: nextStatus, updated_at: event.timestamp ?? current.updated_at }
         : current);
       if (TERMINAL_STATUSES.has(nextStatus)) {
-        setStopping(false);
+        setStoppingRunId((current) => current === runId ? null : current);
         void refreshRuns().catch(() => undefined);
       }
     }
@@ -213,7 +256,9 @@ export function PreviewPage() {
   const streamRun = useCallback(async (
     run: PreviewRunSummary,
     seedEvents: PreviewCanonicalEvent[] = [],
+    streamAttempt = streamAttemptRef.current,
   ) => {
+    if (!isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, run.run_id, streamAttempt)) return;
     streamAbortRef.current?.abort();
     setEvents(seedEvents);
     const lastSeq = seedEvents.reduce((max, event) => Math.max(max, event.seq), -1);
@@ -221,9 +266,17 @@ export function PreviewPage() {
     const controller = new AbortController();
     streamAbortRef.current = controller;
     try {
-      await subscribePreviewRun(run.run_id, lastSeq, applyEvent, controller.signal);
+      await subscribePreviewRun(
+        run.run_id,
+        lastSeq,
+        (event) => applyEvent(run.run_id, streamAttempt, event),
+        controller.signal,
+      );
     } catch (streamError) {
-      if (!controller.signal.aborted) setError(formatError(streamError));
+      if (!controller.signal.aborted && isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, run.run_id, streamAttempt)) {
+        setStoppingRunId((current) => current === run.run_id ? null : current);
+        setError(formatError(streamError));
+      }
     } finally {
       if (streamAbortRef.current === controller) streamAbortRef.current = null;
     }
@@ -231,15 +284,19 @@ export function PreviewPage() {
 
   const openRun = useCallback(async (run: PreviewRunSummary) => {
     setError(null);
+    const streamAttempt = activateRun(run.run_id);
     setSelectedRun(run);
     try {
       const details = await getPreviewRun(run.run_id);
+      if (!isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, run.run_id, streamAttempt)) return;
       setSelectedRun(details.run);
-      await streamRun(details.run, details.events);
+      await streamRun(details.run, details.events, streamAttempt);
     } catch (loadError) {
-      setError(formatError(loadError));
+      if (isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, run.run_id, streamAttempt)) {
+        setError(formatError(loadError));
+      }
     }
-  }, [streamRun]);
+  }, [activateRun, streamRun]);
 
   useEffect(() => {
     let mounted = true;
@@ -260,9 +317,10 @@ export function PreviewPage() {
       });
     return () => {
       mounted = false;
-      streamAbortRef.current?.abort();
+      activeRunIdRef.current = null;
+      invalidateActiveStream();
     };
-  }, []);
+  }, [invalidateActiveStream]);
 
   const saveSettings = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -303,6 +361,7 @@ export function PreviewPage() {
     }
     const runId = createPreviewId("run");
     const commandId = createPreviewId("command");
+    const streamAttempt = activateRun(runId);
     setStarting(true);
     setError(null);
     try {
@@ -315,28 +374,49 @@ export function PreviewPage() {
         created_at: now,
         updated_at: now,
       };
+      if (!isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, runId, streamAttempt)) return;
       setSelectedRun(run);
       setGoal("");
       setRuns((current) => [run, ...current.filter((item) => item.run_id !== run.run_id)]);
-      await streamRun(run);
+      await streamRun(run, [], streamAttempt);
     } catch (startError) {
-      setError(formatError(startError));
+      if (isPreviewStreamCurrent(activeRunIdRef.current, streamAttemptRef.current, runId, streamAttempt)) {
+        setError(formatError(startError));
+      }
     } finally {
       setStarting(false);
     }
-  }, [goal, status.configured, streamRun]);
+  }, [activateRun, goal, status.configured, streamRun]);
 
   const stopCurrentRun = useCallback(async () => {
-    if (!selectedRun || stopping || TERMINAL_STATUSES.has(selectedRun.status)) return;
-    setStopping(true);
+    const requestedRunId = selectedRun?.run_id;
+    if (!requestedRunId || stopping || TERMINAL_STATUSES.has(selectedRun.status)) return;
+    setStoppingRunId(requestedRunId);
     setError(null);
     try {
-      await stopPreviewRun(selectedRun.run_id);
+      const result = await stopPreviewRun(requestedRunId);
+      if (activeRunIdRef.current !== requestedRunId) return;
+      const terminalStatus = stopResponseStatus(activeRunIdRef.current, requestedRunId, result.status);
+      if (terminalStatus !== undefined) {
+        setStoppingRunId((current) => current === requestedRunId ? null : current);
+        invalidateActiveStream(requestedRunId);
+        try {
+          const details = await getPreviewRun(requestedRunId);
+          if (activeRunIdRef.current === requestedRunId) {
+            setSelectedRun(details.run);
+            setEvents(details.events);
+          }
+        } catch (loadError) {
+          if (activeRunIdRef.current === requestedRunId) setError(formatError(loadError));
+        }
+      }
     } catch (stopError) {
-      setStopping(false);
-      setError(formatError(stopError));
+      if (activeRunIdRef.current === requestedRunId) {
+        setStoppingRunId((current) => current === requestedRunId ? null : current);
+        setError(formatError(stopError));
+      }
     }
-  }, [selectedRun, stopping]);
+  }, [invalidateActiveStream, selectedRun, stopping]);
 
   const currentStatus = stopping ? "cancelling" : selectedRun?.status;
 

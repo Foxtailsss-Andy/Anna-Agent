@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createReadStream, realpathSync } from "node:fs";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 
 import {
   RunManager,
@@ -155,6 +155,15 @@ class PreviewJsonBodyError extends Error {
   }
 }
 
+class PreviewWorkspaceAdmissionError extends Error {
+  readonly code = "workspace_conflicts_with_preview_state" as const;
+
+  constructor() {
+    super("Preview workspace must not contain the Preview state or configuration");
+    this.name = "PreviewWorkspaceAdmissionError";
+  }
+}
+
 export async function startPreviewHarnessService(
   options: PreviewHarnessServiceOptions = {},
 ): Promise<RunningPreviewHarnessService> {
@@ -163,15 +172,17 @@ export async function startPreviewHarnessService(
     throw new Error("Harness Preview service must bind to a loopback host");
   }
 
-  const stateRoot = resolve(
+  const requestedStateRoot = resolve(
     options.stateRoot
       ?? process.env.ANNA_PREVIEW_STATE_ROOT
       ?? ".anna/preview",
   );
+  await mkdir(requestedStateRoot, { recursive: true });
+  const stateRoot = await canonicalPath(requestedStateRoot);
   const defaultWorkspaceRoot = resolve(
     options.workspaceRoot
       ?? process.env.ANNA_PREVIEW_WORKSPACE_ROOT
-      ?? process.cwd(),
+      ?? join(stateRoot, "workspace"),
   );
   const settingsPath = join(stateRoot, "settings.json");
   const eventStorePath = resolve(
@@ -192,11 +203,37 @@ export async function startPreviewHarnessService(
     ?? process.env.ANNA_PREVIEW_OMP_RUNTIME_ROOT;
   const now = options.now ?? (() => new Date().toISOString());
 
-  await mkdir(stateRoot, { recursive: true });
-  let storedSettings = await readStoredSettings(settingsPath, defaultWorkspaceRoot);
+  const protectedPaths = [
+    requestedStateRoot,
+    stateRoot,
+    settingsPath,
+    configPath,
+    eventStorePath,
+  ];
+  const defaultWorkspaceAdmission = await admitWorkspace(defaultWorkspaceRoot, protectedPaths);
+  const loadedSettings = await readStoredSettings(
+    settingsPath,
+    defaultWorkspaceAdmission.workspaceRoot,
+  );
+  let storedSettings = loadedSettings.settings;
   let runtimeHandle: PreviewRuntimeHandle | undefined;
   let runtimePromise: Promise<PreviewRuntimeHandle | undefined> | undefined;
   let runtimeReason: PreviewStatus["reason"];
+  let persistedSettingsBlocked = !loadedSettings.valid;
+  if (!loadedSettings.valid) {
+    storedSettings = defaultSettings(defaultWorkspaceAdmission.workspaceRoot);
+    runtimeReason = "invalid_persisted_settings";
+  } else {
+    try {
+      const persistedAdmission = await admitWorkspace(storedSettings.workspace_root, protectedPaths);
+      storedSettings = { ...storedSettings, workspace_root: persistedAdmission.workspaceRoot };
+    } catch (error) {
+      if (!(error instanceof PreviewWorkspaceAdmissionError)) throw error;
+      storedSettings = defaultSettings(defaultWorkspaceAdmission.workspaceRoot);
+      persistedSettingsBlocked = true;
+      runtimeReason = error.code;
+    }
+  }
   const stopping = new Map<string, Promise<void>>();
 
   const createRuntime = options.createRuntime ?? defaultPreviewRuntimeFactory;
@@ -214,6 +251,10 @@ export async function startPreviewHarnessService(
     && publicSettings().has_api_key;
 
   const ensureRuntime = async (): Promise<PreviewRuntimeHandle | undefined> => {
+    if (persistedSettingsBlocked) {
+      runtimeReason ??= "invalid_persisted_settings";
+      return undefined;
+    }
     if (!isConfigured()) {
       runtimeReason = "model_configuration_missing";
       return undefined;
@@ -455,6 +496,19 @@ export async function startPreviewHarnessService(
       workspace_root: resolve(update.workspace_root),
       ...(nextKey === undefined ? {} : { model_api_key: nextKey }),
     };
+    let admittedWorkspace: { workspaceRoot: string };
+    try {
+      admittedWorkspace = await admitWorkspace(nextSettings.workspace_root, protectedPaths);
+    } catch (error) {
+      if (error instanceof PreviewWorkspaceAdmissionError) {
+        throw new PreviewHttpError(400, error.code);
+      }
+      throw error;
+    }
+    const admittedSettings: StoredPreviewSettings = {
+      ...nextSettings,
+      workspace_root: admittedWorkspace.workspaceRoot,
+    };
     const active = await listRuns();
     if (active.some((run) => run.status === "queued" || run.status === "running")) {
       throw new PreviewHttpError(409, "active_run_settings_conflict");
@@ -462,8 +516,9 @@ export async function startPreviewHarnessService(
     await runtimeHandle?.close();
     runtimeHandle = undefined;
     runtimeReason = undefined;
-    storedSettings = nextSettings;
-    await writeFile(settingsPath, JSON.stringify(nextSettings) + "\n", {
+    storedSettings = admittedSettings;
+    persistedSettingsBlocked = false;
+    await writeFile(settingsPath, JSON.stringify(admittedSettings) + "\n", {
       encoding: "utf8",
       mode: 0o600,
     });
@@ -664,28 +719,59 @@ async function defaultPreviewRuntimeFactory(
 async function readStoredSettings(
   path: string,
   defaultWorkspaceRoot: string,
-): Promise<StoredPreviewSettings> {
+): Promise<{ settings: StoredPreviewSettings; valid: boolean }> {
+  let input: unknown;
   try {
-    const input: unknown = JSON.parse(await readFile(path, "utf8"));
-    if (typeof input !== "object" || input === null || Array.isArray(input)) {
-      return defaultSettings(defaultWorkspaceRoot);
-    }
-    const value = input as Record<string, unknown>;
+    input = JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
     return {
-      model_name: typeof value.model_name === "string" ? value.model_name.trim() : "",
-      model_endpoint: typeof value.model_endpoint === "string" && isSafeEndpoint(value.model_endpoint)
-        ? value.model_endpoint.trim()
-        : "",
-      workspace_root: typeof value.workspace_root === "string" && value.workspace_root.trim() !== ""
-        ? resolve(value.workspace_root)
-        : defaultWorkspaceRoot,
-      ...(typeof value.model_api_key === "string" && value.model_api_key.length > 0
-        ? { model_api_key: value.model_api_key }
-        : {}),
+      settings: defaultSettings(defaultWorkspaceRoot),
+      valid: isMissingPathError(error),
     };
-  } catch {
-    return defaultSettings(defaultWorkspaceRoot);
   }
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return { settings: defaultSettings(defaultWorkspaceRoot), valid: false };
+  }
+  const value = input as Record<string, unknown>;
+  if (
+    Object.keys(value).some((key) => ![
+      "model_name",
+      "model_endpoint",
+      "workspace_root",
+      "model_api_key",
+    ].includes(key))
+    ||
+    typeof value.model_name !== "string"
+    || typeof value.model_endpoint !== "string"
+    || typeof value.workspace_root !== "string"
+    || value.workspace_root.trim() === ""
+    || (value.model_api_key !== undefined && typeof value.model_api_key !== "string")
+  ) {
+    return { settings: defaultSettings(defaultWorkspaceRoot), valid: false };
+  }
+  const modelName = value.model_name.trim();
+  const modelEndpoint = value.model_endpoint.trim();
+  const modelApiKey = typeof value.model_api_key === "string"
+    ? value.model_api_key
+    : undefined;
+  if (
+    (modelName === "") !== (modelEndpoint === "")
+    || (modelEndpoint !== "" && !isSafeEndpoint(modelEndpoint))
+    || (modelApiKey !== undefined && modelApiKey.length > 0 && modelName === "")
+  ) {
+    return { settings: defaultSettings(defaultWorkspaceRoot), valid: false };
+  }
+  return {
+    settings: {
+      model_name: modelName,
+      model_endpoint: modelEndpoint,
+      workspace_root: resolve(value.workspace_root),
+      ...(modelApiKey === undefined || modelApiKey.length === 0
+        ? {}
+        : { model_api_key: modelApiKey }),
+    },
+    valid: true,
+  };
 }
 
 function defaultSettings(workspaceRoot: string): StoredPreviewSettings {
@@ -707,11 +793,29 @@ function publicSettingsFor(settings: StoredPreviewSettings): PreviewSettings {
 }
 
 export function derivePreviewScope(workspaceRoot: string): ChannelScope {
-  const digest = createHash("sha256").update(resolve(workspaceRoot), "utf8").digest("hex").slice(0, 32);
+  const scopeRoot = canonicalScopePath(workspaceRoot);
+  const digest = createHash("sha256").update(scopeRoot, "utf8").digest("hex").slice(0, 32);
   return {
     workspaceId: `workspace:preview:${digest}` as ChannelScope["workspaceId"],
     channelId: `channel:preview:${digest}` as ChannelScope["channelId"],
   };
+}
+
+function canonicalScopePath(input: string): string {
+  let candidate = resolve(input);
+  const suffix: string[] = [];
+  for (;;) {
+    try {
+      const existing = realpathSync(candidate);
+      return suffix.reduceRight((current, segment) => join(current, segment), existing);
+    } catch (error) {
+      if (!isMissingPathError(error)) return candidate;
+      const parent = dirname(candidate);
+      if (parent === candidate) return candidate;
+      suffix.push(basename(candidate));
+      candidate = parent;
+    }
+  }
 }
 
 async function readEvents(
@@ -822,6 +926,55 @@ function isSafeEndpoint(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+async function admitWorkspace(
+  workspaceRoot: string,
+  protectedPaths: readonly string[],
+): Promise<{ workspaceRoot: string }> {
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+  const canonicalWorkspaceRoot = await canonicalPath(workspaceRoot);
+  for (const protectedPath of protectedPaths) {
+    const resolvedProtectedPath = resolve(protectedPath);
+    if (
+      containsPath(resolvedWorkspaceRoot, resolvedProtectedPath)
+      || containsPath(canonicalWorkspaceRoot, await canonicalPath(protectedPath))
+    ) {
+      throw new PreviewWorkspaceAdmissionError();
+    }
+  }
+  return { workspaceRoot: canonicalWorkspaceRoot };
+}
+
+async function canonicalPath(input: string): Promise<string> {
+  let candidate = resolve(input);
+  const suffix: string[] = [];
+  for (;;) {
+    try {
+      const existing = await realpath(candidate);
+      return suffix.reduceRight((current, segment) => join(current, segment), existing);
+    } catch (error) {
+      if (!isMissingPathError(error)) throw error;
+      const parent = dirname(candidate);
+      if (parent === candidate) return candidate;
+      suffix.push(basename(candidate));
+      candidate = parent;
+    }
+  }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
+function containsPath(parent: string, child: string): boolean {
+  const childRelative = relative(parent, child);
+  return childRelative === ""
+    || (childRelative !== ".."
+      && !childRelative.startsWith(".." + sep)
+      && !childRelative.startsWith(sep));
 }
 
 function parseRunStart(input: unknown): {

@@ -300,6 +300,66 @@ test("Electron Preview startup rejects a missing Host entry", async () => {
   }
 });
 
+test("Electron Preview forces Node mode for a branded Host executable", async () => {
+  const root = mkdtempSync(join(tmpdir(), "anna-preview-branded-node-"));
+  const wrapperPath = join(root, "Anna");
+  const markerPath = join(root, "node-mode.txt");
+  const childScript = join(root, "child.mjs");
+  writeFileSync(wrapperPath, "#!/bin/sh\nexec \"$ANNA_TEST_NODE\" \"$@\"\n");
+  writeFileSync(childScript, [
+    "import { writeFileSync } from 'node:fs';",
+    "import { createServer } from 'node:http';",
+    `writeFileSync(${JSON.stringify(markerPath)}, process.env.ELECTRON_RUN_AS_NODE ?? 'missing');`,
+    "createServer((_request, response) => { response.writeHead(200); response.end('ok'); }).listen(19004, '127.0.0.1');",
+  ].join("\n"));
+  const chmod = (await import("node:fs/promises")).chmod;
+  await chmod(wrapperPath, 0o755);
+  try {
+    const runtime = await startRuntimeService(
+      {
+        projectRoot: root,
+        userDataPath: root,
+        entryPath: childScript,
+        nodeExecutable: wrapperPath,
+        args: [childScript],
+        env: {
+          ...process.env,
+          ANNA_TEST_NODE: process.execPath,
+        },
+        apiBase: "http://127.0.0.1:19004",
+        apiHost: "127.0.0.1",
+        apiPort: 19004,
+        stateRoot: join(root, "state"),
+        configPath: join(root, "config", "config.json"),
+        workspaceRoot: join(root, "workspace"),
+        staticRoot: join(root, "dist"),
+        ompRuntimeRoot: join(root, "omp"),
+      },
+      { healthTimeoutMs: 5000 },
+    );
+    try {
+      assert.equal(readFileSync(markerPath, "utf8"), "1");
+    } finally {
+      await runtime.stop();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("packaged ASAR smoke re-executes through the branded Anna binary", () => {
+  const smokeSource = readFileSync(
+    new URL("../../scripts/smoke-packaged-asar.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(smokeSource, /ANNA_PACKAGED_SMOKE/);
+  assert.match(smokeSource, /ELECTRON_RUN_AS_NODE/);
+  assert.match(smokeSource, /MacOS.*Anna/);
+  assert.match(smokeSource, /basename\(process\.execPath\).*Anna/);
+  assert.doesNotMatch(smokeSource, /from ["']electron["']/);
+  assert.match(smokeSource, /process\.exit\(0\)/);
+});
+
 test("Electron Preview writes API base runtime info after startup", async () => {
   const root = mkdtempSync(join(tmpdir(), "anna-preview-info-"));
   const runtimeInfoPath = join(root, "runtime-info.json");

@@ -1,8 +1,8 @@
-import { app } from "electron";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 if (process.platform !== "darwin" || process.arch !== "arm64") {
   throw new Error("Anna Harness Preview packaged smoke currently supports macOS arm64 only");
@@ -14,6 +14,32 @@ const resourcesRoot = path.resolve(
   "Contents",
   "Resources",
 );
+const packagedExecutable = path.join(resourcesRoot, "..", "MacOS", "Anna");
+
+// `npm run desktop:smoke-asar` is normally invoked by the development Electron
+// binary. Re-execute this same smoke through the packaged binary so process
+// discovery and ELECTRON_RUN_AS_NODE behavior match an installed Preview.
+if (process.env.ANNA_PACKAGED_SMOKE !== "1") {
+  if (!path.isAbsolute(packagedExecutable)) {
+    throw new Error(`Invalid packaged Anna executable path: ${packagedExecutable}`);
+  }
+  const result = spawnSync(packagedExecutable, [fileURLToPath(import.meta.url)], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      ANNA_PACKAGED_SMOKE: "1",
+      ELECTRON_RUN_AS_NODE: "1",
+    },
+    stdio: "inherit",
+  });
+  if (result.error) throw result.error;
+  process.exit(result.status ?? 1);
+}
+
+if (path.basename(process.execPath) !== "Anna") {
+  throw new Error(`Packaged smoke must run with the branded Anna binary, received ${process.execPath}`);
+}
+
 const runtimeModuleUrl = pathToFileURL(
   path.join(resourcesRoot, "app.asar", "apps", "desktop", "electron", "runtime-service.mjs"),
 ).href;
@@ -70,10 +96,10 @@ try {
   );
   await runtime.stop();
   rmSync(userDataPath, { recursive: true, force: true });
-  app.exit(0);
+  process.exit(0);
 } catch (error) {
   await runtime?.stop?.();
   rmSync(userDataPath, { recursive: true, force: true });
   console.error(error);
-  app.exit(1);
+  process.exit(1);
 }

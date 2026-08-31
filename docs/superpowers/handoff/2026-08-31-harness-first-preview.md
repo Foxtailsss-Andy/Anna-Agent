@@ -67,11 +67,24 @@ This is deterministic integration evidence, not a live remote Provider result.
 Initial detail/history rendering was also exercised through the public API and UI.
 Final packaged/reopen and safety evidence must be recorded against the final candidate revision.
 
+## Final Review Corrections
+
+Both GPT-5.6-Sol Ultra reviewers inspected fixed input `a7d9c1c98e16438af3887cdbc544965d4c7f3bbd`.
+Standards found two defects and Spec found two; the overlapping credential finding means three unique fixes:
+
+- Host children explicitly use Node mode even when the packaged executable is named `Anna`.
+- Workspace admission rejects overlap with canonical Preview state/configuration paths, including aliases and unsafe persisted settings.
+- Stop responses and stream callbacks are bound to the selected Run and stream attempt; changing history cannot retain a stale global stopping flag.
+
+Root reran 30 launcher/UI checks and 11 Preview HTTP/lifecycle/Memory/OMP/admission checks after these fixes; all passed.
+The Preview CI job now covers these UI checks and a branded macOS packaged startup.
+Affected-line Sol rechecks and final packaged verification are separate remaining gates.
+
 ## Remaining Gates
 
 - Real remote Provider smoke from the default UI using user-supplied local configuration (P2).
 - Final scoped security, stop/reopen, and packaged smoke after source freeze.
-- GPT-5.6-Sol Ultra Standards and Spec review, followed only by affected-line rechecks.
+- Affected-line GPT-5.6-Sol Ultra Standards and Spec rechecks.
 - Current-revision CI, public source/Preview build, and precise release notes.
 
 Advanced controls, recovery matrices, business MCP migration, multiplatform distribution,

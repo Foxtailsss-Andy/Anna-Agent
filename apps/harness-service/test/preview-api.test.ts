@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -19,10 +19,12 @@ afterEach(async () => {
 describe("Harness Preview public HTTP seam", () => {
   test("boots without model configuration and reports the Preview protocol", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-red-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
     const service = await startPreviewHarnessService({
-      stateRoot: directory,
-      workspaceRoot: directory,
+      stateRoot,
+      workspaceRoot,
     });
     services.push(service);
 
@@ -41,12 +43,14 @@ describe("Harness Preview public HTTP seam", () => {
 
   test("persists settings without returning the key and derives Run scope at the Host", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-settings-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
     const store = new InMemoryEventStore();
     const starts: unknown[] = [];
     const service = await startPreviewHarnessService({
-      stateRoot: directory,
-      workspaceRoot: directory,
+      stateRoot,
+      workspaceRoot,
       createRuntime: async () => ({
         eventStore: store,
         runtime: {
@@ -66,7 +70,7 @@ describe("Harness Preview public HTTP seam", () => {
       body: JSON.stringify({
         model_name: "preview-model",
         model_endpoint: "https://provider.example/v1/chat/completions",
-        workspace_root: directory,
+        workspace_root: workspaceRoot,
         model_api_key: "preview-secret",
       }),
     });
@@ -74,7 +78,7 @@ describe("Harness Preview public HTTP seam", () => {
     await expect(settingsResponse.json()).resolves.toEqual({
       model_name: "preview-model",
       model_endpoint: "https://provider.example/v1/chat/completions",
-      workspace_root: directory,
+      workspace_root: workspaceRoot,
       has_api_key: true,
     });
     expect(await fetch(`${service.url}/api/preview/settings`).then((response) => response.text()))
@@ -114,10 +118,12 @@ describe("Harness Preview public HTTP seam", () => {
 
   test("rejects unsafe settings URLs, cross-origin mutations, and oversized or widened bodies", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-security-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
     const service = await startPreviewHarnessService({
-      stateRoot: directory,
-      workspaceRoot: directory,
+      stateRoot,
+      workspaceRoot,
       createRuntime: async () => ({
         eventStore: new InMemoryEventStore(),
         runtime: {
@@ -136,7 +142,7 @@ describe("Harness Preview public HTTP seam", () => {
       body: JSON.stringify({
         model_name: "preview-model",
         model_endpoint: "https://user:secret@provider.example/v1/chat/completions",
-        workspace_root: directory,
+        workspace_root: workspaceRoot,
         model_api_key: "secret-key",
       }),
     });
@@ -152,7 +158,7 @@ describe("Harness Preview public HTTP seam", () => {
       body: JSON.stringify({
         model_name: "preview-model",
         model_endpoint: "https://provider.example/v1/chat/completions",
-        workspace_root: directory,
+        workspace_root: workspaceRoot,
       }),
     });
     expect(csrf.status).toBe(403);
@@ -195,8 +201,10 @@ describe("Harness Preview public HTTP seam", () => {
 
   test("rejects requests carrying a different Host header", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-host-header-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
-    const service = await startPreviewHarnessService({ stateRoot: directory, workspaceRoot: directory });
+    const service = await startPreviewHarnessService({ stateRoot, workspaceRoot });
     services.push(service);
 
     const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
@@ -219,8 +227,10 @@ describe("Harness Preview public HTTP seam", () => {
 
   test("does not treat an unknown API path as the application shell", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-api-boundary-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
-    const service = await startPreviewHarnessService({ stateRoot: directory, workspaceRoot: directory });
+    const service = await startPreviewHarnessService({ stateRoot, workspaceRoot });
     services.push(service);
 
     const response = await fetch(`${service.url}/api/chat/runs/submit`);
@@ -230,10 +240,12 @@ describe("Harness Preview public HTTP seam", () => {
 
   test("keeps the UI available while configured without an admitted OMP runtime", async () => {
     const directory = await mkdtemp(join(tmpdir(), "anna-preview-no-omp-"));
+    const stateRoot = join(directory, "state");
+    const workspaceRoot = join(await realpath(directory), "workspace");
     directories.push(directory);
     const service = await startPreviewHarnessService({
-      stateRoot: directory,
-      workspaceRoot: directory,
+      stateRoot,
+      workspaceRoot,
       ompRuntimeRoot: "",
     });
     services.push(service);
@@ -244,7 +256,7 @@ describe("Harness Preview public HTTP seam", () => {
       body: JSON.stringify({
         model_name: "preview-model",
         model_endpoint: "https://provider.example/v1/chat/completions",
-        workspace_root: directory,
+        workspace_root: workspaceRoot,
         model_api_key: "fixture-key",
       }),
     });

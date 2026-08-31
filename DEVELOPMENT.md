@@ -27,6 +27,8 @@ This Preview supports text tasks, admitted read-only workspace tools, stop, cano
 
 Preview uses a separate configuration and state directory. Existing `.anna/runtime.json`, Python databases, and legacy artifacts are preserved and are not imported or written by the Preview. Quit Preview before launching an older release in its own checkout. Do not point the Preview state path at a legacy database.
 
+Choose a workspace that does not contain Preview state or configuration files, including their filesystem aliases. Preview rejects unsafe overlap before a Runtime can read its own credentials. Invalid persisted settings remain unavailable until a safe configuration is supplied.
+
 The macOS Preview build is unsigned and unnotarized. Other platforms, live business connectors, full coding tools, and SWE-bench results have no release acceptance in this version.
 
 ## Legacy live scripts
@@ -47,6 +49,8 @@ ANNA_LIVE_CHAT_MESSAGE='请只回复：Anna 验收通过' npm run live:chat
 ```text
 npm run typecheck
 npm test -- --reporter=dot
+npx --no-install playwright install chromium
+npm run frontend:preview-smoke
 # macOS/Linux
 ./.venv/bin/python -m pytest -q
 # Windows

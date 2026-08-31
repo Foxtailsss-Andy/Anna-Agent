@@ -143,9 +143,10 @@ export async function startPreviewRuntimeService(config, options = {}) {
 
   const childEnv = {
     ...config.env,
-    ...(path.basename(config.nodeExecutable).toLowerCase().includes("electron")
-      ? { ELECTRON_RUN_AS_NODE: "1" }
-      : {}),
+    // Packaged applications run with a branded executable name (for example
+    // `Anna`), so basename heuristics cannot decide whether Electron is Node.
+    // Plain Node ignores this variable; Electron uses it to run preview-main.
+    ELECTRON_RUN_AS_NODE: "1",
   };
   const child = spawn(config.nodeExecutable, config.args, {
     cwd: config.projectRoot,

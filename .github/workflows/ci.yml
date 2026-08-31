@@ -61,3 +61,38 @@ jobs:
 
       - name: Run Python tests
         run: uv run pytest -q
+
+  preview:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Prepare pinned OMP runtime
+        env:
+          ANNA_OMP_BUN_ARCHIVE_URL: https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip
+        run: npm run harness:omp:prepare
+
+      - name: Install Preview test browser
+        run: npx --no-install playwright install chromium
+
+      - name: Run Preview launcher and UI regressions
+        run: npm run frontend:preview-smoke
+
+      - name: Build the macOS arm64 Preview application
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run desktop:package -- --publish never
+
+      - name: Smoke the branded packaged executable
+        run: npm run desktop:smoke-asar
