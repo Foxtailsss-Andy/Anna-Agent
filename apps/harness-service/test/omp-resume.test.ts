@@ -27,6 +27,10 @@ import {
   type WorkerProfileId,
 } from "@anna/harness-v2";
 import { resolvedRunProfileFixture } from "../../../packages/event-store/test/run-profile-fixture";
+import {
+  OMP_RESUME_FIXTURE_WALL_TIME_MS,
+  withAmpleRunBudget,
+} from "./omp-resume-profile-fixture";
 
 import { startHarnessService } from "../src/index";
 import {
@@ -60,7 +64,7 @@ test("restores a consumed OMP transcript after tool-result checkpoint loss and S
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "release notes content", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -68,6 +72,7 @@ test("restores a consumed OMP transcript after tool-result checkpoint loss and S
       "channel",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -87,9 +92,9 @@ test("restores a consumed OMP transcript after tool-result checkpoint loss and S
     await durable.claimStart(command);
     await durable.append(canonicalEvent(command, 0, "run.queued", { phase: "queued" }));
 
-    const sourceProfile = resolvedRunProfileFixture({
+    const sourceProfile = withAmpleRunBudget(resolvedRunProfileFixture({
       memoryPolicy: { read: "channel", write: "propose" },
-    });
+    }));
     const source = parseStartRun({
       workspaceId,
       channelId,
@@ -264,7 +269,7 @@ test("restores a consumed OMP transcript after tool-result checkpoint loss and S
     const responseBody = await response.json() as Record<string, unknown>;
     expect(response.status, JSON.stringify(responseBody)).toBe(202);
     let resumedEvents: CanonicalEvent[] = [];
-    for (let attempt = 0; attempt < 300; attempt += 1) {
+    for (let attempt = 0; attempt < 1_200; attempt += 1) {
       resumedEvents = await readRunEvents(live.eventStore as SqliteEventStore, command);
       if (resumedEvents.some((event) => [
         "run.completed",
@@ -321,7 +326,7 @@ test("restores a consumed OMP transcript after tool-result checkpoint loss and S
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 test("finalizes a durable completed assistant tail without another OMP model call", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-tail-"));
@@ -340,7 +345,7 @@ test("finalizes a durable completed assistant tail without another OMP model cal
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -348,6 +353,7 @@ test("finalizes a durable completed assistant tail without another OMP model cal
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -442,7 +448,7 @@ test("finalizes a durable completed assistant tail without another OMP model cal
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 test("fails closed when a durable tool dispatch has no response checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-fence-"));
@@ -462,7 +468,7 @@ test("fails closed when a durable tool dispatch has no response checkpoint", asy
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "release notes fence content", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -470,6 +476,7 @@ test("fails closed when a durable tool dispatch has no response checkpoint", asy
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -611,7 +618,9 @@ test("does not enter Gateway when cancellation wins after the dispatch fence", a
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "dispatch-cancel.txt"), "cancel after fence", "utf8");
-    const profile = await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor);
+    const profile = withAmpleRunBudget(
+      await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor),
+    );
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -817,7 +826,9 @@ test("rejects a malformed Host model reply before persisting its response checkp
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor);
+    const profile = withAmpleRunBudget(
+      await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor),
+    );
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -934,7 +945,7 @@ test("restores prepared Host Memory input through production HTTP without duplic
   } finally {
     await rm(fixtureDirectory, { recursive: true, force: true });
   }
-}, 240_000);
+}, 300_000);
 
 test("fails closed on a tampered started fingerprint for a read-none HTTP resume", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-started-fingerprint-"));
@@ -954,7 +965,9 @@ test("fails closed on a tampered started fingerprint for a read-none HTTP resume
 
   try {
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor);
+    const profile = withAmpleRunBudget(
+      await createLiveProfile("fixture-model", undefined, false, "general", "none", descriptor),
+    );
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -1042,7 +1055,7 @@ test("fails closed on a tampered started fingerprint for a read-none HTTP resume
     });
     expect(response.status).toBe(202);
     let resumedEvents: CanonicalEvent[] = [];
-    for (let attempt = 0; attempt < 300; attempt += 1) {
+    for (let attempt = 0; attempt < 1_200; attempt += 1) {
       resumedEvents = await readRunEvents(live.eventStore as SqliteEventStore, command);
       if (resumedEvents.some((event) => [
         "run.completed",
@@ -1311,7 +1324,7 @@ async function runPreparedRestoreCase(
 
   try {
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -1319,6 +1332,7 @@ async function runPreparedRestoreCase(
       "channel",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -1457,7 +1471,7 @@ async function runPreparedRestoreCase(
     expect(response.status, JSON.stringify(responseBody)).toBe(202);
 
     let events: CanonicalEvent[] = [];
-    for (let attempt = 0; attempt < 300; attempt += 1) {
+    for (let attempt = 0; attempt < 1_200; attempt += 1) {
       events = await readRunEvents(live.eventStore as SqliteEventStore, command);
       if (events.some((event) => [
         "run.completed",
@@ -1491,9 +1505,9 @@ async function seedPreparedMemories(
   command: ReturnType<typeof parseStartRun>,
   originalMemory: string,
 ): Promise<{ memoryId: string; edit: (content: string) => Promise<void> }> {
-  const sourceProfile = resolvedRunProfileFixture({
+  const sourceProfile = withAmpleRunBudget(resolvedRunProfileFixture({
     memoryPolicy: { read: "channel", write: "propose" },
-  });
+  }));
   const source = parseStartRun({
     workspaceId: command.workspaceId,
     channelId: command.channelId,
@@ -1601,7 +1615,7 @@ async function runMissingProjectionResume(
     });
     expect(response.status).toBe(202);
     let events: CanonicalEvent[] = [];
-    for (let attempt = 0; attempt < 300; attempt += 1) {
+    for (let attempt = 0; attempt < 1_200; attempt += 1) {
       events = await readRunEvents(live.eventStore as SqliteEventStore, command);
       if (events.some((event) => [
         "run.completed",
@@ -1638,7 +1652,7 @@ test("repairs a missing tool observation from its durable response checkpoint", 
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "repairable release notes", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -1646,6 +1660,7 @@ test("repairs a missing tool observation from its durable response checkpoint", 
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -1764,7 +1779,7 @@ test("repairs a missing tool observation from its durable response checkpoint", 
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 test("repairs a missing assistant observation from its durable model checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-model-repair-"));
@@ -1783,7 +1798,7 @@ test("repairs a missing assistant observation from its durable model checkpoint"
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -1791,6 +1806,7 @@ test("repairs a missing assistant observation from its durable model checkpoint"
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -1895,7 +1911,7 @@ test("repairs a missing assistant observation from its durable model checkpoint"
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 test("repairs a missing usage projection from a durable model checkpoint", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-usage-"));
@@ -1914,7 +1930,7 @@ test("repairs a missing usage projection from a durable model checkpoint", async
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -1922,6 +1938,7 @@ test("repairs a missing usage projection from a durable model checkpoint", async
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2023,7 +2040,7 @@ test("repairs a missing usage projection from a durable model checkpoint", async
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 test("records a new resume attempt after a second reopen of the same Run", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-repeat-"));
@@ -2045,7 +2062,7 @@ test("records a new resume attempt after a second reopen of the same Run", async
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "repeatable release notes", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -2053,6 +2070,7 @@ test("records a new resume attempt after a second reopen of the same Run", async
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2205,7 +2223,7 @@ test("records a new resume attempt after a second reopen of the same Run", async
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 120_000);
+}, 300_000);
 
 test("fails closed before worker startup when a persisted context-ready digest is tampered", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-ready-tamper-"));
@@ -2224,7 +2242,7 @@ test("fails closed before worker startup when a persisted context-ready digest i
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -2232,6 +2250,7 @@ test("fails closed before worker startup when a persisted context-ready digest i
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2356,7 +2375,7 @@ test("restores the tool budget from durable OMP dispatch fences", async () => {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "budgeted release notes", "utf8");
-    const profile = createToolBudgetProfile(descriptor);
+    const profile = withAmpleRunBudget(createToolBudgetProfile(descriptor));
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2510,7 +2529,7 @@ test("applies an exhausted input-token cap before restoring a completed tail", a
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = createToolBudgetProfile(descriptor, { inputTokens: 3 });
+    const profile = withAmpleRunBudget(createToolBudgetProfile(descriptor, { inputTokens: 3 }));
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2526,9 +2545,11 @@ test("applies an exhausted input-token cap before restoring a completed tail", a
     });
 
     firstStore = new SqliteEventStore(eventStorePath);
+    const queuedAt = new Date().toISOString();
+    const queuedEvent = { ...canonicalEvent(command, 0, "run.queued", { phase: "queued" }), timestamp: queuedAt };
     const firstDurable = firstStore.scope(command);
     await firstDurable.claimStart(command);
-    await firstDurable.append(canonicalEvent(command, 0, "run.queued", { phase: "queued" }));
+    await firstDurable.append(queuedEvent);
     let firstModelCalls = 0;
     firstKernel = new OmpLoopKernel({
       runtimeRoot,
@@ -2572,6 +2593,10 @@ test("applies an exhausted input-token cap before restoring a completed tail", a
     expect(beforeLoss.some((event) => event.type === "omp.model.response")).toBe(true);
     expect(beforeLoss.some((event) => event.type === "run.usage.updated")).toBe(true);
     expect(beforeLoss.some((event) => event.type === "run.timed_out")).toBe(false);
+    const originalBudgetStartedAt = (beforeLoss.find((event) => event.type === "run.started")?.payload as {
+      readonly budgetStartedAt?: unknown;
+    } | undefined)?.budgetStartedAt;
+    expect(originalBudgetStartedAt).toBe(queuedAt);
     await firstKernel.close();
     firstKernel = undefined;
     firstStore.close();
@@ -2603,11 +2628,28 @@ test("applies an exhausted input-token cap before restoring a completed tail", a
       resumedStore.scope(command),
       new AbortController().signal,
     )).resolves.toEqual({ status: "timed_out" });
+    const observedAt = Date.now();
     expect(resumedModelCalls).toBe(0);
     expect(resumedToolCalls).toBe(0);
     const resumedEvents = await readRunEvents(resumedStore, command);
     expect(resumedEvents.at(-1)?.type).toBe("run.timed_out");
     expect(resumedEvents.some((event) => event.type === "run.completed")).toBe(false);
+    const resumedStartedAt = (resumedEvents.find((event) => event.type === "run.started")?.payload as {
+      readonly budgetStartedAt?: unknown;
+    } | undefined)?.budgetStartedAt;
+    expect(resumedStartedAt).toBe(queuedAt);
+    const wallBudget = profile.budget.wallTimeMs;
+    expect(wallBudget).toBe(OMP_RESUME_FIXTURE_WALL_TIME_MS);
+    if (wallBudget === undefined) throw new Error("input cap fixture must admit a wall budget");
+    expect(typeof originalBudgetStartedAt).toBe("string");
+    if (typeof originalBudgetStartedAt !== "string") {
+      throw new Error("input cap fixture must persist budgetStartedAt");
+    }
+    const budgetStartedAtMs = Date.parse(originalBudgetStartedAt);
+    expect(Number.isFinite(budgetStartedAtMs)).toBe(true);
+    const elapsed = observedAt - budgetStartedAtMs;
+    expect(elapsed).toBeGreaterThanOrEqual(0);
+    expect(elapsed).toBeLessThan(wallBudget);
   } finally {
     await resumedKernel?.close().catch(() => undefined);
     resumedStore?.close();
@@ -2635,7 +2677,7 @@ test("rejects a changed tool response checkpoint instead of trusting its observa
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "checkpoint conflict notes", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -2643,6 +2685,7 @@ test("rejects a changed tool response checkpoint instead of trusting its observa
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2783,7 +2826,7 @@ test("rejects a model response checkpoint whose request input digest changed", a
   try {
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -2791,6 +2834,7 @@ test("rejects a model response checkpoint whose request input digest changed", a
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -2913,7 +2957,7 @@ test("continues a pending tool call when no dispatch fence was persisted", async
     const descriptor = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "release-notes.md"), "pending tool notes", "utf8");
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -2921,6 +2965,7 @@ test("continues a pending tool call when no dispatch fence was persisted", async
       "none",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -3039,7 +3084,7 @@ test("continues a pending tool call when no dispatch fence was persisted", async
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 function createToolBudgetProfile(
   descriptor: Awaited<ReturnType<typeof materializeRuntime>>,

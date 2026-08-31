@@ -16,6 +16,7 @@ import {
 import { expect, test } from "vitest";
 
 import { resolvedRunProfileFixture } from "../../../packages/event-store/test/run-profile-fixture";
+import { withAmpleRunBudget } from "./omp-resume-profile-fixture";
 import { measureOmpImplementation } from "../../../packages/omp-loop-kernel/src/kernel-source";
 import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 import { createHostMemoryContextLoader } from "../src/host-memory-context";
@@ -41,7 +42,8 @@ test("HTTP resume reuses active handles and isolates consumed Runs sharing one I
 
   try {
     const descriptor = await currentDescriptor();
-    const profile = await createLiveProfile("fixture-model", undefined, false, "general", "channel", descriptor);
+    const baseProfile = await createLiveProfile("fixture-model", undefined, false, "general", "channel", descriptor);
+    const profile = withAmpleRunBudget(baseProfile);
     const commands = channels.map((channelId) => parseStartRun({
       workspaceId: "workspace-shared-resume",
       channelId,
@@ -153,7 +155,7 @@ test("HTTP resume reuses active handles and isolates consumed Runs sharing one I
     for (const command of commands) {
       const response = await resume(service.url, command);
       expect(response.status, JSON.stringify(await response.json())).toBe(202);
-      await within(modelEntered.get(command.channelId as typeof channels[number])!.promise, 10_000);
+      await within(modelEntered.get(command.channelId as typeof channels[number])!.promise, 120_000);
       const duplicate = await resume(service.url, command);
       expect(duplicate.status, JSON.stringify(await duplicate.json())).toBe(202);
     }
@@ -190,10 +192,10 @@ test("HTTP resume reuses active handles and isolates consumed Runs sharing one I
     firstStore?.close();
     await rm(directory, { recursive: true, force: true });
   }
-}, 90_000);
+}, 300_000);
 
 async function seedMemory(store: SqliteEventStore, command: StartRun): Promise<void> {
-  const profile = resolvedRunProfileFixture({ memoryPolicy: { read: "channel", write: "propose" } });
+  const profile = withAmpleRunBudget(resolvedRunProfileFixture({ memoryPolicy: { read: "channel", write: "propose" } }));
   const source = parseStartRun({
     ...command,
     commandId: "memory-source-command",
@@ -261,7 +263,7 @@ async function readEvents(store: SqliteEventStore, command: StartRun): Promise<C
 }
 
 async function waitForTerminal(store: SqliteEventStore, command: StartRun): Promise<CanonicalEvent[]> {
-  for (let attempt = 0; attempt < 300; attempt += 1) {
+  for (let attempt = 0; attempt < 2_400; attempt += 1) {
     const events = await readEvents(store, command);
     if (events.some((value) => isTerminal(value.type))) return events;
     await new Promise((done) => setTimeout(done, 50));

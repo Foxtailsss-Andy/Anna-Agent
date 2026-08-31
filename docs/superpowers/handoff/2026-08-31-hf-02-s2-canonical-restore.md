@@ -1,7 +1,7 @@
 # HF-02 S2 Canonical Restore Evidence
 
 Date: 2026-08-31
-Status: local gates and independent source review passed; exact-SHA publication is tracked in PR 1.
+Status: CI test correction passed full local gates and both review axes; replacement exact-SHA CI is pending, so S2 publication acceptance remains open.
 Contract: [frozen S2](../plans/2026-08-30-harness-first/HF-02-S2-canonical-restore.md).
 Product base: `c030246d90fca322717e6d20d2af07a2ee5866bc`.
 Initial S2 document commit: `cb96a8d`.
@@ -14,7 +14,7 @@ S2. This document freezes local S2 evidence before its publication; PR 1 records
 the published SHA and its own push/PR CI outcomes. No merge, release or
 deployment is part of this milestone.
 
-## Final Local Gate
+## Published Candidate Local Gate
 
 Final reviewed input: 29 non-document files, aggregate
 `6a43cc645d18e78399ad69f655a0b679614845cce27159a112b3656e426a27fc`.
@@ -54,6 +54,81 @@ Final publication acceptance additionally requires this source's exact-SHA CI.
 The separately reviewed S3 SPEC is frozen planning, with no S3 implementation
 in this update. Full isolation/distribution, Desktop cutover, live Provider/
 Hiker, official SWE-bench and the complete Harness-first Goal remain open.
+
+## Published CI RED
+
+Published candidate: `31ef10c8700fc0097cd21843d5f873b3bd5173a0`. Remote branch
+matched local HEAD. Both exact-SHA runs passed runtime preparation, the Worker
+check and configured typechecks, then failed JavaScript; later smoke/build/
+Python CI steps were skipped.
+
+| Run | Service result | Service duration |
+| --- | --- | --- |
+| Push `33340543827` | 133 passed, 11 failed, 1 skipped | 793.68 seconds |
+| PR `33340546017` | 141 passed, 3 failed, 1 skipped | 569.80 seconds |
+
+Seven budget-validation cases had implicit 5-second test watchdogs. The PR
+run hit three of those watchdogs. Push also exposed completed-restore and
+missing-projection cases where original wall time had expired, plus scoped
+and multitool polling windows that ended before their expected model request.
+The consumed-input trace correctly ended in `run.timed_out`, not completed;
+the fixture's completion expectation did not have sufficient admitted wall
+time on that runner. These are not GREEN CI results.
+
+The separately reviewed CI timing amendment permits explicit bounded fixture
+admission through the public profile resolver, longer test-only watchdogs and
+non-target-wall-live assertions. It does not change production budgets,
+verification or negative expiry semantics. S3 remains design-only until this
+publication gate is closed.
+
+## CI Fixture Correction
+
+Corrective input: 30 non-document files, aggregate
+`a0458a3346ee485709e334d00f810efe2d8edeb330117007135c9ccd1e9c249c`.
+The delta from `31ef10c` changes four resume test files and adds one shared
+test-profile helper. Production, Worker, dependency locks, runtime verification,
+file concurrency and workflow timeouts are unchanged.
+
+Luna Max admitted 180,000 ms through the public resolver before parsing or
+claiming every non-wall-expiry fixture Run. Entry/terminal polling is bounded
+at 120,000 ms; multi-attempt positive watchdogs are at most 300,000 ms, and
+seven I/O-heavy validation cases now have explicit 60,000 ms watchdogs.
+Original Run clocks, downtime and all target usage caps remain in force.
+
+The first corrective review found two P2 omissions: some non-wall recovery
+profiles still used 30 seconds, and the completed input-token negative lacked
+independent proof that wall time remained. Both were corrected. Input/output/
+cost negatives now compare the original admitted clock with an independently
+captured post-outcome clock. The input case retains actual first execution and
+SQLite reopen, with both started receipts bound to the original queued time.
+
+Independent Sol Ultra Standards and Spec reviews accepted the exact aggregate
+above, with no outstanding P0/P1/P2. Root also compared the four intentional
+wall-expiry test bodies through the TypeScript AST: all are byte-identical to
+`31ef10c`. Configured workspace, independent Worker and direct strict checks of
+the eight new test files plus the helper passed at this correction.
+
+Root reran the complete local gates at this corrective input:
+
+| Check | Result |
+| --- | --- |
+| Exact CI JavaScript command, `npm test -- --reporter=dot` | 1,136 passed, 7 skipped; service 144 passed / 1 skipped in 383.61 seconds |
+| Full Python | 1,048 passed, 53 existing warnings in 31.28 seconds |
+| Configured workspace, independent Worker and scoped strict test checks | Passed; the helper is included, with no whole-service-test strict-clean claim |
+| Web, service and approval bridge builds | Passed; 523, 1,120 and 2 modules respectively; existing web chunk-size warning retained |
+| Frontend smoke | 5 passed |
+| Application non-dev, managed-runtime non-dev/non-optional and Python audits | No known vulnerabilities reported for those selections |
+| Public candidate scan | 1,145 tracked/new files, zero violations |
+| Local Markdown links and existing evidence manifests | 9 documents / 36 links passed; 7 manifests retain integrity, not new live executions |
+
+The non-document fingerprint stayed unchanged through review and the full
+gates. Both protected worktrees retain the recorded HEAD, tracked-diff, status
+and untracked-content digests. The pinned runtime and production source are
+unchanged by the correction.
+
+Replacement exact-SHA CI remains pending. No corrected CI GREEN, default
+30-second latency or live-provider performance is claimed. S3 remains planning
+only until publication acceptance.
 
 ## Host Ownership and Shutdown
 

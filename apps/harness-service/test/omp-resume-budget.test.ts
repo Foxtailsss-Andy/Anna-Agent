@@ -29,6 +29,10 @@ import {
   createProductionToolGateway,
 } from "../src/production";
 import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
+import {
+  OMP_RESUME_FIXTURE_WALL_TIME_MS,
+  withAmpleRunBudget,
+} from "./omp-resume-profile-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const sourceRuntimeRoot = join(repositoryRoot, "packages/omp-loop-kernel/runtime");
@@ -186,7 +190,7 @@ test.each([
 
   try {
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const constrained = constrainedProfile(base, budget);
+    const constrained = withAmpleRunBudget(constrainedProfile(base, budget));
     const command = parseStartRun({
       workspaceId: "workspace-omp-resume-missing",
       channelId: "channel-omp-resume-missing",
@@ -261,7 +265,7 @@ test.each([
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 60_000);
 
 test("fails closed when a restored model attempt has no response usage", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-unanswered-"));
@@ -271,7 +275,7 @@ test("fails closed when a restored model attempt has no response usage", async (
 
   try {
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const constrained = constrainedProfile(base, { outputTokens: 10 });
+    const constrained = withAmpleRunBudget(constrainedProfile(base, { outputTokens: 10 }));
     const command = parseStartRun({
       workspaceId: "workspace-omp-resume-unanswered",
       channelId: "channel-omp-resume-unanswered",
@@ -333,7 +337,7 @@ test("fails closed when a restored model attempt has no response usage", async (
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 60_000);
 
 test("allows required-budget restore with a user observation but no model attempt", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-no-attempt-"));
@@ -347,7 +351,7 @@ test("allows required-budget restore with a user observation but no model attemp
     const runtimeManifestSha256 = await materializeRuntime(runtimeRoot);
     await mkdir(workspaceRoot, { recursive: true });
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const profile = constrainedProfile(base, { outputTokens: 10 });
+    const profile = withAmpleRunBudget(constrainedProfile(base, { outputTokens: 10 }));
     const command = parseStartRun({
       workspaceId: "workspace-omp-resume-no-attempt",
       channelId: "channel-omp-resume-no-attempt",
@@ -457,7 +461,7 @@ test.each([
 
   try {
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const profile = constrainedProfile(base, budget);
+    const profile = withAmpleRunBudget(constrainedProfile(base, budget));
     const command = parseStartRun({
       workspaceId: "workspace-omp-resume-completed-cap",
       channelId: "channel-omp-resume-completed-cap",
@@ -472,13 +476,14 @@ test.each([
       stopCondition: profile.terminalRules.stopCondition,
     });
     store = new SqliteEventStore(eventStorePath);
+    const budgetStartedAt = new Date().toISOString();
     const durable = store.scope(command);
     await durable.claimStart(command);
     await durable.append(canonicalEvent(command, 0, "run.queued", { phase: "queued" }));
     await durable.append(canonicalEvent(command, 1, "run.started", {
       phase: "started",
       executionFingerprint: executionFingerprintFor(profile),
-      budgetStartedAt: new Date().toISOString(),
+      budgetStartedAt,
     }));
     await durable.append(canonicalEvent(command, 2, "omp.transcript.message", {
       message: { role: "user", content: command.goal },
@@ -534,16 +539,29 @@ test.each([
     });
     await expect(kernel.start(command, store.scope(command), new AbortController().signal))
       .resolves.toEqual({ status: "timed_out" });
+    const observedAt = Date.now();
     expect(modelCalls).toBe(0);
     const events = await readRunEvents(store, command);
     expect(events.at(-1)?.type).toBe("run.timed_out");
     expect(events.filter((event) => event.type === "run.completed")).toHaveLength(0);
+    const persistedStartedAt = (events.find((event) => event.type === "run.started")?.payload as {
+      readonly budgetStartedAt?: unknown;
+    } | undefined)?.budgetStartedAt;
+    expect(persistedStartedAt).toBe(budgetStartedAt);
+    const wallBudget = profile.budget.wallTimeMs;
+    expect(wallBudget).toBe(OMP_RESUME_FIXTURE_WALL_TIME_MS);
+    if (wallBudget === undefined) throw new Error("completed cap fixture must admit a wall budget");
+    const budgetStartedAtMs = Date.parse(budgetStartedAt);
+    expect(Number.isFinite(budgetStartedAtMs)).toBe(true);
+    const elapsed = observedAt - budgetStartedAtMs;
+    expect(elapsed).toBeGreaterThanOrEqual(0);
+    expect(elapsed).toBeLessThan(wallBudget);
   } finally {
     await kernel?.close().catch(() => undefined);
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 60_000);
 
 test("counts a durable model attempt against the turn cap across SQLite reopen", async () => {
   const directory = await mkdtemp(join(tmpdir(), "anna-omp-resume-turns-"));
@@ -564,7 +582,7 @@ test("counts a durable model attempt against the turn cap across SQLite reopen",
     await mkdir(workspaceRoot, { recursive: true });
     await writeFile(join(workspaceRoot, "turns.txt"), "turn budget fixture", "utf8");
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const profile = constrainedProfile(base, { turns: 1, toolCalls: 1 });
+    const profile = withAmpleRunBudget(constrainedProfile(base, { turns: 1, toolCalls: 1 }));
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -696,7 +714,7 @@ test("fails closed on an unpaired assistant and checkpoint-free tool result", as
 
   try {
     const base = await createLiveProfile("fixture-model", undefined, false, "general", "none");
-    const profile = constrainedProfile(base, { wallTimeMs: 30_000 });
+    const profile = withAmpleRunBudget(constrainedProfile(base, {}));
     const command = parseStartRun({
       workspaceId: "workspace-omp-resume-corrupt-transcript",
       channelId: "channel-omp-resume-corrupt-transcript",
@@ -795,7 +813,7 @@ test("fails closed on an unpaired assistant and checkpoint-free tool result", as
     store?.close();
     await rm(directory, { recursive: true, force: true });
   }
-});
+}, 60_000);
 
 function constrainedProfile(
   profile: ResolvedRunProfile,

@@ -372,6 +372,60 @@ private SQL/flush hook, conflict suppression, skip/xfail, assertion weakening
 or unrelated test refactor is authorized. Rerun both tests, the Crew file and
 the full Python/JavaScript gates, then independently review the exact test delta.
 
+### CI Fixture Timing Amendment
+
+Exact-SHA push CI `33340543827` and PR CI `33340546017` failed at published
+`31ef10c8700fc0097cd21843d5f873b3bd5173a0`. Both passed runtime preparation and
+Worker/workspace typechecks. The service suites exposed default 5-second
+Vitest watchdogs and original 30-second fixture Run budgets expiring during
+real verification/reopen. A timed-out Run is not a successful restore, and
+the earlier local GREEN results do not replace these CI REDs.
+
+Independent Sol review approves a test-only correction in
+`omp-resume.test.ts`, `omp-resume-budget.test.ts`,
+`omp-resume-multitool.test.ts` and `omp-resume-scope.test.ts`, with one shared
+test-profile helper only if it removes repeated resolver reconstruction.
+Production, Worker, dependency locks, manifest checks, test-file concurrency
+and workflow timeouts stay unchanged.
+
+For non-wall-expiry recovery fixtures, admit a finite 180,000 ms wall budget
+before the first command is parsed/claimed. Reconstruct through public
+`resolveRunProfile`, using `{ ...base.budget, wallTimeMs: 180_000 }` at Channel
+limits, Worker defaults and requested budget. Preserve model, skills, policies,
+contracts, kernel descriptor and every unrelated budget cap. Let the resolver
+produce the hash. Never edit a persisted command/profile, shift its original
+clock or omit downtime on resume.
+
+Use bounded test entry/terminal polling windows up to 120,000 ms and whole-test
+watchdogs up to 300,000 ms for multi-attempt positive cases. Give the seven
+I/O-heavy required-usage/completed-cap/corrupt validation cases explicit
+60,000 ms watchdogs. These are test execution limits, separate from Run budgets.
+Keep intentional wall-expiry cases and their original caps/clock transitions.
+Do not replace actual SDK/SQLite/Host/Gateway with stubs or cache away manifest
+verification to meet a test deadline.
+
+Non-wall negative cases, including missing preparation snapshots and corrupt
+transcripts, need a live wall window so their intended guard is exercised.
+Keep exact failure reasons and zero model/Gateway assertions. Completed token/
+cost-cap negatives must retain their target caps and additionally prove the
+original wall window is unexpired at their expected timed_out result; wall
+expiry cannot stand in for usage enforcement. All existing lifecycle,
+correlation, sequence, user-input and tool-count assertions remain.
+
+This verifies production HTTP resume with an explicitly admitted fixture
+budget. It is not evidence that default 30-second admission, a production
+latency target or live-provider performance succeeds. Keep both failed CI runs
+and their traces; require focused tests, unchanged expiry negatives, full gates,
+independent fixed-source review and new exact-SHA CI before closing S2.
+
+Corrective freeze: independent Sol Ultra Standards and Spec reviews accepted
+the 30-file non-document aggregate
+`a0458a3346ee485709e334d00f810efe2d8edeb330117007135c9ccd1e9c249c`.
+The initial partial profile coverage and missing input-token wall-live proof
+were P2 findings and are closed at this input. The four intentional-expiry
+test bodies remain byte-identical to the published candidate. This review
+freeze does not replace the remaining full gates or exact-SHA CI acceptance.
+
 ## Vertical Verification Order
 
 1. Real consumed transcript and Host Memory snapshot, real SQLite reopen,

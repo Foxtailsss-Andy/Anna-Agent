@@ -23,6 +23,7 @@ import {
   type StreamId,
 } from "@anna/harness-v2";
 import { resolvedRunProfileFixture } from "../../../packages/event-store/test/run-profile-fixture";
+import { withAmpleRunBudget } from "./omp-resume-profile-fixture";
 
 import { startHarnessService } from "../src/index";
 import {
@@ -70,7 +71,7 @@ for (const lossPoint of [
 ] as const) {
   test(`restores one multi-tool OMP response at ${lossPoint}`, async () => {
     await runMultiToolRecovery(lossPoint);
-  }, 120_000);
+  }, 300_000);
 }
 
 async function runMultiToolRecovery(lossPoint: LossPoint): Promise<void> {
@@ -130,7 +131,7 @@ async function runMultiToolRecovery(lossPoint: LossPoint): Promise<void> {
     await writeFile(join(workspaceRoot, firstPath), firstContent, "utf8");
     await writeFile(join(workspaceRoot, secondPath), secondContent, "utf8");
 
-    const profile = await createLiveProfile(
+    const baseProfile = await createLiveProfile(
       "fixture-model",
       undefined,
       false,
@@ -138,6 +139,7 @@ async function runMultiToolRecovery(lossPoint: LossPoint): Promise<void> {
       "channel",
       descriptor,
     );
+    const profile = withAmpleRunBudget(baseProfile);
     const command = parseStartRun({
       workspaceId,
       channelId,
@@ -286,7 +288,7 @@ async function runMultiToolRecovery(lossPoint: LossPoint): Promise<void> {
     expect(response.status, JSON.stringify(responseBody)).toBe(202);
 
     let resumedEvents: CanonicalEvent[] = [];
-    for (let attempt = 0; attempt < 300; attempt += 1) {
+    for (let attempt = 0; attempt < 1_200; attempt += 1) {
       resumedEvents = await readRunEvents(live.eventStore as SqliteEventStore, command);
       if (resumedEvents.some((event) => isTerminalEvent(event.type))) break;
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
@@ -388,9 +390,9 @@ async function seedMemory(
   workspaceId: string,
   channelId: string,
 ): Promise<void> {
-  const sourceProfile = resolvedRunProfileFixture({
+  const sourceProfile = withAmpleRunBudget(resolvedRunProfileFixture({
     memoryPolicy: { read: "channel", write: "propose" },
-  });
+  }));
   const source = parseStartRun({
     workspaceId,
     channelId,
