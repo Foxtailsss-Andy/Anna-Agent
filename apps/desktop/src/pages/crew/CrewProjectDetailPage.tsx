@@ -52,6 +52,7 @@ import "./crew.css";
 import "./inspect/inspect.css";
 
 const OPEN_TASK_EVENT = "crew:open-task";
+const POLL_MS = 3000;
 const POP_W = 372;
 const POP_H = 340; // 翻转判定用估算高度
 
@@ -77,6 +78,7 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
   // F4 覆盖层状态
   const [view, setView] = useState<ViewId>("graph");
@@ -151,6 +153,31 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
     setProject(p);
     if (ch) setChannel(ch);
   }, []);
+
+  // F2:项目详情生命周期内轮询快照,图/列表/阅读器切换时保持刷新
+  useEffect(() => {
+    setLastSync(null);
+    if (!projectId) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const [p, ch] = await Promise.all([
+          getProject(projectId),
+          listChannel(projectId).catch(() => null),
+        ]);
+        if (!alive) return;
+        setLastSync(new Date());
+        onSnapshot(p, ch);
+      } catch {
+        /* 网络抖动:保留上一个真快照,不造数 */
+      }
+    };
+    const iv = setInterval(tick, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, [projectId, onSnapshot]);
 
   // F3:频道动作后立即重取,不等画布下一拍
   const refresh = useCallback(
@@ -574,11 +601,10 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
         ) : (
           <div className="ir-crew-canvas">
             <CrewGraphCanvas
-              projectId={projectId}
               project={project}
               channel={channel ?? []}
               members={members}
-              onSnapshot={onSnapshot}
+              lastSync={lastSync}
               onInspect={onInspect}
               onOpenDrawer={onOpenDrawer}
               selectedTaskId={inspect?.taskId ?? null}

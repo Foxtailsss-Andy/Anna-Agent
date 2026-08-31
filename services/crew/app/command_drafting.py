@@ -25,6 +25,8 @@ _DEFAULT_ROLE = "产品"
 
 DRAFT_TOOL: dict[str, Any] = {
     "name": "crew.emit_task_drafts",
+    "effect": "proposal",
+    "replay_policy": "safe",
     "description": (
         "Emit 1 to 3 concrete task drafts distilled from a teammate's channel "
         "message, tailored to the project. Call this once with the final drafts."

@@ -19,16 +19,23 @@ export interface DurableHarnessV2RuntimeOptions {
   readonly kernel: LoopKernel;
   readonly profile: ResolvedRunProfile;
   readonly surfaceProfiles?: Partial<Record<V2SurfaceId, ResolvedRunProfile>>;
+  readonly profileFor?: (
+    surfaceId: V2SurfaceId,
+    body: unknown,
+    fallback: ResolvedRunProfile,
+  ) => ResolvedRunProfile;
   readonly surfaces: readonly V2SurfaceId[];
   readonly evidenceMode?: HarnessV2Runtime["evidenceMode"];
   readonly permissionScope?: string;
   readonly webSearchConfigured?: boolean;
   readonly reviewGateConfigured?: boolean;
+  readonly validateStartCommand?: (command: StartRun) => void | Promise<void>;
+  readonly validateResumeCommand?: (command: StartRun) => void | Promise<void>;
 }
 
 export function createDurableHarnessV2Runtime(
   options: DurableHarnessV2RuntimeOptions,
-): HarnessV2Runtime {
+): HarnessV2Runtime & { close(): Promise<void> } {
   const runtime = new DurableRunRuntime(
     options.eventStore,
     options.profile.evalPolicy.contract === "required"
@@ -36,67 +43,130 @@ export function createDurableHarnessV2Runtime(
       : options.kernel,
   );
   const permissionScope = options.permissionScope ?? "permission:harness-v2";
+  const pending = new Set<Promise<unknown>>();
+  let closing = false;
+  let closePromise: Promise<void> | undefined;
+  const track = <T>(operation: () => Promise<T>): Promise<T> => {
+    if (closing) return Promise.reject(new Error("Harness Runtime is closing"));
+    const task = Promise.resolve().then(operation);
+    pending.add(task);
+    void task.then(() => pending.delete(task), () => pending.delete(task));
+    return task;
+  };
 
   return {
+    close() {
+      if (closePromise !== undefined) return closePromise;
+      closing = true;
+      closePromise = Promise.allSettled([runtime.close(), ...pending]).then(() => undefined);
+      return closePromise;
+    },
     evidenceMode: options.evidenceMode ?? "test",
     surfaces: [...options.surfaces],
     webSearchConfigured: options.webSearchConfigured ?? false,
     reviewGateConfigured: options.reviewGateConfigured ?? false,
-    async start(surfaceId, body) {
-      if (!options.surfaces.includes(surfaceId)) {
-        throw new Error("v2 surface is not enabled by this Runtime");
-      }
+    start(surfaceId, body) {
+      return track(async () => {
+        if (!options.surfaces.includes(surfaceId)) {
+          throw new Error("v2 surface is not enabled by this Runtime");
+        }
 
-      const command = commandFromRequest(
-        surfaceId,
-        body,
-        options.surfaceProfiles?.[surfaceId] ?? options.profile,
-        permissionScope,
-      );
-      const handle = await runtime.start(command);
-      return { runId: command.runId, status: handle.run.status };
+        const command = commandFromRequest(
+          surfaceId,
+          body,
+          options.profileFor?.(
+            surfaceId,
+            body,
+            options.surfaceProfiles?.[surfaceId] ?? options.profile,
+          ) ?? options.surfaceProfiles?.[surfaceId] ?? options.profile,
+          permissionScope,
+        );
+        await options.validateStartCommand?.(command);
+        const handle = await runtime.start(command);
+        return { runId: command.runId, status: handle.run.status };
+      });
     },
-    async resume(surfaceId, runId, body) {
-      if (!options.surfaces.includes(surfaceId)) {
-        throw new Error("v2 surface is not enabled by this Runtime");
-      }
+    resume(surfaceId, runId, body) {
+      return track(async () => {
+        if (!options.surfaces.includes(surfaceId)) {
+          throw new Error("v2 surface is not enabled by this Runtime");
+        }
 
-      const request = requestRecord(body);
-      const workspaceId = requiredString(request.workspace_id, "workspace_id");
-      const channelId = requiredString(request.channel_id, "channel_id");
-      const command = await options.eventStore
-        .scope({
+        const request = requestRecord(body);
+        const workspaceId = requiredString(request.workspace_id, "workspace_id");
+        const channelId = requiredString(request.channel_id, "channel_id");
+        const command = await options.eventStore
+          .scope({
+            workspaceId: workspaceId as ChannelScope["workspaceId"],
+            channelId: channelId as ChannelScope["channelId"],
+          })
+          .getRunCommand(runId as never);
+        if (command === undefined) {
+          throw new Error("v2 Run is not present in the requested Channel scope");
+        }
+        if (command.surfaceId !== undefined && command.surfaceId !== surfaceId) {
+          throw new Error("v2 Run surface does not match the resume route");
+        }
+        await options.validateResumeCommand?.(command);
+        const handle = await runtime.resume(command);
+        return { runId: command.runId, status: handle.run.status };
+      });
+    },
+    stop(workspaceId, channelId, runId, reason = "Stopped by user") {
+      return track(async () => {
+        const outcome = await runtime.stop({
           workspaceId: workspaceId as ChannelScope["workspaceId"],
           channelId: channelId as ChannelScope["channelId"],
-        })
-        .getRunCommand(runId as never);
-      if (command === undefined) {
-        throw new Error("v2 Run is not present in the requested Channel scope");
-      }
-      if (command.surfaceId !== undefined && command.surfaceId !== surfaceId) {
-        throw new Error("v2 Run surface does not match the resume route");
-      }
-      const handle = await runtime.resume(command);
-      return { runId: command.runId, status: handle.run.status };
+        }, runId as never, reason);
+        return outcome === undefined
+          ? undefined
+          : { status: outcome.status };
+      });
     },
-    async readEvents(workspaceId, channelId, runId, fromSeq = -1) {
-      if (!Number.isSafeInteger(fromSeq) || fromSeq < -1) {
-        throw new Error("from_seq must be an integer greater than or equal to -1");
-      }
-      const scope: ChannelScope = {
-        workspaceId: workspaceId as ChannelScope["workspaceId"],
-        channelId: channelId as ChannelScope["channelId"],
-      };
-      const store = options.eventStore.scope(scope);
-      if (await store.getRunCommand(runId as never) === undefined) {
-        throw new Error("Run is outside the requested Channel scope");
-      }
+    steer(workspaceId, channelId, runId, content) {
+      return track(async () => {
+        const scope: ChannelScope = {
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        };
+        if (await options.eventStore.scope(scope).getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
+        await options.kernel.steer(runId as never, { ...scope, content });
+      });
+    },
+    answer(workspaceId, channelId, runId, content) {
+      return track(async () => {
+        const scope: ChannelScope = {
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        };
+        if (await options.eventStore.scope(scope).getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
+        await options.kernel.answer(runId as never, { content });
+      });
+    },
+    readEvents(workspaceId, channelId, runId, fromSeq = -1) {
+      return track(async () => {
+        if (!Number.isSafeInteger(fromSeq) || fromSeq < -1) {
+          throw new Error("from_seq must be an integer greater than or equal to -1");
+        }
+        const scope: ChannelScope = {
+          workspaceId: workspaceId as ChannelScope["workspaceId"],
+          channelId: channelId as ChannelScope["channelId"],
+        };
+        const store = options.eventStore.scope(scope);
+        if (await store.getRunCommand(runId as never) === undefined) {
+          throw new Error("Run is outside the requested Channel scope");
+        }
 
-      const events: CanonicalEvent[] = [];
-      for await (const event of store.read(runId as never, fromSeq)) {
-        events.push(event);
-      }
-      return events;
+        const events: CanonicalEvent[] = [];
+        for await (const event of store.read(runId as never, fromSeq)) {
+          events.push(event);
+        }
+        return events;
+      });
     },
   };
 }
@@ -105,6 +175,7 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
   return {
     async start(command, sink, signal): Promise<RunOutcome> {
       let terminalEvent: CanonicalEvent | undefined;
+      let failureCode: string | undefined;
       const durableSink = sink as EventSink & {
         read?: (streamId: never, afterSeq?: number) => AsyncIterable<CanonicalEvent>;
       };
@@ -125,7 +196,8 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
       let outcome: RunOutcome;
       try {
         outcome = await kernel.start(command, evalSink, signal);
-      } catch {
+      } catch (error) {
+        failureCode = sanitizedRuntimeFailureCode(error);
         outcome = { status: "failed" };
       }
       let events: CanonicalEvent[] = [];
@@ -162,6 +234,7 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
           passed: result.passed,
           version: result.version,
           failedRules: [...result.failedRules],
+          ...(failureCode === undefined ? {} : { error_code: failureCode }),
         },
       });
       if (terminalEvent !== undefined) {
@@ -173,6 +246,22 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
             ? terminalEvent.payload
             : { outcome: "failed", reason: "contract_eval_failed" },
         });
+      } else if (failureCode !== undefined) {
+        await sink.append({
+          id: crypto.randomUUID() as CanonicalEvent["id"],
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          streamId: command.runId as never,
+          seq: nextSeq + 1,
+          type: "run.failed",
+          timestamp: new Date().toISOString(),
+          schemaVersion: 1,
+          payload: {
+            outcome: "failed",
+            errorType: failureCode ?? "runtime_bridge_failed",
+            ...(failureCode === undefined ? {} : { error_code: failureCode }),
+          },
+        });
       }
       return result.passed ? outcome : { status: "failed" };
     },
@@ -180,6 +269,30 @@ function withContractEval(kernel: LoopKernel): LoopKernel {
     answer: (runId, answer) => kernel.answer(runId, answer),
     abort: (runId, reason) => kernel.abort(runId, reason),
   };
+}
+
+function sanitizedRuntimeFailureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  const admittedTool = message.match(/^business tool catalog does not offer admitted tool: ([A-Za-z0-9_.-]+)$/);
+  if (admittedTool !== null) return `business_tool_catalog_missing:${admittedTool[1]}`;
+  const known: Record<string, string> = {
+    "OMP model input mismatch": "omp_model_input_mismatch",
+    "OMP model request history mismatch": "omp_model_request_history_mismatch",
+    "OMP readiness identity mismatch": "omp_readiness_identity_mismatch",
+    "OMP frame binding or sequence mismatch": "omp_frame_binding_mismatch",
+    "OMP tool request raw context mismatch": "omp_tool_request_context_mismatch",
+    "OMP undeclared tool request": "omp_undeclared_tool_request",
+    "OMP model returned invalid tool identity": "omp_invalid_tool_identity",
+    "OMP model transport returned no final response": "omp_model_no_response",
+    "OMP model transport returned multiple final responses": "omp_model_multiple_responses",
+    "OMP worker closed before terminal proposal": "omp_worker_closed_before_terminal",
+    "OMP worker readiness timed out": "omp_worker_readiness_timeout",
+    "OMP worker wall budget exhausted": "omp_worker_wall_budget_exhausted",
+    "OMP runtime source identity mismatch": "omp_runtime_source_identity_mismatch",
+    "OMP tool definitions do not match the admitted profile": "omp_tool_definitions_mismatch",
+    "OMP tool definitions do not cover the admitted profile": "omp_tool_definitions_incomplete",
+  };
+  return known[message] ?? "runtime_bridge_failed";
 }
 
 function isTerminalEvent(type: string): boolean {

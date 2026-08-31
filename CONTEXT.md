@@ -22,7 +22,23 @@
 | 权限 | **permission mode**（readonly / ask / contained-write / full）；审批 = **human-in-the-loop** | ADLC 原文 "Permissioned: graduated access escalation" |
 | 给 agent 看的运行时仪表 | **agent-facing telemetry** | ADLC 原文 "giving agents the same observability they have in production" |
 
-## 2. 从点击提交到终局：九跳链路
+## 2. Harness-first 产品边界（2026-08-31）
+
+本分支以 [HF-PARITY-1.0](docs/product/anna-harness-product-parity-goal-2026-08-31.md) 为当前交付范围。Home、Cowork、Crew 的既定功能与界面保留，Agent 执行权迁移到 Harness。接入实现及验收证据见 Goal，以下定义所有权。
+
+| 概念 | 所有权 |
+|---|---|
+| Home | 个人对话、任务和创建产物的统一工作面，保留共享 LoopCard、历史、文件、执行控制和 Trace |
+| Cowork | 确定性业务看板、业务助手和审批流程；真实业务事实来自连接器 |
+| Crew | 项目 Graph、Channel、Memory，以及已有指派、产物、评审和协作规则 |
+| Harness Host | 唯一 Agent 执行 authority，拥有 Run/Profile、上下文、Memory 装载、权限、持久化事件与终态 |
+| Oh-my-Pi | Harness 中的模型/工具循环执行器，根据实际上下文判断下一步，通过受控工具执行 |
+| Business Adapter | 复用身份、业务 CRUD、状态机和连接器；无模型凭据、无旧 Agent Loop，不独立完成 Agent 任务 |
+| Product Projection | 将规范事件映射为已有界面的结果、过程、历史与产物视图；不产生第二个 Agent 事实源 |
+
+原有 Home/Cowork/Crew 的功能保真属于当前 Goal；穷尽恢复组合、多平台和 Benchmark 等后续工作见 [社区 Backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md)。下节只保留旧实现的历史术语和证据映射。
+
+### 2.1 Legacy Python 九跳链路（历史执行实现）
 
 | # | 跳 | 模块 · 位置 |
 |---|---|---|
@@ -38,7 +54,7 @@
 
 观测双通道贯穿 3-9：过程帧 + audit 事件 → `FrameJournal.append` 盖 `seq`+毫秒 `ts` → 内存环 + SQLite `run_frames` 写穿；audit 另经 `AuditFrameWatermark` 以 `{"type":"event"}` 帧混入同一 journal。帧词表事实源 = [A2](docs/superpowers/plans/2026-07-09-iris-rebuild/A2-frame-contract.md)。
 
-## 3. TraceDoc 契约（`GET /api/chat/runs/{run_id}/trace`）
+## 3. Legacy TraceDoc 契约（`GET /api/chat/runs/{run_id}/trace`）
 
 装配器 = `services/runtime/app/trace_assembler.py`（纯读、确定性、无墙钟），契约 gate = `tests/gates/test_gate_trace.py`（9 条）。
 

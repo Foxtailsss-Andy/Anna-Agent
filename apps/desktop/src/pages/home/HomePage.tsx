@@ -577,9 +577,6 @@ export function HomePage({ displayName }: { displayName: string }) {
     if (v2ApiBase() !== "") {
       void runStream.startBackground(
         async () => {
-          if (kind !== "skill") {
-            throw new Error("Harness v2 Create currently supports only Skill artifacts");
-          }
           const capabilities = await getHarnessV2Capabilities();
           const surface = capabilities.surfaces?.find((candidate) => candidate.id === "create");
           if (surface?.status !== "available") {

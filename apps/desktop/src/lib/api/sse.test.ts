@@ -17,6 +17,17 @@ describe("readSse", () => {
     await readSse(stream(['data: {"type":"a"}\n\ndata: {"ty', 'pe":"b"}\n\n: keepalive\n\ndata: {"type":"c"}\n\n']), (f) => got.push(f));
     expect(got.map((f) => (f as { type: string }).type)).toEqual(["a", "b", "c"]);
   });
+  it("accepts named canonical SSE events with an event field before data", async () => {
+    const got: unknown[] = [];
+    await readSse(stream([
+      'event: canonical\ndata: {"type":"run.started","seq":1}\n\n',
+      'event: canonical\ndata: {"type":"run.completed","seq":2}\n\n',
+    ]), (f) => got.push(f));
+    expect(got).toEqual([
+      { type: "run.started", seq: 1 },
+      { type: "run.completed", seq: 2 },
+    ]);
+  });
   it("非 2xx / 无 body 抛错", async () => {
     await expect(readSse(new Response("boom", { status: 500 }), () => {})).rejects.toThrow();
   });

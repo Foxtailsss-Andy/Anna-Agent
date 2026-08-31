@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -47,6 +48,70 @@ def _create_run_creation_order_key(run: CreateDraftRun) -> tuple[str, str]:
     """
     created_at = run.audit_events[0].created_at if run.audit_events else ""
     return (created_at, run.id)
+
+
+def _host_draft_arguments(
+    result: dict[str, Any], kind: str
+) -> dict[str, Any] | None:
+    """Find the requested structured Create tool arguments in a Host result."""
+    calls = result.get("tool_calls")
+    if calls is None:
+        calls = result.get("toolCalls")
+    if not isinstance(calls, list):
+        return None
+    expected = f"create.emit_{kind}_draft"
+    for raw in calls:
+        if not isinstance(raw, dict):
+            continue
+        function = raw.get("function") if isinstance(raw.get("function"), dict) else raw
+        name = function.get("name")
+        if not isinstance(name, str) or name.replace("__", ".") != expected:
+            continue
+        arguments = function.get("arguments", {})
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                return None
+        return dict(arguments) if isinstance(arguments, dict) else None
+    return None
+
+
+def _host_artifact(
+    result: dict[str, Any],
+    kind: str,
+    run_id: str,
+    workspace_root: Path,
+) -> CreateArtifact | None:
+    """Materialize a Host-provided artifact into the isolated Create workspace."""
+    raw = result.get("artifact")
+    if raw is None and isinstance(result.get("artifacts"), list):
+        raw = next((item for item in result["artifacts"] if isinstance(item, dict)), None)
+    if not isinstance(raw, dict):
+        return None
+    preview = raw.get("preview") or raw.get("content") or raw.get("body")
+    if not isinstance(preview, str) or not preview:
+        return None
+    identifier_key = {"skill": "skill_id", "prompt": "prompt_id", "python_tool": "tool_id"}[kind]
+    identifier = raw.get(identifier_key) or raw.get("id")
+    if not isinstance(identifier, str) or not identifier.strip():
+        return None
+    # Host paths are never trusted for later activation. Keep the draft under
+    # this process's isolated workspace and preserve only the artifact content.
+    target = (workspace_root / run_id / f"{kind}.draft").resolve()
+    root = workspace_root.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return None
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(preview, encoding="utf-8")
+    return CreateArtifact(
+        kind=kind,
+        path=str(target),
+        preview=preview,
+        **{identifier_key: identifier.strip()},
+    )
 
 
 def _rehydrate_run(payload: dict[str, Any]) -> CreateDraftRun | None:
@@ -230,6 +295,98 @@ class CreateOrchestrator(BaseOrchestrator):
         if failed is not None:
             return failed
         return self._advance_run(run)
+
+    def begin_draft(
+        self,
+        workspace_id: str,
+        actor_user_id: str,
+        prompt: str,
+        kind: str = "skill",
+        agent_id: str | None = None,
+        workdir_id: str | None = None,
+        permission_mode: Literal["ask", "bypass"] = "ask",
+    ) -> tuple[CreateDraftRun, CreateDraftRun | None]:
+        """Allocate a Create run without invoking a model.
+
+        Product mode lets the Node Host own the whole generation task while the
+        Python service keeps the existing run/artifact/activation contract. The
+        legacy ``create_draft`` path remains unchanged for retained tests and
+        non-product callers.
+        """
+        return self._begin_run(
+            workspace_id,
+            actor_user_id,
+            prompt,
+            kind,
+            agent_id,
+            workdir_id=workdir_id,
+            permission_mode=permission_mode,
+        )
+
+    def apply_host_result(
+        self, run: CreateDraftRun, result: dict[str, Any], *, host_status: str
+    ) -> CreateDraftRun:
+        """Project a completed Host generation into the existing Create contract.
+
+        The Host owns model/tool iteration. Python remains responsible for the
+        original draft materialization, validation and fixture checks, so an
+        assistant message without the requested structured draft never becomes
+        a fake ``ready_for_review`` run.
+        """
+        if host_status not in {"completed", "succeeded"}:
+            return self._fail_run(
+                run,
+                str(result.get("error_code") or result.get("code") or "harness_task_failed"),
+                str(result.get("error_message") or result.get("message") or "Harness Host Create task failed"),
+            )
+        arguments = _host_draft_arguments(result, run.kind)
+        try:
+            if arguments is not None:
+                if run.kind == "skill":
+                    self._write_skill_draft(run, arguments)
+                elif run.kind == "prompt":
+                    self._write_prompt_draft(run, arguments)
+                else:
+                    self._write_python_tool_draft(run, arguments)
+            else:
+                artifact = _host_artifact(result, run.kind, run.id, self.workspace_root)
+                if artifact is None:
+                    return self._fail_run(
+                        run,
+                        "create_artifact_missing",
+                        "Harness Host completed without the requested Create artifact",
+                    )
+                run.artifact = artifact
+            self.audit.append(
+                run.audit_events,
+                f"create.{run.kind}.generated",
+                run.id,
+                {
+                    "skill_id": run.artifact.skill_id if run.artifact else None,
+                    "prompt_id": run.artifact.prompt_id if run.artifact else None,
+                    "tool_id": run.artifact.tool_id if run.artifact else None,
+                    "source": "harness",
+                },
+            )
+            if run.kind == "skill":
+                self._validate_skill_draft(run)
+            elif run.kind == "prompt":
+                self._validate_prompt_draft(run)
+            else:
+                # A direct artifact projection cannot satisfy the Python-tool
+                # fixture contract without the original tool arguments.
+                if arguments is None:
+                    return self._fail_run(
+                        run,
+                        "python_tool_fixture_missing",
+                        "Harness Host Create result omitted Python tool fixture input",
+                    )
+                self._run_python_tool_fixture(run, arguments)
+        except ValueError as exc:
+            return self._fail_run(run, f"{run.kind}_draft_invalid", str(exc))
+        run.status = "ready_for_review"
+        self._persist_run(run)
+        return run
 
     async def stream_draft(
         self,

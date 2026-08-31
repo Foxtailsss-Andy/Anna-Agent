@@ -149,7 +149,7 @@ export default function App() {
       }
       return <SectionPlaceholder section={section} coworkItem={coworkItem} />;
     },
-    [identity?.displayName],
+    [identity?.displayName, identity?.workspaceId],
   );
 
   if (bootError) {

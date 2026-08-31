@@ -5,6 +5,7 @@ import {
   fauxToolCall,
 } from "@earendil-works/pi-ai";
 import {
+  buildRunContext,
   createToolGateway,
   parseCanonicalEvent,
   parseStartRun,
@@ -12,6 +13,7 @@ import {
   type CanonicalEvent,
   type StartRun,
   type EventSink,
+  type JsonValue,
   type RunId,
   type SandboxAdapter,
   type ScopedChannelStore,
@@ -49,6 +51,7 @@ function startRun(
     parentRunId?: string;
     parentEventId?: string;
     laneId?: string;
+    memoryPolicy?: { read: "none" | "channel"; write: "disabled" | "propose" };
   } = {},
 ): StartRun {
   return parseStartRun({
@@ -62,6 +65,7 @@ function startRun(
     runProfileSnapshot: resolvedRunProfileFixture({
       budget,
       allowedTools: overrides.allowedTools,
+      memoryPolicy: overrides.memoryPolicy,
     }),
     budget,
     permissionScope: "scope-1",
@@ -151,6 +155,122 @@ test("completes a natural first turn when the one-turn budget is exhausted", asy
 
   expect(calls).toBe(1);
   expect(events.at(-1)?.type).toBe("run.completed");
+});
+
+test("binds a per-Run ToolGateway and worker identity from the admitted profile", async () => {
+  const provider = fauxProvider();
+  const observedRequests: ToolRequest[] = [];
+  let factoryCalls = 0;
+  let streamCalls = 0;
+  const kernel = new PiLoopKernel({
+    model: provider.getModel(),
+    toolGateway: inMemoryToolGateway,
+    createToolGateway(command) {
+      factoryCalls += 1;
+      expect(command.runProfileSnapshot.workerProfileId).toBe("fixture-worker");
+      return {
+        async execute(request) {
+          observedRequests.push(request);
+          return { status: "succeeded", output: "Fixture: release-note" };
+        },
+      };
+    },
+    workerProfileId,
+    streamFn: () => {
+      const stream = createAssistantMessageEventStream();
+      const message = streamCalls === 0
+        ? fauxAssistantMessage(
+            fauxToolCall("fixture_read", { key: "release-note" }),
+            { stopReason: "toolUse" },
+          )
+        : fauxAssistantMessage("done");
+      streamCalls += 1;
+      stream.push({ type: "start", partial: message });
+      stream.push({
+        type: "done",
+        reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+        message,
+      });
+      return stream;
+    },
+    now: () => 0,
+  });
+
+  await expect(kernel.start(
+    startRun({ turns: 2 }, { allowedTools: ["fixture_read"] }),
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+
+  expect(factoryCalls).toBe(1);
+  expect(observedRequests).toHaveLength(1);
+  expect(observedRequests[0]).toEqual(expect.objectContaining({
+    workspaceId: "workspace-1",
+    channelId: "channel-1",
+    runId: "run-1",
+    workerProfileId: "fixture-worker",
+    name: "fixture_read",
+  }));
+});
+
+test("assigns a stable scoped effect key to Create artifact requests", async () => {
+  const provider = fauxProvider();
+  const command = startRun({ turns: 2 }, { allowedTools: ["create_artifact"] });
+  const effectKeys: string[] = [];
+
+  const runKernel = () => {
+    let streamCalls = 0;
+    return new PiLoopKernel({
+      model: provider.getModel(),
+      toolGateway: {
+        async execute(request) {
+          effectKeys.push(request.effectKey ?? "");
+          return {
+            status: "succeeded",
+            output: { artifact: { kind: "skill" }, validation: { valid: true } },
+          };
+        },
+      },
+      workerProfileId,
+      streamFn: () => {
+        const stream = createAssistantMessageEventStream();
+        const message = streamCalls === 0
+          ? fauxAssistantMessage(
+              fauxToolCall("create_artifact", {
+                kind: "skill",
+                skill_id: "release-notes",
+                preview: "---\nname: Release notes\n---",
+              }),
+              { stopReason: "toolUse" },
+            )
+          : fauxAssistantMessage("done");
+        streamCalls += 1;
+        stream.push({ type: "start", partial: message });
+        stream.push({
+          type: "done",
+          reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+          message,
+        });
+        return stream;
+      },
+      now: () => 0,
+    });
+  };
+
+  await expect(runKernel().start(
+    command,
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+  await expect(runKernel().start(
+    command,
+    collectingSink([]),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+
+  expect(effectKeys).toHaveLength(2);
+  expect(effectKeys[0]).toMatch(/^artifact:/);
+  expect(effectKeys[1]).toBe(effectKeys[0]);
 });
 
 test("attributes every child Run event to its parent Run and lane", async () => {
@@ -1048,7 +1168,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
       workspaceId: "workspace-1" as ToolRequest["workspaceId"],
       channelId: "channel-1" as ToolRequest["channelId"],
     }),
-    workerProfileId: "worker-profile-1" as WorkerProfileId,
+    workerProfileId: "fixture-worker" as WorkerProfileId,
     policy,
     sandbox,
     events,
@@ -1076,7 +1196,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
       return stream;
     },
     toolGateway: gateway,
-    workerProfileId: "worker-profile-1" as WorkerProfileId,
+    workerProfileId: "fixture-worker" as WorkerProfileId,
   };
   const kernel = new PiLoopKernel(options);
 
@@ -1092,7 +1212,7 @@ test("routes the sole Pi tool through ToolGateway with the Run scope", async () 
     workspaceId: "workspace-1",
     channelId: "channel-1",
     runId: "run-1",
-    workerProfileId: "worker-profile-1",
+    workerProfileId: "fixture-worker",
     toolCallId: expect.any(String),
   }]);
   expect(contexts[1]?.messages).toContainEqual(expect.objectContaining({
@@ -1505,4 +1625,188 @@ test("enforces wall time while a provider stream remains blocked", async () => {
   expect(timeoutState).toBe("timed_out");
   await expect(run).resolves.toEqual({ status: "timed_out" });
   expect(events.at(-1)?.type).toBe("run.timed_out");
+});
+
+test("retries preparation after partial Memory receipts without duplicating input", async () => {
+  for (const failureType of ["memory.hit", "run.context.ready"] as const) {
+    const command = startRun(
+      { turns: 2 },
+      {
+        runId: `run-memory-recovery-${failureType}`,
+        memoryPolicy: { read: "channel", write: "disabled" },
+        goal: "Use the prepared Memory context.",
+      },
+    );
+    const sink = durableSink();
+    const memories = [
+      {
+        id: "memory-recovery-first",
+        content: "The first accepted Memory is durable.",
+        sourceRunId: "source-memory-run",
+        sourceEventIds: ["source-memory-event"],
+        sourceChannel: { workspaceId: command.workspaceId, channelId: command.channelId },
+        acceptedBy: "channel-owner",
+        acceptedEventId: "accepted-memory-first",
+        acceptedAt: "2026-08-30T00:00:00.000Z",
+      },
+      {
+        id: "memory-recovery-second",
+        content: "The second accepted Memory is durable.",
+        sourceRunId: "source-memory-run",
+        sourceEventIds: ["source-memory-event"],
+        sourceChannel: { workspaceId: command.workspaceId, channelId: command.channelId },
+        acceptedBy: "channel-owner",
+        acceptedEventId: "accepted-memory-second",
+        acceptedAt: "2026-08-30T00:00:00.000Z",
+      },
+    ];
+    const preparedContext = async (): Promise<{
+      context: ReturnType<typeof buildRunContext>;
+      memoryHits: typeof memories;
+      snapshotDigest: string;
+      originalExecutionFingerprint: JsonValue;
+    }> => {
+      const started = sink.events.find((event) => event.type === "run.started");
+      const payload = started?.payload;
+      if (
+        typeof payload !== "object"
+        || payload === null
+        || Array.isArray(payload)
+        || payload.executionFingerprint === undefined
+      ) {
+        throw new Error("test setup did not persist the original fingerprint");
+      }
+      return {
+        context: buildRunContext({
+          workspaceId: command.workspaceId,
+          channelId: command.channelId,
+          runId: command.runId,
+          workerProfileId: command.runProfileSnapshot.workerProfileId,
+          goal: {
+            content: command.goal,
+            provenance: { source: "run.command", sourceEventIds: ["event-1"] },
+          },
+          constraints: [],
+          transientMessages: [],
+          pendingToolCalls: [],
+          memoryHits: memories.map((memory) => ({
+            memoryId: memory.id,
+            content: memory.content,
+            provenance: {
+              source: "accepted.channel.memory",
+              sourceEventIds: [memory.acceptedEventId, ...memory.sourceEventIds],
+            },
+          })),
+        }),
+        memoryHits: memories,
+        snapshotDigest: "sha256:memory-recovery-snapshot",
+        originalExecutionFingerprint: payload.executionFingerprint as JsonValue,
+      };
+    };
+    let failureInjected = false;
+    const failingSink: EventSink & {
+      read: typeof sink.read;
+    } = {
+      read: sink.read,
+      async append(event) {
+        await sink.append(event);
+        if (event.type === failureType && !failureInjected) {
+          failureInjected = true;
+          throw new Error(`simulated loss after ${failureType}`);
+        }
+      },
+    };
+    const provider = fauxProvider();
+    let firstModelCalls = 0;
+    const firstKernel = new PiLoopKernel({
+      model: provider.getModel(),
+      toolGateway: inMemoryToolGateway,
+      workerProfileId,
+      prepareContext: preparedContext,
+      streamFn: () => {
+        firstModelCalls += 1;
+        throw new Error("first model must not start after simulated preparation loss");
+      },
+      now: () => 0,
+    });
+
+    await expect(firstKernel.start(
+      command,
+      failingSink,
+      new AbortController().signal,
+    )).rejects.toThrow(`simulated loss after ${failureType}`);
+    expect(firstModelCalls).toBe(0);
+    expect(sink.events.filter((event) => event.type === "run.started")).toHaveLength(1);
+    expect(sink.events.filter((event) => event.type === "memory.hit")).toHaveLength(
+      failureType === "memory.hit" ? 1 : 2,
+    );
+    expect(sink.events.filter((event) => event.type === "run.context.ready")).toHaveLength(
+      failureType === "run.context.ready" ? 1 : 0,
+    );
+
+    let secondModelCalls = 0;
+    const secondKernel = new PiLoopKernel({
+      model: provider.getModel(),
+      toolGateway: inMemoryToolGateway,
+      workerProfileId,
+      prepareContext: preparedContext,
+      streamFn: () => {
+        secondModelCalls += 1;
+        const stream = createAssistantMessageEventStream();
+        const message = fauxAssistantMessage("Recovered Memory input.");
+        stream.push({ type: "start", partial: message });
+        stream.push({ type: "done", reason: "stop", message });
+        return stream;
+      },
+      now: () => 0,
+    });
+    await expect(secondKernel.start(
+      command,
+      sink,
+      new AbortController().signal,
+    )).resolves.toEqual({ status: "completed" });
+
+    expect(secondModelCalls).toBe(1);
+    expect(sink.events.filter((event) => event.type === "run.started")).toHaveLength(1);
+    expect(sink.events.filter((event) => event.type === "memory.hit")).toHaveLength(2);
+    expect(sink.events.filter((event) => event.type === "run.context.ready")).toHaveLength(1);
+    expect(sink.events.map((event) => event.seq)).toEqual(
+      sink.events.map((_event, index) => index),
+    );
+  }
+});
+
+test("read:none keeps the historical Pi path free of Host Memory preparation", async () => {
+  const provider = fauxProvider();
+  let preparationCalls = 0;
+  let modelCalls = 0;
+  const kernel = new PiLoopKernel({
+    model: provider.getModel(),
+    toolGateway: inMemoryToolGateway,
+    workerProfileId,
+    prepareContext: async () => {
+      preparationCalls += 1;
+      throw new Error("read:none must not prepare Memory");
+    },
+    streamFn: () => {
+      modelCalls += 1;
+      const stream = createAssistantMessageEventStream();
+      const message = fauxAssistantMessage("Historical Run path.");
+      stream.push({ type: "start", partial: message });
+      stream.push({ type: "done", reason: "stop", message });
+      return stream;
+    },
+    now: () => 0,
+  });
+  const events: CanonicalEvent[] = [];
+
+  await expect(kernel.start(
+    startRun({ turns: 1 }),
+    collectingSink(events),
+    new AbortController().signal,
+  )).resolves.toEqual({ status: "completed" });
+  expect(preparationCalls).toBe(0);
+  expect(modelCalls).toBe(1);
+  expect(events.some((event) => event.type === "memory.hit" || event.type === "run.context.ready"))
+    .toBe(false);
 });

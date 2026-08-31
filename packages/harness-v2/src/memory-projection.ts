@@ -23,11 +23,28 @@ import type {
   DeletedMemoryCandidate,
 } from "./memory-types";
 
+const memoryStopWords = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "before", "by", "for",
+  "from", "in", "into", "is", "it", "of", "on", "or", "the", "to",
+  "with",
+]);
+
+export function memoryQueryTokens(text: string): readonly string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((token) => token.length > 0 && !memoryStopWords.has(token));
+}
+
 export function retrieveAcceptedMemories(
   events: readonly CanonicalEvent[],
   scope: ChannelScope,
   queryTokens: readonly string[],
 ): AcceptedChannelMemory[] {
+  if (queryTokens.length === 0) {
+    return [];
+  }
+
   return events.flatMap((event) => {
     const candidate = proposedCandidate(event);
     if (candidate === undefined) {

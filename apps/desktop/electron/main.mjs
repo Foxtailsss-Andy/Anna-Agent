@@ -29,9 +29,9 @@ async function createWindow() {
     userDataPath: app.getPath("userData"),
     onExit: ({ code, signal, stderr }) => {
       const reason = code === null ? `signal ${signal}` : `code ${code}`;
-      console.error(`Anna runtime exited with ${reason}: ${stderr}`);
+      console.error(`Anna Product Host exited with ${reason}`);
       showRuntimeFailure({
-        message: `Anna runtime exited with ${reason}`,
+        message: `Anna Product Host exited with ${reason}`,
         details: stderr,
       });
     },
@@ -50,7 +50,6 @@ async function createWindow() {
       preload: path.join(electronDir, "preload.mjs"),
       additionalArguments: [
         `--anna-api-base=${runtime.apiBase}`,
-        `--anna-harness-v2-api-base=${runtime.harnessV2ApiBase ?? ""}`,
       ],
       contextIsolation: true,
       nodeIntegration: false,
@@ -115,7 +114,7 @@ function createRuntimeFailureWindow(error) {
     height: 640,
     minWidth: 760,
     minHeight: 520,
-    title: "Anna runtime 启动失败",
+    title: "Anna 启动失败",
     ...(appIconPath && existsSync(appIconPath) ? { icon: appIconPath } : {}),
     backgroundColor: "#f7f8fa",
   });

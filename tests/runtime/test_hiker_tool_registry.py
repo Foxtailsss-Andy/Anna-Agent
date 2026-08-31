@@ -11,6 +11,8 @@ def test_model_visible_tools_lists_all_allowed():
         assert tool["input_schema"]["type"] == "object"
         assert tool["description"]
         assert tool["schema_source"] == "registry"
+        assert tool["effect"] == "read"
+        assert tool["replay_policy"] == "safe"
 
 
 def test_assert_allowed_accepts_read_tool():

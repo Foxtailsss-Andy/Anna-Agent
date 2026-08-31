@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
+from uuid import uuid4
 
 from services.hiker.app.capability import HikerCapabilityHandler
 from services.hiker.app.schemas import (
@@ -77,7 +78,6 @@ class HikerOrchestrator(BaseOrchestrator):
             error_contract=HikerMcpError.as_contract,
         )
         self._run_counter = 0
-        self._assistant_counter = 0
         self._dashboard_runs: dict[str, HikerDashboardRun] = {}
         self._assistant_runs: dict[str, HikerAssistantRun] = {}
 
@@ -411,8 +411,9 @@ class HikerOrchestrator(BaseOrchestrator):
         return self._fail_run_event(run, "hiker.assistant.failed", error_code, message)
 
     def _next_assistant_run_id(self) -> str:
-        self._assistant_counter += 1
-        return f"hiker_assistant_run_{self._assistant_counter:03d}"
+        # Product Host treats assistant run IDs as durable idempotency keys;
+        # process-local counters would collide after a business peer restart.
+        return f"hiker_assistant_run_{uuid4().hex}"
 
 
 def _detect_anomalies(dashboard: dict, collection: dict, top_customers: list[HikerCustomerRow]) -> list[HikerAnomaly]:

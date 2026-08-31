@@ -52,6 +52,7 @@ def build_router(
     hiker: HikerOrchestrator,
     runtime_validation_store: SQLiteRuntimeValidationLedgerStore | None,
     runtime_validation_ledger: list[dict[str, Any]],
+    product_mode: bool = False,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -137,6 +138,14 @@ def build_router(
 
     @router.put("/api/admin/runtime/config")
     def update_runtime_config(request: UpdateRuntimeConfigRequest) -> dict:
+        if product_mode and any(
+            getattr(request, key) is not None
+            for key in ("model_provider", "model_endpoint", "model_name", "model_api_key", "model_profiles")
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="model configuration is owned by the Node Harness Host",
+            )
         config_path = _active_runtime_config_path(reimbursement)
         _write_runtime_config_file(config_path, request.model_dump(exclude_unset=True))
         return _runtime_config_file_response(
@@ -147,6 +156,11 @@ def build_router(
     @router.post("/api/admin/runtime/model-profiles")
     def add_model_profile(request: AddModelProfileRequest) -> dict:
         """P3 refinement - server-side profile merge (secrets never round-trip)."""
+        if product_mode:
+            raise HTTPException(
+                status_code=409,
+                detail="model profiles are owned by the Node Harness Host",
+            )
         config_path = _active_runtime_config_path(reimbursement)
         config = _read_runtime_config_file(config_path)
         profiles = [p for p in config.get("model_profiles", []) if isinstance(p, dict)]
@@ -165,6 +179,11 @@ def build_router(
 
     @router.delete("/api/admin/runtime/model-profiles/{profile_id}")
     def delete_model_profile(profile_id: str) -> dict:
+        if product_mode:
+            raise HTTPException(
+                status_code=409,
+                detail="model profiles are owned by the Node Harness Host",
+            )
         config_path = _active_runtime_config_path(reimbursement)
         config = _read_runtime_config_file(config_path)
         profiles = [p for p in config.get("model_profiles", []) if isinstance(p, dict)]
@@ -176,6 +195,11 @@ def build_router(
 
     @router.post("/api/admin/runtime/validate")
     async def validate_runtime() -> dict:
+        if product_mode:
+            raise HTTPException(
+                status_code=409,
+                detail="runtime validation is owned by the Node Harness Host",
+            )
         result = await _runtime_validation_response(reimbursement, associate)
         item = _runtime_validation_ledger_item(
             result,

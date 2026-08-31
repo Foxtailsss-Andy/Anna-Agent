@@ -152,3 +152,15 @@ def test_registry_classifies_submit_intent_as_local_approval():
     assert registry.dispatch_kind("reimbursement.create_draft") == "mcp_tool"
     with pytest.raises(PermissionError):
         registry.dispatch_kind("reimbursement.submit")
+
+
+def test_registry_exposes_effect_and_replay_policy_for_each_business_tool_kind():
+    tools = {tool["name"]: tool for tool in ReimbursementToolRegistry().model_visible_tools()}
+
+    assert tools["reimbursement.get_policy"]["effect"] == "read"
+    assert tools["reimbursement.get_policy"]["replay_policy"] == "safe"
+    assert tools["reimbursement.validate_draft"]["replay_policy"] == "safe"
+    assert tools["reimbursement.create_draft"]["effect"] == "business_write"
+    assert tools["reimbursement.create_draft"]["replay_policy"] == "never"
+    assert tools["reimbursement.submit_intent"]["effect"] == "approval"
+    assert tools["reimbursement.submit_intent"]["replay_policy"] == "never"

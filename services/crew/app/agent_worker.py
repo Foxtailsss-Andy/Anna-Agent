@@ -11,6 +11,7 @@ from typing import Literal
 from services.crew.app import lifecycle
 from services.crew.app.schemas import CrewProject, CrewTask
 from services.crew.app.store import SQLiteCrewStore
+from services.business.harness_client import HarnessHostClient, ProductTask, result_payload
 from services.memory.app.schemas import BusinessMemoryItem
 from services.memory.app.store import BusinessMemoryStore
 from services.runtime.app.config import RuntimeSettings
@@ -588,6 +589,164 @@ class AgentWorkerExecutor:
         if result.status == "failed":
             return result.summary.strip() or "Agent 执行失败，已阻塞待处理。"
         return "Agent 返回空交付物，已阻塞待处理。"
+
+
+class HarnessWorkerExecutor:
+    """Crew worker executor whose whole model task belongs to the Node Host.
+
+    Crew still performs the state-machine transitions and review gate locally;
+    only the Agent decision/output is delegated. ``submitted_run_id`` lets a
+    route return a durable Host run id immediately and then reuse that exact run
+    while this executor waits in a background thread.
+    """
+
+    def __init__(
+        self,
+        client: HarnessHostClient,
+        *,
+        memory_store: BusinessMemoryStore | None = None,
+        submitted_run_id: str | None = None,
+    ) -> None:
+        self._client = client
+        self._context_assembler = CrewWorkerContextAssembler(memory_store)
+        self._submitted_run_id = submitted_run_id
+
+    def build_task(self, project: CrewProject, task: CrewTask, run_ref: str) -> ProductTask:
+        context = self._context_assembler.assemble(project, task)
+        return ProductTask(
+            run_id=run_ref,
+            workspace_id=project.workspace_id,
+            actor_user_id=project.owner_user_id,
+            surface="crew",
+            prompt=context.prompt,
+            channel_id=f"crew_channel:{project.id}",
+            conversation_id=f"crew_project:{project.id}",
+            context={
+                "source": "crew.worker",
+                "project_id": project.id,
+                "task_id": task.id,
+                "project": project.model_dump(mode="json"),
+                "task": task.model_dump(mode="json"),
+                "memory_hits": list(context.memory_hits),
+            },
+            permission_mode="readonly",
+            source_event_id=f"crew_task:{project.id}:{task.id}",
+        )
+
+    def run_task(
+        self,
+        project: CrewProject,
+        task_id: str,
+        *,
+        run_ref: str | None = None,
+    ) -> tuple[CrewProject, WorkerRunResult]:
+        task = _find_task(project, task_id)
+        if task.is_gate:
+            raise CrewAgentError("gate tasks are reviewed, not executed")
+        if task.status in ("assigned", "rework"):
+            lifecycle.start_task(project, task_id)
+            task.run_started_at = _now()
+        elif task.status == "running":
+            if task.run_started_at is None:
+                task.run_started_at = _now()
+        elif task.status in ("submitted", "in_review", "done"):
+            raise CrewRunSkipped(
+                f"Task {task_id!r} already advanced to {task.status!r}; nothing to run",
+                task_status=task.status,
+            )
+        else:
+            raise CrewAgentError(
+                f"Task {task_id!r} is not runnable by an agent: status is {task.status!r}"
+            )
+
+        effective_run_ref = run_ref or f"crew:{project.id}:{task.id}:host"
+        task.run_ref = effective_run_ref
+        context = self._context_assembler.assemble(project, task)
+        try:
+            if self._submitted_run_id is None:
+                submitted = self._client.submit(self.build_task(project, task, effective_run_ref))
+            else:
+                submitted = self._client.get(self._submitted_run_id)
+            host_run = self._client.wait(submitted.run_id)
+        except Exception as exc:
+            task.status = "blocked"
+            task.blocker = "Harness Host worker failed; task is blocked pending retry."
+            task.run_started_at = None
+            raise CrewAgentError(
+                str(exc) or "Harness Host worker failed",
+                error_code=getattr(exc, "code", None) or "harness_worker_failed",
+                retryable=False,
+                frames=list(getattr(exc, "events", ()) or ()),
+                memory_hits=list(context.memory_hits),
+            ) from exc
+
+        if host_run.status not in {"completed", "succeeded"}:
+            reason = _host_error_message(host_run) or "Harness Host worker failed"
+            task.status = "blocked"
+            task.blocker = reason
+            task.run_started_at = None
+            raise CrewAgentError(
+                reason,
+                error_code=_host_error_code(host_run) or "harness_worker_failed",
+                memory_hits=list(context.memory_hits),
+            )
+
+        summary = _host_worker_summary(result_payload(host_run))
+        if not summary:
+            task.status = "blocked"
+            task.blocker = "Harness Host returned no Worker artifact."
+            task.run_started_at = None
+            raise CrewAgentError(
+                task.blocker,
+                error_code="harness_artifact_missing",
+                memory_hits=list(context.memory_hits),
+            )
+        lifecycle.submit_task(project, task_id, summary)
+        task.run_started_at = None
+        return project, WorkerRunResult(
+            status="completed",
+            summary=summary,
+            turns_used=_host_turns(host_run.result or {}),
+            audit_events=list(host_run.events),
+            memory_hits=list(context.memory_hits),
+        )
+
+
+def _host_worker_summary(result: dict[str, Any]) -> str:
+    artifact = result.get("artifact")
+    if isinstance(artifact, dict):
+        for key in ("content", "preview", "body", "text"):
+            value = artifact.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    for key in ("artifact", "assistant_message", "answer", "text", "output"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _host_error_code(run: Any) -> str | None:
+    result = getattr(run, "result", None) or {}
+    for key in ("error_code", "code", "error"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_error_message(run: Any) -> str | None:
+    result = getattr(run, "result", None) or {}
+    for key in ("error_message", "message", "error"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_turns(result: dict[str, Any]) -> int:
+    value = result.get("turns_used")
+    return value if isinstance(value, int) and value >= 0 else 0
 
 
 class QueryEngineLoopAdapter:

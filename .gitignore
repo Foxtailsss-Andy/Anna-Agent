@@ -16,6 +16,7 @@ dist/
 # Desktop packaging output
 release/
 build/python-runtime/
+build/omp-runtime/
 
 # Anna local runtime state (SQLite DBs, create-run artifacts, local runtime.json with secrets)
 .anna/
@@ -30,3 +31,4 @@ graphify-out/
 # Local scratch / session-tool state
 .tmp-tests/
 .superpowers/
+packages/omp-loop-kernel/runtime/node_modules/

@@ -851,7 +851,17 @@ def test_channel_say_at_active_agent_sends_durable_steer_signal(tmp_path):
                 workspace_id=project["workspace_id"],
                 subject_ref_prefix=f"crew_task:{pid}:{prd_id}",
             )
-            if active and _task_by_id(project, prd_id)["run_inflight"]:
+            if (
+                active
+                and _task_by_id(project, prd_id)["run_inflight"]
+                and any(
+                    event.get("type") == "crew.task.execution_claimed"
+                    and event.get("payload", {}).get("task_id") == prd_id
+                    and event.get("payload", {}).get("run_ref")
+                    == active[0].execution_id
+                    for event in project.get("audit_events", [])
+                )
+            ):
                 break
             time.sleep(0.02)
         else:
@@ -992,7 +1002,17 @@ def test_channel_say_terminal_signal_race_keeps_message_and_does_not_500(
                 workspace_id=project["workspace_id"],
                 subject_ref_prefix=f"crew_task:{pid}:{prd_id}",
             )
-            if active and _task_by_id(project, prd_id)["run_inflight"]:
+            if (
+                active
+                and _task_by_id(project, prd_id)["run_inflight"]
+                and any(
+                    event.get("type") == "crew.task.execution_claimed"
+                    and event.get("payload", {}).get("task_id") == prd_id
+                    and event.get("payload", {}).get("run_ref")
+                    == active[0].execution_id
+                    for event in project.get("audit_events", [])
+                )
+            ):
                 run_ref = active[0].execution_id
                 break
             time.sleep(0.02)

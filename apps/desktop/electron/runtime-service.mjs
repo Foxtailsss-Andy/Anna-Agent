@@ -1,305 +1,554 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-
 const API_HOST = "127.0.0.1";
 const DEFAULT_API_PORT = 18765;
+const PRODUCT_STARTUP_TIMEOUT_MS = 30_000;
 
 export function resolveProjectRoot(currentFileUrl = import.meta.url) {
   const projectRoot = path.resolve(path.dirname(fileURLToPath(currentFileUrl)), "../../..");
   return projectRoot.endsWith(".asar") ? `${projectRoot}.unpacked` : projectRoot;
 }
 
-export function resolvePythonExecutable(projectRoot, env = process.env, platform = process.platform) {
-  if (env.ANNA_PYTHON_BIN) {
-    return env.ANNA_PYTHON_BIN;
-  }
-  const isWindows = platform === "win32";
-  const sidecarCandidates = isWindows
-    ? [path.join(projectRoot, "build", "python-runtime", "python", "python.exe")]
-    : [path.join(projectRoot, "build", "python-runtime", "python", "bin", "python3.12")];
-  for (const sidecarPython of sidecarCandidates) {
-    if (existsSync(sidecarPython)) {
-      return sidecarPython;
-    }
-  }
-  const venvPython = isWindows
-    ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
-    : path.join(projectRoot, ".venv", "bin", "python");
-  if (existsSync(venvPython)) {
-    return venvPython;
-  }
-  return isWindows ? "python" : "python3";
+export function resolveNodeExecutable(env = process.env) {
+  return env.ANNA_NODE_BIN || process.execPath;
 }
 
-function resolveNodeExecutable(env = process.env) {
-  if (env.ANNA_NODE_BIN) {
-    return env.ANNA_NODE_BIN;
+export function assertPreviewPlatform(
+  platform = process.platform,
+  arch = process.arch,
+) {
+  if (platform !== "darwin" || arch !== "arm64") {
+    throw new Error("Anna Harness Preview currently supports macOS arm64 only");
   }
-  return process.execPath;
+}
+
+export function createPreviewRuntimeConfig({
+  projectRoot = resolveProjectRoot(),
+  userDataPath,
+  apiPort,
+  env = process.env,
+  platform = process.platform,
+  arch = process.arch,
+} = {}) {
+  if (!userDataPath) {
+    throw new Error("userDataPath is required for Anna Preview runtime");
+  }
+  assertPreviewPlatform(platform, arch);
+
+  const host = env.ANNA_PREVIEW_HOST ?? API_HOST;
+  if (!isLoopbackHost(host)) {
+    throw new Error("Anna Preview Host must bind to a loopback address");
+  }
+  const port = apiPort === undefined
+    ? parseOptionalPort(env.ANNA_PREVIEW_PORT) ?? DEFAULT_API_PORT
+    : parsePort(apiPort, "apiPort");
+  const stateRoot = env.ANNA_PREVIEW_STATE_ROOT ?? path.join(userDataPath, "preview");
+  const configPath = env.ANNA_PREVIEW_CONFIG_PATH ?? path.join(stateRoot, "config.json");
+  const workspaceRoot = env.ANNA_PREVIEW_WORKSPACE_ROOT ?? path.join(stateRoot, "workspace");
+  const staticRoot = env.ANNA_PREVIEW_STATIC_ROOT ?? path.join(projectRoot, "dist");
+  const ompRuntimeRoot = env.ANNA_PREVIEW_OMP_RUNTIME_ROOT
+    ?? path.join(projectRoot, "build", "omp-runtime", "darwin-arm64");
+  const entryPath = env.ANNA_PREVIEW_ENTRY_PATH
+    ?? path.join(projectRoot, "apps", "harness-service", "dist", "preview-main.js");
+  const runtimeInfoPath = env.ANNA_PREVIEW_RUNTIME_INFO_PATH
+    ?? path.join(userDataPath, "preview-runtime-info.json");
+
+  // Preview deliberately does not inherit legacy Python/Harness bridge selectors.
+  // The Host receives only the new, explicit path contract plus ordinary process env.
+  const {
+    ANNA_RUNTIME_CONFIG_PATH: _legacyConfigPath,
+    ANNA_STATE_DB_PATH: _legacyStateDbPath,
+    ANNA_HARNESS_V2_BRIDGE_ENABLED: _legacyBridgeEnabled,
+    ANNA_HARNESS_V2_BRIDGE_MANAGED: _legacyBridgeManaged,
+    ANNA_HARNESS_V2_BRIDGE_ORIGIN: _legacyBridgeOrigin,
+    ANNA_HARNESS_V2_PORT: _legacyBridgePort,
+    ANNA_HARNESS_V2_EVENT_STORE_PATH: _legacyEventStorePath,
+    ANNA_PYTHON_BIN: _legacyPythonBin,
+    ...ordinaryEnv
+  } = env;
+  const runtimeEnv = {
+    ...ordinaryEnv,
+    ANNA_PREVIEW_HOST: host,
+    ANNA_PREVIEW_PORT: String(port),
+    ANNA_PREVIEW_ENTRY_PATH: entryPath,
+    ANNA_PREVIEW_CONFIG_PATH: configPath,
+    ANNA_PREVIEW_STATE_ROOT: stateRoot,
+    ANNA_PREVIEW_WORKSPACE_ROOT: workspaceRoot,
+    ANNA_PREVIEW_STATIC_ROOT: staticRoot,
+    ANNA_PREVIEW_OMP_RUNTIME_ROOT: ompRuntimeRoot,
+  };
+
+  return {
+    projectRoot,
+    userDataPath,
+    host,
+    port,
+    apiHost: host,
+    apiPort: port,
+    apiBase: `http://${host}:${port}`,
+    nodeExecutable: resolveNodeExecutable(env),
+    entryPath,
+    args: [entryPath],
+    env: runtimeEnv,
+    configPath,
+    stateRoot,
+    workspaceRoot,
+    staticRoot,
+    ompRuntimeRoot,
+    runtimeInfoPath,
+  };
+}
+
+/**
+ * The normal desktop process is the Product Host. Preview remains available as
+ * an explicit legacy test helper, but it is never the default launcher path.
+ */
+export function createProductRuntimeConfig({
+  projectRoot = resolveProjectRoot(),
+  userDataPath,
+  apiPort,
+  businessPort,
+  env = process.env,
+} = {}) {
+  if (!userDataPath) throw new Error("userDataPath is required for Anna Product Host runtime");
+  const host = env.ANNA_HARNESS_HOST ?? API_HOST;
+  if (!isLoopbackHost(host)) throw new Error("Anna Product Host must bind to a loopback address");
+  const port = apiPort === undefined
+    ? parseOptionalPort(env.ANNA_HARNESS_HOST_PORT, "ANNA_HARNESS_HOST_PORT") ?? DEFAULT_API_PORT
+    : parsePort(apiPort, "apiPort");
+  const stateRoot = env.ANNA_HARNESS_STATE_ROOT ?? path.join(userDataPath, "harness");
+  const hostConfigPath = env.ANNA_HARNESS_HOST_CONFIG_PATH
+    ?? env.ANNA_RUNTIME_CONFIG_PATH
+    ?? path.join(userDataPath, "config", "host.json");
+  const businessConfigPath = env.ANNA_HARNESS_BUSINESS_CONFIG_PATH
+    ?? path.join(userDataPath, "config", "business.json");
+  const businessOriginConfigured = Boolean(env.ANNA_HARNESS_BUSINESS_ORIGIN);
+  const businessManaged = env.ANNA_HARNESS_BUSINESS_ENABLED !== "0" && !businessOriginConfigured;
+  const businessEnabled = businessManaged || businessOriginConfigured;
+  const resolvedBusinessPort = businessPort
+    ?? parseOptionalPort(env.ANNA_HARNESS_BUSINESS_PORT, "ANNA_HARNESS_BUSINESS_PORT")
+    ?? DEFAULT_API_PORT + 1;
+  const hostEntryPath = env.ANNA_HARNESS_HOST_ENTRY_PATH
+    ?? path.join(projectRoot, "apps", "harness-service", "dist", "main.js");
+  const staticRoot = env.ANNA_HARNESS_HOST_STATIC_ROOT ?? path.join(projectRoot, "dist");
+  const ompRuntimeRoot = env.ANNA_HARNESS_OMP_RUNTIME_ROOT
+    ?? path.join(projectRoot, "build", "omp-runtime", "darwin-arm64");
+  const eventStorePath = env.ANNA_HARNESS_HOST_EVENT_STORE_PATH
+    ?? path.join(stateRoot, "events.sqlite3");
+  const sessionStorePath = env.ANNA_HARNESS_SESSION_STORE_PATH
+    ?? path.join(stateRoot, "sessions.json");
+  const serviceToken = env.ANNA_HARNESS_SERVICE_TOKEN ?? randomUUID();
+  const hostOrigin = `http://${host}:${port}`;
+  const businessOrigin = env.ANNA_HARNESS_BUSINESS_ORIGIN
+    ?? (businessEnabled ? `http://${host}:${resolvedBusinessPort}` : undefined);
+  const pythonExecutable = resolvePythonExecutable(projectRoot, env);
+  const pythonHome = resolveBundledPythonHome(projectRoot, env, pythonExecutable);
+
+  // Do not inherit the old Python Agent selectors into the Node Host.
+  const {
+    ANNA_PREVIEW_HOST: _previewHost,
+    ANNA_PREVIEW_PORT: _previewPort,
+    ANNA_PREVIEW_ENTRY_PATH: _previewEntryPath,
+    ANNA_PREVIEW_CONFIG_PATH: _previewConfigPath,
+    ANNA_PREVIEW_STATE_ROOT: _previewStateRoot,
+    ANNA_PREVIEW_WORKSPACE_ROOT: _previewWorkspaceRoot,
+    ANNA_PREVIEW_STATIC_ROOT: _previewStaticRoot,
+    ANNA_PREVIEW_OMP_RUNTIME_ROOT: _previewOmpRuntimeRoot,
+    ANNA_HARNESS_V2_BRIDGE_ENABLED: _legacyBridgeEnabled,
+    ANNA_HARNESS_V2_BRIDGE_MANAGED: _legacyBridgeManaged,
+    ANNA_HARNESS_V2_BRIDGE_ORIGIN: _legacyBridgeOrigin,
+    ANNA_HARNESS_V2_PORT: _legacyBridgePort,
+    ANNA_HARNESS_V2_EVENT_STORE_PATH: _legacyBridgeEventStore,
+    ANNA_HARNESS_HOST_CONFIG_PATH: _hostConfigPath,
+    ANNA_HARNESS_HOST_EVENT_STORE_PATH: _hostEventStorePath,
+    ANNA_HARNESS_HOST_WORKSPACE_ROOT: _hostWorkspaceRoot,
+    ANNA_HARNESS_HOST_STATIC_ROOT: _hostStaticRoot,
+    ANNA_HARNESS_HOST_ENTRY_PATH: _hostEntryPath,
+    ANNA_HARNESS_HOST_PORT: _hostPort,
+    ANNA_HARNESS_OMP_RUNTIME_ROOT: _hostOmpRuntimeRoot,
+    ANNA_HARNESS_SESSION_STORE_PATH: _hostSessionStorePath,
+    ANNA_HARNESS_BUSINESS_CONFIG_PATH: _businessConfigPath,
+    ANNA_HARNESS_HOST_ORIGIN: _hostOrigin,
+    ANNA_HARNESS_HOST_URL: _hostUrl,
+    ANNA_HARNESS_BUSINESS_ORIGIN: _businessOrigin,
+    ANNA_PYTHON_BIN: _pythonBin,
+    ANNA_MODEL_API_KEY: _modelApiKey,
+    ANNA_MODEL_ENDPOINT: _modelEndpoint,
+    ANNA_MODEL_NAME: _modelName,
+    ANNA_API_KEY: _annaApiKey,
+    OPENAI_API_KEY: _openAiApiKey,
+    DEEPSEEK_API_KEY: _deepSeekApiKey,
+    ANNA_OPENAI_API_KEY: _annaOpenAiApiKey,
+    ANNA_DEEPSEEK_API_KEY: _annaDeepSeekApiKey,
+    MODEL_API_KEY: _modelApiKeyGeneric,
+    MODEL_ENDPOINT: _modelEndpointGeneric,
+    MODEL_NAME: _modelNameGeneric,
+    OPENAI_BASE_URL: _openAiBaseUrl,
+    ANTHROPIC_API_KEY: _anthropicApiKey,
+    ANNA_RUNTIME_CONFIG_PATH: _runtimeConfigPath,
+    ANNA_STATE_DB_PATH: _stateDbPath,
+    ANNA_RUNS_DB_PATH: _runsDbPath,
+    ANNA_MEMORY_DB_PATH: _memoryDbPath,
+    ...ordinaryEnv
+  } = env;
+  const hostWorkspaceRoot = env.ANNA_HARNESS_HOST_WORKSPACE_ROOT ?? path.join(stateRoot, "workspace");
+  const hostEnv = {
+    ...ordinaryEnv,
+    ANNA_RUNTIME_CONFIG_PATH: hostConfigPath,
+    ANNA_HARNESS_HOST_CONFIG_PATH: hostConfigPath,
+    ANNA_HARNESS_HOST: host,
+    ANNA_HARNESS_HOST_PORT: String(port),
+    ANNA_HARNESS_HOST_ENTRY_PATH: hostEntryPath,
+    ANNA_HARNESS_HOST_STATIC_ROOT: staticRoot,
+    ANNA_HARNESS_OMP_RUNTIME_ROOT: ompRuntimeRoot,
+    ANNA_HARNESS_HOST_EVENT_STORE_PATH: eventStorePath,
+    ANNA_HARNESS_HOST_WORKSPACE_ROOT: hostWorkspaceRoot,
+    ANNA_HARNESS_SESSION_STORE_PATH: sessionStorePath,
+    ANNA_HARNESS_SERVICE_TOKEN: serviceToken,
+    ANNA_HARNESS_BUSINESS_PORT: String(resolvedBusinessPort),
+    ANNA_HARNESS_PROTECTED_PATHS: [
+      hostConfigPath,
+      businessConfigPath,
+      eventStorePath,
+      sessionStorePath,
+      stateRoot,
+      hostWorkspaceRoot,
+    ].join(path.delimiter),
+    ANNA_HARNESS_BUSINESS_ENABLED: businessEnabled ? "1" : "0",
+    ...(businessOrigin === undefined ? {} : { ANNA_HARNESS_BUSINESS_ORIGIN: businessOrigin }),
+    ...(env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN === undefined
+      ? { ANNA_HARNESS_BUSINESS_SERVICE_TOKEN: serviceToken }
+      : { ANNA_HARNESS_BUSINESS_SERVICE_TOKEN: env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN }),
+  };
+  const businessEnv = {
+    ...ordinaryEnv,
+    ANNA_RUNTIME_CONFIG_PATH: businessConfigPath,
+    ANNA_HARNESS_BUSINESS_CONFIG_PATH: businessConfigPath,
+    ANNA_HARNESS_BUSINESS_MODE: "1",
+    ANNA_BUSINESS_MODE: "1",
+    ANNA_PRODUCT_MODE: "1",
+    ANNA_HARNESS_BUSINESS_HOST: host,
+    ANNA_HARNESS_BUSINESS_PORT: String(resolvedBusinessPort),
+    ANNA_BUSINESS_HOST: host,
+    ANNA_BUSINESS_PORT: String(resolvedBusinessPort),
+    ANNA_HARNESS_HOST_ORIGIN: hostOrigin,
+    ANNA_HARNESS_HOST_URL: hostOrigin,
+    ANNA_SERVICE_TOKEN: serviceToken,
+    ANNA_HARNESS_SERVICE_TOKEN: serviceToken,
+    ANNA_HARNESS_BUSINESS_SERVICE_TOKEN: serviceToken,
+    PYTHONPATH: resolvePythonPath(projectRoot, env),
+    ...(pythonHome === undefined ? {} : { PYTHONHOME: pythonHome }),
+  };
+  return {
+    projectRoot,
+    userDataPath,
+    host,
+    port,
+    apiHost: host,
+    apiPort: port,
+    apiBase: hostOrigin,
+    nodeExecutable: resolveNodeExecutable(env),
+    pythonExecutable,
+    entryPath: hostEntryPath,
+    args: [hostEntryPath],
+    env: hostEnv,
+    hostEnv,
+    businessEnv,
+    businessEnabled,
+    businessManaged,
+    businessHost: host,
+    businessPort: resolvedBusinessPort,
+    businessApiBase: businessOrigin,
+    hostConfigPath,
+    businessConfigPath,
+    stateRoot,
+    eventStorePath,
+    sessionStorePath,
+    workspaceRoot: hostEnv.ANNA_HARNESS_HOST_WORKSPACE_ROOT,
+    staticRoot,
+    ompRuntimeRoot,
+    serviceToken,
+    runtimeInfoPath: env.ANNA_HARNESS_RUNTIME_INFO_PATH
+      ?? path.join(userDataPath, "harness-runtime-info.json"),
+  };
+}
+
+export function resolvePythonExecutable(projectRoot, env = process.env, platform = process.platform) {
+  if (env.ANNA_PYTHON_BIN) return env.ANNA_PYTHON_BIN;
+  const candidate = platform === "win32"
+    ? path.join(projectRoot, "build", "python-runtime", "python", "python.exe")
+    : path.join(projectRoot, "build", "python-runtime", "python", "bin", "python3.12");
+  if (existsSync(candidate)) return candidate;
+  const venv = platform === "win32"
+    ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
+    : path.join(projectRoot, ".venv", "bin", "python");
+  return existsSync(venv) ? venv : platform === "win32" ? "python" : "python3";
 }
 
 function resolvePythonPath(projectRoot, env = process.env) {
   const entries = [projectRoot];
-  const sidecarSitePackages = path.join(
-    projectRoot,
-    "build",
-    "python-runtime",
-    "site-packages",
-  );
-  if (existsSync(sidecarSitePackages)) {
-    entries.push(sidecarSitePackages);
+  const bundledSitePackages = path.join(projectRoot, "build", "python-runtime", "site-packages");
+  // An explicit interpreter (usually a developer .venv) owns its dependency
+  // set. The packaged interpreter gets the copied dependency tree below.
+  if (!env.ANNA_PYTHON_BIN && existsSync(bundledSitePackages)) {
+    entries.push(bundledSitePackages);
   }
-  if (env.PYTHONPATH) {
-    entries.push(env.PYTHONPATH);
-  }
+  if (env.PYTHONPATH) entries.push(env.PYTHONPATH);
   return entries.join(path.delimiter);
 }
 
-export function createRuntimeConfig({
-  projectRoot = resolveProjectRoot(),
-  userDataPath,
-  apiPort = DEFAULT_API_PORT,
-  harnessV2Port,
-  env = process.env,
-} = {}) {
-  if (!userDataPath) {
-    throw new Error("userDataPath is required for Anna desktop runtime");
+function resolveBundledPythonHome(projectRoot, env, pythonExecutable) {
+  if (env.PYTHONHOME) return env.PYTHONHOME;
+  if (env.ANNA_PYTHON_BIN) return undefined;
+  const bundledRoot = path.join(projectRoot, "build", "python-runtime", "python");
+  const bundledExecutable = process.platform === "win32"
+    ? path.join(bundledRoot, "python.exe")
+    : path.join(bundledRoot, "bin", "python3.12");
+  if (path.resolve(pythonExecutable) !== path.resolve(bundledExecutable) || !existsSync(bundledRoot)) {
+    return undefined;
   }
-  // A source checkout may carry an ignored `.anna/runtime.json` with its
-  // local model, connector, and migrated state. Prefer that complete local
-  // state bundle when present. Packaged installs and clean checkouts keep the
-  // existing Electron userData defaults.
-  const projectLocalStatePath = path.join(projectRoot, ".anna");
-  const projectLocalRuntimeConfigPath = path.join(projectLocalStatePath, "runtime.json");
-  const useProjectLocalState = existsSync(projectLocalRuntimeConfigPath);
-  const defaultStateRoot = useProjectLocalState ? projectLocalStatePath : userDataPath;
-  const stateDbPath =
-    env.ANNA_STATE_DB_PATH ?? path.join(defaultStateRoot, "state", "anna-state.sqlite3");
-  const harnessV2Enabled = env.ANNA_HARNESS_V2_BRIDGE_ENABLED === "1"
-    || env.ANNA_HARNESS_V2_BRIDGE_MANAGED === "1";
-  const harnessV2Managed = harnessV2Enabled
-    && (env.ANNA_HARNESS_V2_BRIDGE_MANAGED === "1"
-      || env.ANNA_HARNESS_V2_BRIDGE_ORIGIN === undefined);
-  const resolvedHarnessV2Port = harnessV2Port ?? Number(env.ANNA_HARNESS_V2_PORT ?? 0);
-  if (harnessV2Managed && (!Number.isInteger(resolvedHarnessV2Port) || resolvedHarnessV2Port < 1)) {
-    throw new Error("Managed Harness v2 requires a preallocated harnessV2Port");
-  }
-  const harnessV2ApiBase = harnessV2Enabled
-    ? env.ANNA_HARNESS_V2_BRIDGE_ORIGIN
-      ?? `http://${API_HOST}:${resolvedHarnessV2Port}`
-    : undefined;
-  const harnessV2EventStorePath =
-    env.ANNA_HARNESS_V2_EVENT_STORE_PATH
-      ?? path.join(defaultStateRoot, "state", "harness-v2.sqlite3");
-  const harnessV2EntryPath = path.join(projectRoot, "apps", "harness-service", "dist", "main.js");
-  const harnessV2Env = harnessV2Enabled && harnessV2ApiBase
-    ? {
-        ANNA_HARNESS_V2_BRIDGE_ENABLED: "1",
-        ANNA_HARNESS_V2_BRIDGE_MANAGED: harnessV2Managed ? "1" : "0",
-        ANNA_HARNESS_V2_BRIDGE_ORIGIN: harnessV2ApiBase,
-        ANNA_HARNESS_V2_EVENT_STORE_PATH: harnessV2EventStorePath,
-        ...(harnessV2Managed ? { ANNA_HARNESS_V2_PORT: String(resolvedHarnessV2Port) } : {}),
-      }
-    : {};
-  const runtimeConfigPath =
-    env.ANNA_RUNTIME_CONFIG_PATH
-    ?? (useProjectLocalState
-      ? projectLocalRuntimeConfigPath
-      : path.join(userDataPath, "config", "runtime.json"));
-  const runtimeInfoPath =
-    env.ANNA_RUNTIME_INFO_PATH
-    ?? (useProjectLocalState
-      ? path.join(projectLocalStatePath, "runtime-info-electron.json")
-      : path.join(userDataPath, "runtime-info.json"));
-  const runtimeEnv = {
-    ...env,
-    ANNA_RUNTIME_CONFIG_PATH: runtimeConfigPath,
-    ANNA_RUNTIME_INFO_PATH: runtimeInfoPath,
-    ANNA_STATE_DB_PATH: stateDbPath,
-    ...harnessV2Env,
-    PYTHONPATH: resolvePythonPath(projectRoot, env),
-  };
-  const args = [
-    "-m",
-    "uvicorn",
-    "services.api.app.main:app",
-    "--host",
-    API_HOST,
-    "--port",
-    String(apiPort),
-  ];
-  return {
-    projectRoot,
-    userDataPath,
-    apiHost: API_HOST,
-    apiPort,
-    apiBase: `http://${API_HOST}:${apiPort}`,
-    pythonExecutable: resolvePythonExecutable(projectRoot, env),
-    nodeExecutable: resolveNodeExecutable(env),
-    moduleName: "uvicorn",
-    args,
-    env: runtimeEnv,
-    runtimeConfigPath,
-    runtimeInfoPath,
-    stateDbPath,
-    harnessV2Enabled,
-    harnessV2Managed,
-    harnessV2ApiBase,
-    harnessV2Port: harnessV2Enabled ? resolvedHarnessV2Port : undefined,
-    harnessV2EntryPath,
-    harnessV2EventStorePath,
-  };
+  return bundledRoot;
 }
 
+// The stable launcher factory now points to the original-product Host.
+export const createRuntimeConfig = createProductRuntimeConfig;
+
 export async function createDesktopRuntime(options = {}) {
-  const apiPort = options.apiPort ?? (await findFreePort());
   const env = options.env ?? process.env;
-  const managedHarnessV2 = env.ANNA_HARNESS_V2_BRIDGE_ENABLED === "1"
-    && env.ANNA_HARNESS_V2_BRIDGE_ORIGIN === undefined;
-  const harnessV2Port = options.harnessV2Port
-    ?? (managedHarnessV2 ? await findFreePort() : undefined);
-  const config = createRuntimeConfig({ ...options, apiPort, harnessV2Port });
-  return startRuntimeService(config, options);
+  const configuredPort = options.apiPort ?? parseOptionalPort(env.ANNA_HARNESS_HOST_PORT, "ANNA_HARNESS_HOST_PORT");
+  const apiPort = configuredPort ?? (await findFreePort());
+  const businessManaged = env.ANNA_HARNESS_BUSINESS_ENABLED !== "0"
+    && !Boolean(env.ANNA_HARNESS_BUSINESS_ORIGIN);
+  const configuredBusinessPort = options.businessPort
+    ?? parseOptionalPort(env.ANNA_HARNESS_BUSINESS_PORT, "ANNA_HARNESS_BUSINESS_PORT");
+  const nextBusinessPort = businessManaged
+    ? configuredBusinessPort ?? (await findFreePort())
+    : configuredBusinessPort;
+  const config = createProductRuntimeConfig({ ...options, apiPort, businessPort: nextBusinessPort });
+  return startProductRuntimeService(config, options);
 }
 
 export async function restartDesktopRuntime(currentRuntime, options = {}) {
   const startRuntime = options.startRuntime ?? createDesktopRuntime;
   const restartDelayMs = options.restartDelayMs ?? 400;
-  const env = restartEnvironment(currentRuntime, options.env ?? currentRuntime?.env);
+  const currentEnv = options.env ?? currentRuntime?.env;
+  const restartEnv = currentRuntime?.businessManaged && currentEnv
+    ? (() => {
+        const { ANNA_HARNESS_BUSINESS_ORIGIN: _businessOrigin, ...managedEnv } = currentEnv;
+        return { ...managedEnv, ANNA_HARNESS_BUSINESS_ENABLED: "1" };
+      })()
+    : currentEnv;
   const startOptions = {
     projectRoot: options.projectRoot ?? currentRuntime?.projectRoot,
     userDataPath: options.userDataPath ?? currentRuntime?.userDataPath,
     apiPort: options.apiPort ?? currentRuntime?.apiPort,
-    harnessV2Port: options.harnessV2Port ?? currentRuntime?.harnessV2Port,
-    env,
+    businessPort: options.businessPort ?? currentRuntime?.businessPort,
+    env: restartEnv,
     healthTimeoutMs: options.healthTimeoutMs,
     onExit: options.onExit,
+    platform: options.platform,
+    arch: options.arch,
   };
   await currentRuntime?.stop?.();
   await delay(restartDelayMs);
   return startRuntime(startOptions);
 }
 
-function restartEnvironment(currentRuntime, env) {
-  if (!currentRuntime?.harnessV2Managed || env === undefined) {
-    return env;
+export async function startPreviewRuntimeService(config, options = {}) {
+  if (!config || !config.entryPath || !existsSync(config.entryPath)) {
+    throw new Error(`Preview Host entry is missing: ${config?.entryPath ?? "<unknown>"}`);
   }
-  const {
-    ANNA_HARNESS_V2_BRIDGE_ORIGIN: _bridgeOrigin,
-    ...managedEnv
-  } = env;
-  return managedEnv;
-}
 
-export async function startRuntimeService(config, options = {}) {
-  mkdirSync(path.dirname(config.stateDbPath), { recursive: true });
-  mkdirSync(path.dirname(config.runtimeConfigPath), { recursive: true });
-  const harnessV2Child = config.harnessV2Managed
-    ? spawnManagedHarnessV2(config, options)
-    : undefined;
-  let harnessV2Stderr = "";
-  harnessV2Child?.stderr?.on("data", (chunk) => {
-    harnessV2Stderr += chunk.toString();
-  });
-  const child = spawn(config.pythonExecutable, config.args, {
+  mkdirSync(config.stateRoot, { recursive: true });
+  mkdirSync(path.dirname(config.configPath), { recursive: true });
+  mkdirSync(config.workspaceRoot, { recursive: true });
+
+  const childEnv = {
+    ...config.env,
+    // Packaged applications run with a branded executable name (for example
+    // `Anna`), so basename heuristics cannot decide whether Electron is Node.
+    // Plain Node ignores this variable; Electron uses it to run preview-main.
+    ELECTRON_RUN_AS_NODE: "1",
+  };
+  const child = spawn(config.nodeExecutable, config.args, {
     cwd: config.projectRoot,
-    env: config.env,
+    env: childEnv,
     stdio: options.stdio ?? "pipe",
   });
-  let stderr = "";
-  child.stderr?.on("data", (chunk) => {
-    stderr += chunk.toString();
-  });
+  const readStderr = monitorChildOutput(child);
+
   let startupComplete = false;
-  observeRuntimeExit(
-    child,
-    options,
-    () => stderr,
-    () => startupComplete,
-  );
+  observeRuntimeExit(child, options, readStderr, () => startupComplete);
   const startupFailure = new Promise((_, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (!startupComplete && !child.__annaIntentionalStop) {
-        reject(
-          new Error(`Anna runtime exited with ${formatRuntimeExitReason(code, signal)}`),
-        );
+        const details = readStderr();
+        reject(new Error(`Anna Preview Host exited with ${formatRuntimeExitReason(code, signal)}${details ? `: ${details}` : ""}`));
       }
     });
   });
-  const harnessV2StartupFailure = harnessV2Child === undefined
-    ? undefined
-    : new Promise((_, reject) => {
-        harnessV2Child.once("error", reject);
-        harnessV2Child.once("exit", (code, signal) => {
-          if (!harnessV2Child.__annaIntentionalStop) {
-            reject(new Error(
-              `Anna Harness v2 sidecar exited with ${formatRuntimeExitReason(code, signal)}${harnessV2Stderr ? `: ${harnessV2Stderr}` : ""}`,
-            ));
-          }
-        });
-      });
+
   try {
-    if (harnessV2Child !== undefined) {
-      await Promise.race([
-        waitForHealth(`${config.harnessV2ApiBase}/health`, options.healthTimeoutMs ?? 15000),
-        harnessV2StartupFailure,
-      ]);
-    }
     await Promise.race([
-      waitForHealth(`${config.apiBase}/api/health`, options.healthTimeoutMs ?? 15000),
+      waitForHealth(`${config.apiBase}/health`, options.healthTimeoutMs ?? 15000),
       startupFailure,
     ]);
     startupComplete = true;
-    writeRuntimeInfo(config, child, harnessV2Child);
+    writeRuntimeInfo(config, child);
   } catch (error) {
     await stopRuntimeService(child);
-    if (harnessV2Child !== undefined) {
-      await stopRuntimeService(harnessV2Child);
-    }
     throw error;
   }
+
   return {
     ...config,
     child,
-    harnessV2Child,
+    env: childEnv,
+    stop: () => stopRuntimeService(child),
+  };
+}
+
+/** Start the Node Product Host and, when configured, the managed business peer. */
+export async function startProductRuntimeService(config, options = {}) {
+  if (!config || !config.entryPath || !existsSync(config.entryPath)) {
+    throw new Error(`Anna Product Host entry is missing: ${config?.entryPath ?? "<unknown>"}`);
+  }
+
+  mkdirSync(config.stateRoot, { recursive: true });
+  mkdirSync(path.dirname(config.hostConfigPath), { recursive: true });
+  mkdirSync(config.workspaceRoot, { recursive: true });
+
+  let business;
+  if (config.businessManaged) {
+    business = spawnBusinessService(config, options);
+  }
+  const host = spawn(config.nodeExecutable, config.args, {
+    cwd: config.projectRoot,
+    env: {
+      ...config.hostEnv,
+      ELECTRON_RUN_AS_NODE: "1",
+    },
+    stdio: options.stdio ?? "pipe",
+  });
+  const readHostStderr = monitorChildOutput(host);
+  let hostStarted = false;
+  observeRuntimeExit(host, options, readHostStderr, () => hostStarted);
+  const hostFailure = processFailure(host, "Anna Product Host", readHostStderr, () => hostStarted);
+  const businessFailure = business === undefined
+    ? undefined
+    : processFailure(business.child, "Anna business service", () => business.stderr, () => business.started);
+  try {
+    await Promise.race([
+      waitForHealth(`${config.apiBase}/health`, options.healthTimeoutMs ?? PRODUCT_STARTUP_TIMEOUT_MS),
+      hostFailure,
+    ]);
+    hostStarted = true;
+    if (business !== undefined) {
+      await Promise.race([
+        waitForHealth(`${business.apiBase}/api/health`, options.healthTimeoutMs ?? PRODUCT_STARTUP_TIMEOUT_MS),
+        businessFailure,
+      ]);
+      business.started = true;
+    }
+    writeProductRuntimeInfo(config, host, business);
+  } catch (error) {
+    await stopRuntimeService(host);
+    await stopRuntimeService(business?.child);
+    throw error;
+  }
+
+  return {
+    ...config,
+    child: host,
+    businessChild: business?.child,
+    env: config.hostEnv,
     stop: async () => {
-      await stopRuntimeService(child);
-      if (harnessV2Child !== undefined) {
-        await stopRuntimeService(harnessV2Child);
-      }
+      await stopRuntimeService(host);
+      await stopRuntimeService(business?.child);
     },
   };
 }
 
-function spawnManagedHarnessV2(config, options) {
-  if (!existsSync(config.harnessV2EntryPath)) {
-    throw new Error(
-      `Harness v2 sidecar is not built: ${config.harnessV2EntryPath}. Run npm run harness:v2:build first.`,
-    );
-  }
-  const child = spawn(config.nodeExecutable, [config.harnessV2EntryPath], {
+// The stable process helper is the original Product Host, never the Preview-only service.
+export const startRuntimeService = startProductRuntimeService;
+
+function spawnBusinessService(config, options) {
+  const args = [
+    "-m",
+    "uvicorn",
+    "services.business_main:app",
+    "--host",
+    config.businessHost,
+    "--port",
+    String(config.businessPort),
+  ];
+  const child = spawn(config.pythonExecutable, args, {
     cwd: config.projectRoot,
-    env: {
-      ...config.env,
-      ...(path.basename(config.nodeExecutable).toLowerCase().includes("electron")
-        ? { ELECTRON_RUN_AS_NODE: "1" }
-        : {}),
-    },
+    env: config.businessEnv,
     stdio: options.stdio ?? "pipe",
   });
-  observeRuntimeExit(child, options, () => "Harness v2 sidecar exited unexpectedly");
-  return child;
+  const readStderr = monitorChildOutput(child);
+  return { child, apiBase: config.businessApiBase, get stderr() { return readStderr(); }, started: false };
 }
 
-function writeRuntimeInfo(config, child, harnessV2Child) {
-  if (!config.runtimeInfoPath) {
-    return;
-  }
+function monitorChildOutput(child, maxStderrBytes = 64 * 1024) {
+  // Always consume both pipes. Uvicorn access logs are stdout; leaving that
+  // pipe unread eventually blocks the Python event loop on a busy desktop.
+  child.stdout?.on("data", () => {});
+  let stderr = "";
+  child.stderr?.on("data", (chunk) => {
+    stderr += chunk.toString();
+    if (Buffer.byteLength(stderr, "utf8") > maxStderrBytes) {
+      stderr = stderr.slice(-maxStderrBytes);
+    }
+  });
+  return () => stderr;
+}
+
+function processFailure(child, label, readStderr, started) {
+  return new Promise((_, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (!started() && !child.__annaIntentionalStop) {
+        const details = readStderr();
+        reject(new Error(`${label} exited with ${formatRuntimeExitReason(code, signal)}${details ? `: ${details}` : ""}`));
+      }
+    });
+  });
+}
+
+function writeProductRuntimeInfo(config, host, business) {
+  if (!config.runtimeInfoPath) return;
+  mkdirSync(path.dirname(config.runtimeInfoPath), { recursive: true });
+  writeFileSync(
+    config.runtimeInfoPath,
+    JSON.stringify({
+      apiBase: config.apiBase,
+      apiHost: config.apiHost,
+      apiPort: config.apiPort,
+      pid: host.pid,
+      businessApiBase: config.businessApiBase,
+      businessPid: business?.child.pid,
+      projectRoot: config.projectRoot,
+      entryPath: config.entryPath,
+      hostConfigPath: config.hostConfigPath,
+      businessConfigPath: config.businessConfigPath,
+      stateRoot: config.stateRoot,
+      eventStorePath: config.eventStorePath,
+      sessionStorePath: config.sessionStorePath,
+      startedAt: new Date().toISOString(),
+    }, null, 2),
+  );
+}
+
+function writeRuntimeInfo(config, child) {
+  if (!config.runtimeInfoPath) return;
   mkdirSync(path.dirname(config.runtimeInfoPath), { recursive: true });
   writeFileSync(
     config.runtimeInfoPath,
@@ -310,10 +559,12 @@ function writeRuntimeInfo(config, child, harnessV2Child) {
         apiPort: config.apiPort,
         pid: child.pid,
         projectRoot: config.projectRoot,
-        runtimeConfigPath: config.runtimeConfigPath,
-        stateDbPath: config.stateDbPath,
-        harnessV2ApiBase: config.harnessV2ApiBase,
-        harnessV2Pid: harnessV2Child?.pid,
+        entryPath: config.entryPath,
+        configPath: config.configPath,
+        stateRoot: config.stateRoot,
+        workspaceRoot: config.workspaceRoot,
+        staticRoot: config.staticRoot,
+        ompRuntimeRoot: config.ompRuntimeRoot,
         startedAt: new Date().toISOString(),
       },
       null,
@@ -341,23 +592,20 @@ export async function waitForHealth(url, timeoutMs = 15000) {
   while (Date.now() < deadline) {
     try {
       const response = await fetch(url);
-      if (response.ok) {
-        return;
-      }
+      if (response.ok) return;
       lastError = new Error(`Health check failed with ${response.status}`);
     } catch (error) {
       lastError = error;
     }
     await delay(250);
   }
-  throw lastError ?? new Error("Anna runtime health check timed out");
+  throw lastError ?? new Error("Anna Preview Host health check timed out");
 }
 
 export async function stopRuntimeService(child, options = {}) {
+  if (!child) return;
   child.__annaIntentionalStop = true;
-  if (hasRuntimeExited(child)) {
-    return;
-  }
+  if (hasRuntimeExited(child)) return;
   const exitPromise = waitForRuntimeExit(child);
   child.kill("SIGTERM");
   const stopped = await waitForRuntimeExitOrTimeout(
@@ -370,18 +618,18 @@ export async function stopRuntimeService(child, options = {}) {
   }
 }
 
-export async function findFreePort() {
+export async function findFreePort(host = API_HOST) {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once("error", reject);
-    server.listen(0, API_HOST, () => {
+    server.listen(0, host, () => {
       const address = server.address();
       server.close(() => {
         if (typeof address === "object" && address?.port) {
           resolve(address.port);
           return;
         }
-        reject(new Error("Unable to allocate Anna runtime port"));
+        reject(new Error("Unable to allocate Anna Preview Host port"));
       });
     });
   });
@@ -393,12 +641,31 @@ export function parseApiBaseFromArgv(argv = process.argv) {
   return arg ? arg.slice(prefix.length) : "";
 }
 
+// Retained as a harmless parser for old renderer fixtures; Preview does not
+// inject or consume a second runtime base.
 export function parseRuntimeBaseFromArgv(
   argv = process.argv,
   prefix = "--anna-harness-v2-api-base=",
 ) {
   const arg = argv.find((item) => item.startsWith(prefix));
   return arg ? arg.slice(prefix.length) : "";
+}
+
+function parsePort(value, name) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`${name} must be a valid TCP port`);
+  }
+  return port;
+}
+
+function parseOptionalPort(value, name = "ANNA_PREVIEW_PORT") {
+  if (value === undefined || value.trim() === "") return undefined;
+  return parsePort(value, name);
+}
+
+function isLoopbackHost(host) {
+  return host === "127.0.0.1" || host === "::1" || host === "localhost";
 }
 
 function delay(ms) {
@@ -413,9 +680,7 @@ function hasRuntimeExited(child) {
 }
 
 function waitForRuntimeExit(child) {
-  if (typeof child.once !== "function") {
-    return Promise.resolve();
-  }
+  if (typeof child.once !== "function") return Promise.resolve();
   return new Promise((resolve) => {
     child.once("exit", resolve);
     child.once("error", resolve);

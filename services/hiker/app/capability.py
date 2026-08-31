@@ -140,7 +140,9 @@ class HikerCapabilityHandler:
                 self.run.id,
                 tool_call.name,
                 tool_call.arguments,
-                {**self.base_args, **tool_call.arguments},
+                # Remote actor/request identity comes from server configuration;
+                # model arguments must never be able to replace it.
+                {**tool_call.arguments, **self.base_args},
             )
         except HikerMcpError as exc:
             raise CapabilityError(exc.error_code, exc.message)

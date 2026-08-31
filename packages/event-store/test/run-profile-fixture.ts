@@ -16,10 +16,12 @@ export function resolvedRunProfileFixture(
     version?: string;
     budget?: Budget;
     memoryPolicy?: { read: "none" | "channel"; write: "disabled" | "propose" };
+    allowedTools?: readonly string[];
   } = {},
 ): ResolvedRunProfile {
   const budget = options.budget ?? { turns: 1 };
   const memoryPolicy = options.memoryPolicy ?? { read: "none" as const, write: "disabled" as const };
+  const allowedTools = options.allowedTools ?? ["read_workspace"];
   const catalog: SkillCatalogEntry[] = [{
     id: "fixture-skill",
     name: "Fixture skill",
@@ -27,11 +29,11 @@ export function resolvedRunProfileFixture(
     hash: "sha256:fixture-skill",
     provenance: { source: "test", uri: "fixture://skill" },
     content: "Read the approved fixture before responding.",
-    allowedTools: ["read_workspace"],
+    allowedTools,
     forbiddenTools: ["shell"],
   }];
   const channelPolicy: ChannelPolicy = {
-    toolPolicy: { allowedTools: ["read_workspace"] },
+    toolPolicy: { allowedTools },
     allowedSkillIds: ["fixture-skill"],
     allowedModels: [{ provider: "test", name: "fixture-model", reasoning: "low" }],
     budgetLimits: budget,
@@ -45,7 +47,7 @@ export function resolvedRunProfileFixture(
     version: "1.0.0",
     instructions: "Use the fixture policy.",
     allowedSkillIds: ["fixture-skill"],
-    allowedTools: ["read_workspace"],
+    allowedTools,
     modelPolicy: { allowedModels: channelPolicy.allowedModels },
     budgetDefaults: budget,
     artifactContract: {
@@ -60,7 +62,7 @@ export function resolvedRunProfileFixture(
     model: channelPolicy.allowedModels[0]!,
     skillIds: ["fixture-skill"],
     contextTransforms: [{ kind: "compact", preserve: ["goal"] }],
-    toolPolicy: { allowedTools: ["read_workspace"] },
+    toolPolicy: { allowedTools },
     budget,
     memoryPolicy,
     evalPolicy: { contract: "disabled", quality: "disabled" },

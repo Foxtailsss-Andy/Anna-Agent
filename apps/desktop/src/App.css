@@ -71,7 +71,7 @@
   background: linear-gradient(180deg, var(--panel, #faf9f5), var(--panel-2, #f7f6f1));
   border-inline-start: 1px solid var(--line-strong, rgb(35 35 40 / 14%));
   box-shadow: -18px 0 44px rgb(35 35 40 / 16%);
-  z-index: 60;
+  z-index: 70;
 }
 .trace-drawer__head {
   flex: none;

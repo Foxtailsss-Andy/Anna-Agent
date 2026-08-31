@@ -20,11 +20,15 @@
     "test": "vitest run && npm run harness:v2:test",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "desktop:run": "npm run build && npm run harness:v2:build && electron .",
+    "desktop:run": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && npm run harness:omp:prepare && electron .",
     "desktop:prepare-python": "node scripts/prepare-python-runtime.mjs",
-    "desktop:package": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && electron-builder --dir",
+    "harness:omp:prepare": "node scripts/ensure-omp-runtime.mjs",
+    "desktop:package": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && npm run harness:omp:prepare && electron-builder --dir",
     "desktop:smoke-asar": "electron scripts/smoke-packaged-asar.mjs",
     "frontend:smoke": "node --test tests/frontend/app_shell_smoke.mjs",
+    "frontend:product-smoke": "node --test tests/frontend/app_shell_smoke.mjs tests/frontend/product_runtime.test.mjs",
+    "frontend:preview-smoke": "node --test tests/frontend/electron_runtime.test.mjs tests/frontend/preview_desktop.test.mjs tests/frontend/preview_ui.test.mjs",
+    "preview:smoke": "node --test tests/frontend/electron_runtime.test.mjs tests/frontend/preview_desktop.test.mjs tests/frontend/preview_ui.test.mjs",
     "release:verify": "node scripts/verify-public-preview.mjs",
     "live:e2e": "node scripts/live-reimbursement-e2e.mjs",
     "live:associate": "node scripts/live-associate-e2e.mjs",
@@ -35,10 +39,10 @@
     "evidence:manifest": "node scripts/build-evidence-manifest.mjs",
     "evidence:verify": "node scripts/verify-evidence-manifest.mjs",
     "evidence:verify:all": "node scripts/verify-evidence-manifests.mjs evals/harness-v2",
-    "harness:v2:test": "npm run test --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
+    "harness:v2:test": "npm run test --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/omp-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
     "harness:v2:build": "npm run build --workspace=@anna/harness-service",
     "harness:v2:approval-bridge": "node apps/harness-service/dist/review-approval-main.js",
-    "harness:v2:typecheck": "npm run typecheck --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
+    "harness:v2:typecheck": "npm run typecheck --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/omp-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
     "harness:v2:test/typecheck": "npm run harness:v2:test && npm run harness:v2:typecheck",
     "harness:v2:canary": "npm run test --workspace=@anna/pi-loop-kernel -- --testNamePattern=live-canary"
   },
@@ -79,12 +83,21 @@
       "services/**",
       "skills/**",
       "build/python-runtime/**",
-      "pyproject.toml",
       "package.json"
     ],
     "directories": {
       "output": "release"
     },
+    "extraResources": [
+      {
+        "from": "build/omp-runtime/darwin-arm64",
+        "to": "app.asar.unpacked/build/omp-runtime/darwin-arm64"
+      },
+      {
+        "from": "build/omp-runtime/darwin-arm64/node_modules",
+        "to": "app.asar.unpacked/build/omp-runtime/darwin-arm64/node_modules"
+      }
+    ],
     "files": [
       "dist/**/*",
       "apps/desktop/electron/**/*",
@@ -93,33 +106,16 @@
       "services/**/*",
       "skills/**/*",
       "build/python-runtime/**/*",
-      "pyproject.toml",
       "package.json"
     ],
     "mac": {
       "icon": "build/icon.icns",
       "target": [
-        "dir"
-      ]
-    },
-    "win": {
-      "icon": "build/icon.ico",
-      "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "target": "dir",
+          "arch": ["arm64"]
         }
       ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Anna"
     }
   }
 }

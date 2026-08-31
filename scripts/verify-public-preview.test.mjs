@@ -17,6 +17,7 @@ test("public preview verification rejects local state, generated output, secrets
   const result = verifyPublicPreviewFiles([
     { path: ".anna/runtime.json", content: '{"model_api_key":"secret"}' },
     { path: "dist/index.html", content: "built" },
+    { path: "build/omp-runtime/darwin-arm64/manifest.json", content: "generated runtime" },
     { path: "evals/live/run.sqlite3", content: "sqlite" },
     { path: "docs/debug.md", content: `workspace: ${["", "Users", "alice", "Desktop", "Anna"].join("/")}` },
     { path: "docs/windows-debug.json", content: `{"workspace":"${["C:", "Users", "alice", "Desktop", "Anna"].join("\\\\")}"}` },
@@ -26,6 +27,7 @@ test("public preview verification rejects local state, generated output, secrets
   assert.equal(result.ok, false);
   assert.deepEqual(result.violations.map((violation) => violation.code), [
     "local_state",
+    "generated_output",
     "generated_output",
     "runtime_database",
     "absolute_path",

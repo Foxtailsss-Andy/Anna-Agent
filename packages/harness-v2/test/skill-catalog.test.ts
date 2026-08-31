@@ -104,12 +104,17 @@ test("loads every repository Agent Skill SKILL.md with stable provenance and too
       id: "chat/general-assistant",
       name: "general-assistant-chat",
       version: "0.1.0",
-      hash: "sha256:f9fe48cafea57380553ccf3a6b0ba66cb8ebbe8608cf18d4a3e41f8e786f5473",
+      hash: "sha256:420c820007d302a5b628b01389b2cfa6a148487338907e4c463731dc0beded66",
       provenance: {
         source: "workspace",
         uri: "skills/chat/general-assistant/SKILL.md",
       },
-      allowedTools: [],
+      allowedTools: [
+        "todo",
+        "chat.emit_page",
+        "chat.emit_document",
+        "workdir.read_file",
+      ],
       forbiddenTools: [
         "reimbursement.submit",
         "erp.collection_task.create_draft",
@@ -120,12 +125,13 @@ test("loads every repository Agent Skill SKILL.md with stable provenance and too
       id: "hiker/global-customer",
       name: "hiker-global-customer",
       version: "0.1.0",
-      hash: "sha256:fda5cc92bb69dce68ebfdf3cea9741ee79b932d29fad975feaf349dc08853839",
+      hash: "sha256:38f371f05d7b9541c1040fc0957a668ff33b130b184a95ae9da1e60c1be95d20",
       provenance: {
         source: "workspace",
         uri: "skills/hiker/global-customer/SKILL.md",
       },
       allowedTools: [
+        "todo",
         "hiker.system.list_capabilities",
         "hiker.system.get_current_user_context",
         "hiker.master_data.search",
@@ -151,12 +157,13 @@ test("loads every repository Agent Skill SKILL.md with stable provenance and too
       id: "reimbursement/travel-expense",
       name: "travel-expense-reimbursement",
       version: "0.1.0",
-      hash: "sha256:9d16d248cbe88aa88a9e4641cf9b161035e223d171f4614dca1fb33c22b9c4a6",
+      hash: "sha256:e8c4661712093f7f29d6de748da369266449707821f9fe4fd1d0f828993dd3de",
       provenance: {
         source: "workspace",
         uri: "skills/reimbursement/travel-expense/SKILL.md",
       },
       allowedTools: [
+        "todo",
         "reimbursement.get_capabilities",
         "reimbursement.get_policy",
         "reimbursement.validate_draft",

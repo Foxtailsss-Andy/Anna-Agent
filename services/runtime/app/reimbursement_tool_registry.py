@@ -13,6 +13,16 @@ APPROVAL_INTENT_TOOLS = frozenset({"reimbursement.submit_intent"})
 APPROVAL_ACTION_INTENT_TOOLS = frozenset(
     {"reimbursement.approve_intent", "reimbursement.reject_intent"}
 )
+READ_ONLY_TOOLS = frozenset(
+    {
+        "reimbursement.get_capabilities",
+        "reimbursement.get_policy",
+        "reimbursement.validate_draft",
+        "reimbursement.get_status",
+        "reimbursement.list_approvals",
+        "reimbursement.get_approval",
+    }
+)
 MERGEABLE_SCHEMA_KEYS = frozenset(
     {
         "minimum",
@@ -86,13 +96,25 @@ def _model_visible_tool(tool_name: str, discovered_by_name: dict[str, dict]) -> 
                 "description": _tool_description(tool_name),
                 "input_schema": input_schema,
                 "schema_source": "mcp",
+                **_tool_metadata(tool_name),
             }
     return {
         "name": tool_name,
         "description": _tool_description(tool_name),
         "input_schema": base_schema,
         "schema_source": "registry",
+        **_tool_metadata(tool_name),
     }
+
+
+def _tool_metadata(tool_name: str) -> dict[str, str]:
+    if tool_name in READ_ONLY_TOOLS:
+        return {"effect": "read", "replay_policy": "safe"}
+    if tool_name == "reimbursement.create_draft":
+        return {"effect": "business_write", "replay_policy": "never"}
+    if tool_name in APPROVAL_INTENT_TOOLS | APPROVAL_ACTION_INTENT_TOOLS:
+        return {"effect": "approval", "replay_policy": "never"}
+    raise ValueError(f"unknown reimbursement tool metadata: {tool_name}")
 
 
 def _merge_discovered_schema(

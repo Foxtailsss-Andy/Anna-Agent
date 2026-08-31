@@ -894,6 +894,335 @@ test("executes a duplicate never-replay effect key at most once across Gateway r
   ]);
 });
 
+test("executes an explicitly allowed effect through the existing durable ledger", async () => {
+  let sandboxExecutions = 0;
+  const effectResult = {
+    status: "succeeded" as const,
+    output: { artifact: "created" },
+  };
+  const events = createInMemoryEvents();
+  const gateway = expectedToolGatewayPublicApi.createToolGateway({
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never",
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow"; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        return effectResult;
+      },
+    },
+    events,
+    now: () => "2026-08-19T00:00:00.000Z",
+  });
+  const request: ToolRequest = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "---" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-allowed-effect" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: "artifact-effect-1",
+    toolCallId: "tool-call-allowed-effect-1",
+  };
+
+  await expect(gateway.execute(request, new AbortController().signal)).resolves.toEqual(effectResult);
+  const cancelledReplay = new AbortController();
+  cancelledReplay.abort();
+  await expect(gateway.execute(request, cancelledReplay.signal)).resolves.toEqual(effectResult);
+  expect(sandboxExecutions).toBe(1);
+
+  const effectEvents: CanonicalEvent[] = [];
+  for await (const event of events.read("effect:artifact-effect-1" as never)) {
+    effectEvents.push(event);
+  }
+  expect(effectEvents.map((event) => event.type)).toEqual([
+    "tool.effect.started",
+    "tool.effect.succeeded",
+  ]);
+});
+
+test("coordinates concurrent allowed effect requests without duplicate execution", async () => {
+  let sandboxExecutions = 0;
+  let releaseExecution!: () => void;
+  const executionReleased = new Promise<void>((resolve) => {
+    releaseExecution = resolve;
+  });
+  let executionStarted!: () => void;
+  const firstExecutionStarted = new Promise<void>((resolve) => {
+    executionStarted = resolve;
+  });
+  const events = createInMemoryEvents();
+  const gatewayOptions = {
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never" as const,
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow" as const; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        executionStarted();
+        await executionReleased;
+        return { status: "succeeded" as const, output: { artifact: "created" } };
+      },
+    },
+    events,
+  };
+  const request: ToolRequest = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "---" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-concurrent-allowed-effect" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: "artifact-concurrent-allowed-1",
+    toolCallId: "tool-call-concurrent-allowed-1",
+  };
+  const first = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions).execute(
+    request,
+    new AbortController().signal,
+  );
+  await firstExecutionStarted;
+  const second = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions).execute(
+    { ...request, toolCallId: "tool-call-concurrent-allowed-2" },
+    new AbortController().signal,
+  );
+  releaseExecution();
+
+  await expect(first).resolves.toEqual({ status: "succeeded", output: { artifact: "created" } });
+  await expect(second).resolves.toEqual({ status: "succeeded", output: { artifact: "created" } });
+  expect(sandboxExecutions).toBe(1);
+
+  const effectEvents: CanonicalEvent[] = [];
+  for await (const event of events.read("effect:artifact-concurrent-allowed-1" as never)) {
+    effectEvents.push(event);
+  }
+  expect(effectEvents.map((event) => event.type)).toEqual([
+    "tool.effect.started",
+    "tool.effect.succeeded",
+  ]);
+});
+
+test("rejects changed intent for an allowed effect key without re-executing", async () => {
+  let sandboxExecutions = 0;
+  const events = createInMemoryEvents();
+  const gatewayOptions = {
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never" as const,
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow" as const; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        return { status: "succeeded" as const, output: { artifact: "created" } };
+      },
+    },
+    events,
+  };
+  const firstRequest: ToolRequest = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "first" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-changed-allowed-effect" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: "artifact-changed-allowed-1",
+    toolCallId: "tool-call-changed-allowed-1",
+  };
+  const first = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions);
+  await expect(first.execute(firstRequest, new AbortController().signal)).resolves.toEqual({
+    status: "succeeded",
+    output: { artifact: "created" },
+  });
+
+  const changedRequest = {
+    ...firstRequest,
+    input: { kind: "skill", skill_id: "release-notes", preview: "changed" },
+    toolCallId: "tool-call-changed-allowed-2",
+  } as ToolRequest;
+  const second = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions);
+  await expect(second.execute(changedRequest, new AbortController().signal)).resolves.toEqual({
+    status: "failed",
+    output: { reason: "effect_key_conflict" },
+  });
+  expect(sandboxExecutions).toBe(1);
+});
+
+test("turns an orphaned allowed effect into durable unknown without replay", async () => {
+  let sandboxExecutions = 0;
+  let loseStartedAppend = true;
+  const persisted = createInMemoryEvents();
+  const events = {
+    async append(event: CanonicalEvent) {
+      await persisted.append(event);
+      if (loseStartedAppend && event.type === "tool.effect.started") {
+        loseStartedAppend = false;
+        throw new Error("effect start acknowledgement lost");
+      }
+    },
+    read: persisted.read,
+  };
+  const gatewayOptions = {
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never" as const,
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow" as const; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        return { status: "succeeded" as const, output: { artifact: "created" } };
+      },
+    },
+    events,
+  };
+  const request: ToolRequest = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "orphan" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-orphaned-allowed-effect" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: "artifact-orphaned-allowed-1",
+    toolCallId: "tool-call-orphaned-allowed-1",
+  };
+  const gatewayA = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions);
+  await expect(gatewayA.execute(request, new AbortController().signal))
+    .rejects.toThrow("effect start acknowledgement lost");
+
+  const gatewayB = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions);
+  const unknownResult = {
+    status: "unknown" as const,
+    output: {
+      reason: "effect_outcome_unknown",
+      effectKey: request.effectKey,
+    },
+  };
+  await expect(gatewayB.execute(request, new AbortController().signal)).resolves.toEqual(
+    unknownResult,
+  );
+  const gatewayC = expectedToolGatewayPublicApi.createToolGateway(gatewayOptions);
+  const cancelledReplay = new AbortController();
+  cancelledReplay.abort();
+  await expect(gatewayC.execute(request, cancelledReplay.signal)).resolves.toEqual(unknownResult);
+  expect(sandboxExecutions).toBe(0);
+
+  const effectEvents: CanonicalEvent[] = [];
+  for await (const event of persisted.read("effect:artifact-orphaned-allowed-1" as never)) {
+    effectEvents.push(event);
+  }
+  expect(effectEvents.map((event) => event.type)).toEqual([
+    "tool.effect.started",
+    "tool.effect.unknown",
+  ]);
+});
+
+test("rejects a non-string effect identity before the allowed effect dispatch", async () => {
+  let sandboxExecutions = 0;
+  const events = createInMemoryEvents();
+  const gateway = expectedToolGatewayPublicApi.createToolGateway({
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never",
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow"; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        return { status: "succeeded" };
+      },
+    },
+    events,
+  });
+  const request = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "---" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-invalid-effect-identity" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: ["invalid-array-identity"] as unknown as string,
+    toolCallId: "tool-call-invalid-effect-identity",
+  };
+
+  await expect(gateway.execute(request, new AbortController().signal)).resolves.toEqual({
+    status: "failed",
+    output: { reason: "invalid_tool_combination" },
+  });
+  expect(sandboxExecutions).toBe(0);
+  const effectEvents: CanonicalEvent[] = [];
+  for await (const event of events.read("effect:invalid-array-identity" as never)) {
+    effectEvents.push(event);
+  }
+  expect(effectEvents).toEqual([]);
+});
+
+test("does not dispatch an allowed effect when its signal is already cancelled", async () => {
+  let sandboxExecutions = 0;
+  const events = createInMemoryEvents();
+  const gateway = expectedToolGatewayPublicApi.createToolGateway({
+    catalog: [{
+      name: "create_artifact",
+      replayPolicy: "never",
+      inputSchema: { parse(input: unknown) { return input; } },
+    }],
+    scope: defaultScope,
+    workerProfileId: defaultWorkerProfileId,
+    policy: { async decide() { return "allow"; } },
+    sandbox: {
+      async execute() {
+        sandboxExecutions += 1;
+        return { status: "succeeded", output: { mustNotWrite: true } };
+      },
+    },
+    events,
+  });
+  const request: ToolRequest = {
+    name: "create_artifact",
+    input: { kind: "skill", skill_id: "release-notes", preview: "---" },
+    workspaceId: defaultScope.workspaceId,
+    channelId: defaultScope.channelId,
+    runId: "run-cancelled-effect" as never,
+    workerProfileId: defaultWorkerProfileId,
+    effectKey: "artifact-cancelled-1",
+    toolCallId: "tool-call-cancelled-effect",
+  };
+  const controller = new AbortController();
+  controller.abort();
+
+  await expect(gateway.execute(request, controller.signal)).resolves.toEqual({
+    status: "failed",
+    output: { reason: "cancelled" },
+  });
+  expect(sandboxExecutions).toBe(0);
+  const effectEvents: CanonicalEvent[] = [];
+  for await (const event of events.read("effect:artifact-cancelled-1" as never)) {
+    effectEvents.push(event);
+  }
+  expect(effectEvents.map((event) => event.type)).toEqual([
+    "tool.effect.started",
+    "tool.effect.cancelled",
+  ]);
+});
+
 test("does not let safe replay policy bypass effect-key deduplication", async () => {
   let sandboxExecutions = 0;
   const succeededResult = {

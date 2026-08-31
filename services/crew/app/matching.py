@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 EMIT_TOOL: dict[str, Any] = {
     "name": "crew.emit_assignments",
+    "effect": "proposal",
+    "replay_policy": "safe",
     "description": (
         "Emit the assignment plan: for each unassigned task, pick the best-fit "
         "team member. Call this once with the complete assignments."
@@ -155,6 +157,9 @@ class CrewMatchingService:
         members: list[Account],
     ) -> list[AssignmentProposal]:
         """Propose assignees: call model to override deterministic baseline."""
+        bind_scope = getattr(self.harness_runtime, "bind_scope", None)
+        if callable(bind_scope):
+            bind_scope(project.id, project.workspace_id, project.owner_user_id)
         # Start from deterministic baseline — guarantees full coverage
         baseline = deterministic_proposals(project, members)
         baseline_by_key = {p.task_key: p for p in baseline}

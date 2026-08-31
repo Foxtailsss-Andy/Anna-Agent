@@ -255,3 +255,194 @@ def assemble_trace(
         }
 
     return {"trace_id": run_id, "surface": surface, "spans": [serialize(s) for s in spans]}
+
+
+def assemble_host_trace(
+    run_id: str,
+    surface: str,
+    events: list[dict[str, Any]],
+    *,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """Project canonical OMP Host events through the existing TraceDoc assembler.
+
+    The product API receives canonical Host events rather than the legacy chat
+    journal frames consumed by :func:`assemble_trace`. Keep one TraceDoc shape
+    by translating only the lifecycle vocabulary at this boundary; all values
+    (model, tool name, timestamps, and usage) come from Host evidence.
+    """
+    return assemble_trace(
+        run_id,
+        surface,
+        _host_trace_rows(events),
+        conversation_id=conversation_id,
+    )
+
+
+def _host_trace_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    usage_by_request: dict[int, dict[str, Any]] = {}
+    for event in events:
+        if event.get("type") != "run.usage.updated":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        request_index = _host_request_index(payload)
+        cumulative = payload.get("cumulative")
+        if request_index is not None and isinstance(cumulative, dict):
+            usage_by_request[request_index] = cumulative
+
+    rows: list[dict[str, Any]] = []
+    tool_names: dict[str, str] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            continue
+        payload = event.get("payload")
+        payload = payload if isinstance(payload, dict) else {}
+        timestamp = _host_timestamp(event)
+
+        if event_type == "run.model.requested":
+            _append_host_event(
+                rows,
+                "model.call.started",
+                {
+                    "model_name": payload.get("model"),
+                    "request_index": payload.get("requestIndex"),
+                },
+                timestamp,
+            )
+            continue
+
+        if event_type == "omp.model.response":
+            message = payload.get("message")
+            message = message if isinstance(message, dict) else {}
+            response_payload: dict[str, Any] = {
+                "finish_reason": message.get("stopReason"),
+                **_host_usage_payload(
+                    message.get("usage") if isinstance(message.get("usage"), dict) else None,
+                    usage_by_request.get(_host_request_index(payload)),
+                ),
+            }
+            _append_host_event(rows, "model.call.completed", response_payload, timestamp)
+            continue
+
+        if event_type == "omp.tool.dispatch":
+            call_id = _host_call_id(payload)
+            name = payload.get("tool") or payload.get("tool_name") or "unknown"
+            if isinstance(call_id, str) and isinstance(name, str):
+                tool_names[call_id] = name
+            _append_host_frame(
+                rows,
+                {"type": "tool_start", "name": str(name), "call_id": call_id},
+                timestamp,
+            )
+            continue
+
+        if event_type == "omp.tool.response":
+            call_id = _host_call_id(payload)
+            result = payload.get("result")
+            result = result if isinstance(result, dict) else {}
+            name = tool_names.get(call_id or "", "unknown")
+            status = result.get("status")
+            if status != "succeeded":
+                _append_host_event(
+                    rows,
+                    "mcp.tool.called",
+                    {"status": status or "unknown", "tool_name": name},
+                    timestamp,
+                )
+            _append_host_frame(rows, {"type": "tool_done", "name": name}, timestamp)
+            continue
+
+        terminal_frame = {
+            "run.completed": "done",
+            "run.failed": "error",
+            "run.timed_out": "exhausted",
+            "run.cancelled": "error",
+            "run.awaiting_input": "awaiting_approval",
+            "run.awaiting_approval": "awaiting_approval",
+        }.get(event_type)
+        if terminal_frame is not None:
+            frame: dict[str, Any] = {"type": terminal_frame}
+            if event_type in {"run.failed", "run.cancelled", "run.timed_out"}:
+                error_code = payload.get("error_code") or payload.get("errorType")
+                if isinstance(error_code, str) and error_code:
+                    frame["error_code"] = error_code
+            _append_host_frame(rows, frame, timestamp)
+            continue
+
+        # Preserve non-lifecycle events as span events. The existing assembler
+        # applies the scalar-only attribute rule and keeps their timestamps.
+        _append_host_event(rows, event_type, payload, timestamp)
+    return rows
+
+
+def _append_host_event(
+    rows: list[dict[str, Any]],
+    event_type: str,
+    payload: dict[str, Any],
+    timestamp: str | None,
+) -> None:
+    event = {"type": event_type, "payload": payload}
+    if timestamp is not None:
+        event["created_at"] = timestamp
+    frame: dict[str, Any] = {"type": "event", "event": event}
+    if timestamp is not None:
+        frame["ts"] = timestamp
+    rows.append({"frame": frame, **({"created_at": timestamp} if timestamp is not None else {})})
+
+
+def _append_host_frame(
+    rows: list[dict[str, Any]], frame: dict[str, Any], timestamp: str | None
+) -> None:
+    if timestamp is not None:
+        frame["ts"] = timestamp
+    rows.append({"frame": frame, **({"created_at": timestamp} if timestamp is not None else {})})
+
+
+def _host_timestamp(event: dict[str, Any]) -> str | None:
+    for key in ("timestamp", "created_at", "ts"):
+        value = event.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_request_index(payload: dict[str, Any]) -> int | None:
+    value = payload.get("requestIndex")
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _host_call_id(payload: dict[str, Any]) -> str | None:
+    for key in ("toolCallId", "tool_call_id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _host_usage_payload(
+    direct: dict[str, Any] | None,
+    cumulative: dict[str, Any] | None,
+) -> dict[str, Any]:
+    source = direct if isinstance(direct, dict) else cumulative
+    if not isinstance(source, dict):
+        return {}
+    payload: dict[str, Any] = {}
+    for source_keys, target in (
+        (("input", "input_tokens"), "input_tokens"),
+        (("output", "output_tokens"), "output_tokens"),
+    ):
+        for key in source_keys:
+            value = source.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                payload[target] = value
+                break
+    return payload

@@ -33,9 +33,9 @@ from services.runtime.app.engine.query_engine import (
 )
 from services.runtime.app.event_stream import AuditFrameWatermark
 from services.runtime.app.interjections import pop_interjection
-from services.runtime.app.model_provider import OpenAICompatibleModelProvider
+from services.runtime.app.model_provider import ModelRequest, OpenAICompatibleModelProvider
 from services.runtime.app.run_store import RunStore
-from services.runtime.app.skill_loader import SkillLoader, SkillLoaderError
+from services.runtime.app.skill_loader import LoadedSkill, SkillLoader, SkillLoaderError
 from services.runtime.app.workdir_store import (
     resolve_valid_workdir,
     workdir_system_context,
@@ -141,6 +141,17 @@ class _EvaluationCarry:
 
     last_messages: list[dict[str, Any]] | None = None
     rounds_started: bool = False
+
+
+@dataclass(frozen=True)
+class ChatHostInputs:
+    """Resolved, model-free Chat inputs handed to the Node Host."""
+
+    request: ModelRequest
+    skill: LoadedSkill
+    skill_id: str
+    agent_directive: str | None
+    workdir_root: str | None
 
 
 class ChatOrchestrator(BaseOrchestrator):
@@ -864,6 +875,47 @@ class ChatOrchestrator(BaseOrchestrator):
         )
         engine = self._engine_for(run.model_profile_id, resolved_settings)
         return handler, config, engine
+
+    def build_host_inputs(self, run: ChatRun) -> ChatHostInputs:
+        """Resolve Chat context/tools for a model-free Product Host task.
+
+        This reuses the normal Chat capability constructor but deliberately
+        stops before model preflight or the Python engine loop. The Node Host
+        remains the sole model/tool-loop authority in product mode.
+        """
+        handler = self.build_host_capability(run)
+        return ChatHostInputs(
+            request=handler.build_initial_request(),
+            skill=handler.skill,
+            skill_id=handler.chat_skill_id,
+            agent_directive=handler.boss_directive,
+            workdir_root=handler.workdir_root,
+        )
+
+    def build_host_capability(self, run: ChatRun) -> ChatCapabilityHandler:
+        """Build the resolved Chat capability without starting the Python loop."""
+        skill_id = run.skill_id or self.settings.chat_skill_id
+        skill = self.skill_loader.load(skill_id)
+        if not any(event.type == "skill.loaded" for event in run.audit_events):
+            self._record_skill_loaded(run, skill)
+        template = self._template(run.template_id)
+        workdir_context_text, workdir_root = self._workdir_injection(run)
+        directive = self.settings.agent_directive(run.agent_id or "chat")
+        handler = ChatCapabilityHandler(
+            skill=skill,
+            run=run,
+            tool_registry=self.tool_registry,
+            audit=self.audit,
+            hash_payload=self._hash_payload,
+            chat_skill_id=skill_id,
+            template_label=template.label if template else "通用对话",
+            template_instruction=template.prompt if template else "直接回答用户问题。",
+            boss_directive=directive,
+            workdir_context_text=workdir_context_text,
+            workdir_root=workdir_root,
+            history_messages=self._thread_history_messages(run),
+        )
+        return handler
 
     def _workdir_injection(self, run: ChatRun) -> tuple[str | None, str | None]:
         """B2:解析 run.workdir_id → ``(system 上下文文本, 根目录)``。

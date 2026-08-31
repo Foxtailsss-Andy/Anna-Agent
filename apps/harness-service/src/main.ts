@@ -1,54 +1,67 @@
-import { createLiveHarnessV2Runtime } from "./production";
-import { startHarnessService } from "./index";
-import { startReviewApprovalService } from "./review-approval";
+import { randomUUID } from "node:crypto";
 
-const localApproval = process.env.ANNA_HARNESS_V2_APPROVAL_BRIDGE_ENABLED === "1"
-  ? await startReviewApprovalService({
-      ownerId: requiredEnv("ANNA_T07_LIVE_OWNER_ID"),
-      storePath: process.env.ANNA_HARNESS_V2_APPROVAL_STORE_PATH
-        ?? ".anna/state/review-approval.jsonl",
-      port: parsePort(process.env.ANNA_HARNESS_V2_APPROVAL_PORT),
-    })
-  : undefined;
+import { createLiveHarnessV2Runtime } from "./production";
+import { ProductSessionStore, productSurfaces } from "./product-session";
+import { startProductHost } from "./product-facade";
+import { readProductConfig } from "./product-config";
+
+const serviceToken = process.env.ANNA_HARNESS_SERVICE_TOKEN?.trim() || randomUUID();
+const hostConfigPath = process.env.ANNA_HARNESS_HOST_CONFIG_PATH?.trim()
+  || process.env.ANNA_RUNTIME_CONFIG_PATH?.trim();
+const businessOrigin = process.env.ANNA_HARNESS_BUSINESS_ORIGIN?.trim();
+const sessionStore = new ProductSessionStore(process.env.ANNA_HARNESS_SESSION_STORE_PATH);
+const hostConfig = await readProductConfig(hostConfigPath);
+const modelProfiles = modelProfilesFromConfig(hostConfig);
+const agentDirectives = agentDirectivesFromConfig(hostConfig);
 
 let live: Awaited<ReturnType<typeof createLiveHarnessV2Runtime>> | undefined;
-let service!: Awaited<ReturnType<typeof startHarnessService>>;
+let service!: Awaited<ReturnType<typeof startProductHost>>;
 try {
   live = await createLiveHarnessV2Runtime({
-    ...(localApproval === undefined
+    ...(hostConfigPath === undefined ? {} : { runtimeConfigPath: hostConfigPath }),
+    ...(process.env.ANNA_HARNESS_HOST_EVENT_STORE_PATH === undefined
       ? {}
-      : {
-          reviewApprovalOrigin: localApproval.url,
-          reviewOwnerId: process.env.ANNA_T07_LIVE_OWNER_ID,
-        }),
+      : { eventStorePath: process.env.ANNA_HARNESS_HOST_EVENT_STORE_PATH }),
+    ...(process.env.ANNA_HARNESS_HOST_WORKSPACE_ROOT === undefined
+      ? {}
+      : { workspaceRoot: process.env.ANNA_HARNESS_HOST_WORKSPACE_ROOT }),
+    ...(process.env.ANNA_HARNESS_OMP_RUNTIME_ROOT === undefined
+      ? {}
+      : { ompRuntimeRoot: process.env.ANNA_HARNESS_OMP_RUNTIME_ROOT }),
+    requireOmp: true,
+    allowUnconfigured: true,
+    surfaces: ["chat", "create", "hiker", "reimbursement", "crew", "hub"],
+    ...(businessOrigin === undefined ? {} : {
+      businessOrigin,
+      businessServiceToken: process.env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN ?? serviceToken,
+    }),
+    productTaskFor: async (runId: string) => (await sessionStore.get(runId))?.task,
+    productTaskPeek: (runId: string) => sessionStore.peek(runId)?.task,
+    modelProfiles,
+    agentDirectives,
   });
-  const port = parsePort(process.env.ANNA_HARNESS_V2_PORT);
-  const host = process.env.ANNA_HARNESS_V2_HOST ?? "127.0.0.1";
-  service = await startHarnessService({
+  service = await startProductHost({
     runtime: live.runtime,
     eventStore: live.eventStore,
-    host,
-    port,
-    ...(live.createActivation === undefined
-      ? {}
-      : { createActivation: live.createActivation }),
+    host: process.env.ANNA_HARNESS_HOST ?? "127.0.0.1",
+    port: parsePort(process.env.ANNA_HARNESS_HOST_PORT),
+    staticRoot: process.env.ANNA_HARNESS_HOST_STATIC_ROOT,
+    runtimeConfigPath: hostConfigPath,
+    serviceToken,
+    sessionStore,
+    ...(businessOrigin === undefined ? {} : { businessOrigin }),
+    businessServiceToken: process.env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN,
   });
 } catch (error) {
-  live?.close();
-  await localApproval?.close();
+  await live?.close();
   throw error;
 }
 
-process.stdout.write(JSON.stringify({
-  status: "ready",
-  url: service.url,
-  ...(localApproval === undefined ? {} : { approvalUrl: localApproval.url }),
-}) + "\n");
+process.stdout.write(JSON.stringify({ status: "ready", url: service.url, surfaces: [...productSurfaces] }) + "\n");
 
 const shutdown = async () => {
   await service.close();
-  live?.close();
-  await localApproval?.close();
+  await live?.close();
 };
 
 process.once("SIGINT", () => void shutdown().then(() => process.exit(0)));
@@ -65,8 +78,31 @@ function parsePort(value: string | undefined): number | undefined {
   return port;
 }
 
-function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required`);
-  return value;
+function modelProfilesFromConfig(config: Record<string, unknown>): Record<string, {
+  model_name: string;
+  endpoint?: string;
+  api_key?: string;
+}> {
+  if (!Array.isArray(config.model_profiles)) return {};
+  const profiles: Record<string, { model_name: string; endpoint?: string; api_key?: string }> = {};
+  for (const item of config.model_profiles) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) continue;
+    const profile = item as Record<string, unknown>;
+    if (typeof profile.id !== "string" || typeof profile.model_name !== "string" || profile.model_name.trim() === "") continue;
+    profiles[profile.id] = {
+      model_name: profile.model_name.trim(),
+      ...(typeof profile.endpoint === "string" && profile.endpoint.trim() !== "" ? { endpoint: profile.endpoint.trim() } : {}),
+      ...(typeof profile.api_key === "string" && profile.api_key.trim() !== "" ? { api_key: profile.api_key } : {}),
+    };
+  }
+  return profiles;
+}
+
+function agentDirectivesFromConfig(config: Record<string, unknown>): Record<string, string> {
+  if (typeof config.agent_directives !== "object" || config.agent_directives === null || Array.isArray(config.agent_directives)) return {};
+  return Object.fromEntries(
+    Object.entries(config.agent_directives)
+      .filter((entry): entry is [string, string] => typeof entry[0] === "string" && typeof entry[1] === "string" && entry[1].trim() !== "")
+      .map(([key, value]) => [key, value.trim()]),
+  );
 }

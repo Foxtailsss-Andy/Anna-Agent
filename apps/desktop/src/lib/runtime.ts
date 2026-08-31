@@ -8,6 +8,8 @@ declare global {
   interface Window {
     __ANNA_RUNTIME__?: {
       apiBase?: string;
+      mode?: "product" | "preview";
+      /** Legacy renderer surface; the default Preview preload does not set it. */
       v2ApiBase?: string;
       harnessV2ApiBase?: string;
       /** Electron 主进程重启运行时(preload 注入);浏览器 dev 环境缺席 */
@@ -25,19 +27,20 @@ export function apiBase(): string {
   return base.replace(/\/$/, '');
 }
 
+export function apiUrl(path: string): string {
+  return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/** Kept for legacy source modules that are not mounted by the Preview app. */
 export function v2ApiBase(): string {
   const injected = typeof window !== "undefined"
     ? window.__ANNA_RUNTIME__?.v2ApiBase ?? window.__ANNA_RUNTIME__?.harnessV2ApiBase
     : undefined;
   const env = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_ANNA_V2_API_BASE;
-  const base = injected ?? env ?? "";
-  return base.replace(/\/$/, "");
+  return (injected ?? env ?? "").replace(/\/$/, "");
 }
 
-export function apiUrl(path: string): string {
-  return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
-}
-
+/** Kept for legacy source modules that are not mounted by the Preview app. */
 export function v2ApiUrl(path: string): string {
   return `${v2ApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }

@@ -5,6 +5,7 @@ version: 0.1.0
 owner: Anna
 domain: reimbursement
 allowed_tools:
+  - todo
   - reimbursement.get_capabilities
   - reimbursement.get_policy
   - reimbursement.validate_draft

@@ -155,6 +155,18 @@ def test_assistant_react_happy_path():
     assert run.agent_message == run.answer
 
 
+def test_assistant_run_ids_are_unique_across_orchestrator_restarts():
+    first_process = _orchestrator()
+    restarted_process = _orchestrator()
+
+    first = first_process.begin_assistant_run("ws_demo", "admin", "第一问")
+    second = restarted_process.begin_assistant_run("ws_demo", "admin", "第二问")
+
+    assert first.id.startswith("hiker_assistant_run_")
+    assert second.id.startswith("hiker_assistant_run_")
+    assert first.id != second.id
+
+
 def test_assistant_audit_trail_matches_old_loop_order():
     orchestrator = _assistant_orchestrator(FakeGateway(), HikerAssistantStream())
 

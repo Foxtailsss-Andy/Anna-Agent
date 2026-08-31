@@ -332,7 +332,7 @@ button.ir-insp-chip:hover { background: var(--tint); }
 .ir-insp-picker__cur { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); }
 
 /* ---------------- 任务抽屉(480 右滑 · 1h) ---------------- */
-.ir-insp-drawer-layer { position: fixed; inset: 0; z-index: 55; }
+.ir-insp-drawer-layer { position: fixed; inset: 0; z-index: 70; }
 .ir-insp-scrim { position: absolute; inset: 0; background: rgba(20, 20, 24, 0.06); animation: irInspFade 240ms ease; }
 .ir-insp-scrim--light { background: rgba(20, 20, 24, 0.04); }
 .ir-insp-drawer {
