@@ -2,6 +2,10 @@
 
 ![Anna。Chat、Workflows、Associate。A Governed AI Agent for Enterprise Work。](docs/public/assets/anna-readme-banner-v2.png)
 
+> **2026 年 9 月 5 日 · Anna 新的更新即将上线**
+>
+> 随着 [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra) 的发布，我们正借助 Codex 中的 Astra，集中排查和修复 Anna 底层存在的问题，持续优化架构与运行稳定性。目前这项工作正在进行中，具体改动与验证结果会随下一次更新一同公布。感谢大家关注这个个人项目，也欢迎继续分享反馈。
+
 Anna 是一个受治理、local-first 桌面 AI Agent，产品由 **Home、Cowork、Crew** 三大模块组成。本分支保留原有产品，将 Agent 执行迁移到单一 Node Harness Host 与实际 Oh-my-Pi Loop。
 
 - **Home：** 个人对话、任务执行，以及共享工作界面中的 Skill、Prompt、Python Tool 产物创建。
@@ -15,6 +19,21 @@ Anna 是一个受治理、local-first 桌面 AI Agent，产品由 **Home、Cowor
 此前版本：[`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)，发布于默认 Harness 切换之前。
 
 [English](README.md) | [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary) | [产品演示](#产品演示) | [快速开始](#快速开始) | [可以体验什么](#可以体验什么) | [架构](#anna-如何推进工作)
+
+## 认识 Anna：你的 Codex 小伙伴
+
+戴着鸢尾花、穿着米白上衣和紫色长裙的 Anna，现在也有了自己的桌面小宠物形象。欢迎把她带到 Codex 中，陪你一起工作。
+
+<p align="center">
+  <img src="docs/public/assets/anna-pet/anna.png" width="192" height="208" alt="Anna Codex 小宠物：从发布素材截取的静态形象" />
+  <img src="docs/public/assets/anna-pet/waving.gif" width="192" height="208" alt="Anna Codex 小宠物挥手动画" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/Foxtailsss-Andy/Anna-Agent/releases/download/anna-pet-v1.0.0/anna-codex-pet-v1.0.0.zip"><strong>下载 Anna Codex 小宠物</strong></a> · <a href="pets/README.md#中文安装说明">安装说明</a> · <a href="pets/anna-iris">宠物源文件</a>
+</p>
+
+*以上为共享宠物素材的静态截图与动画预览。包含 9 组动作和 16 个视线方向，需要支持自定义 v2 宠物的桌面版本。*
 
 ## 产品演示
 
