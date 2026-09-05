@@ -2,23 +2,44 @@
 
 ![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner-v2.png)
 
+**An AI companion for personal tasks, business workflows, and project collaboration.**
+
+Anna is a personal open-source project exploring how an AI agent can carry work from a conversation through to a reviewable result. The local-first desktop app brings tasks, connected business systems, and collaboration together in **Home, Cowork, and Crew**.
+
+The aim is to keep the work understandable: what Anna is doing, which tools she can use, what needs your decision, and where the result came from.
+
+**Developer Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+
+[中文](README.zh-CN.md) · [Explore Anna](#what-you-can-explore) · [Quick start](#quick-start) · [Current status](#current-status) · [Codex pet](#meet-anna-your-codex-companion) · [Development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
+
 > **September 5, 2026 · The next Anna update is coming soon**
 >
 > With the release of [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), we're working with Astra in Codex to investigate and fix underlying issues in Anna, with a focus on architecture and runtime reliability. This work is in progress; we'll share the changes and validation results with the next update. Thank you for following this personal project and sharing your feedback.
 
-Anna is a governed, local-first desktop AI agent organized around **Home, Cowork, and Crew**. This branch preserves the existing product while moving Agent execution into one Node Harness Host and the actual Oh-my-Pi loop.
+## What you can explore
 
-- **Home:** personal conversations, task execution, and creation of Skills, prompts, and Python-tool artifacts in the original shared work surface.
-- **Cowork:** business dashboards, Hiker MCP assistance, and existing reimbursement workflows.
-- **Crew:** project graphs, channels, contextual Anna, specialist Workers, artifacts, review, and confirmed project Memory.
+| Workspace | When to use it | What you can do |
+| --- | --- | --- |
+| **Home** | Work through a personal task or create a reusable resource. | Bring files into a conversation, follow the task plan, inspect tool activity, and review documents or Prompt artifacts. Skill and Python Tool creation are also part of the interface. |
+| **Cowork** | Work with information from a connected business system. | View business dashboards, ask the Hiker assistant about available data, and access existing reimbursement workflows. Connector permissions determine the available operations. |
+| **Crew** | Coordinate a project with people and specialist Workers. | Organize tasks and dependencies on a project graph, add context in channels, assign work, and review or return versioned artifacts for rework. |
 
-The migration replaces Agent execution authority, while retaining business state machines, interfaces, and data. Python may serve identity, business storage, and connectors without model credentials or a legacy Agent loop. Integration and live acceptance are tracked separately; a passing unit test does not establish product readiness.
+Home includes execution controls, history, files, and Trace inspection. Crew keeps project context, task discussions, artifacts, and review decisions connected, so a result can be followed back to the work that produced it.
 
-**Current branch: [Harness Product-Parity Goal](docs/product/anna-harness-product-parity-goal-2026-08-31.md)** | macOS arm64 | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+## Product walkthrough
 
-Earlier release: [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0), before the default Harness cutover.
+![Anna product tour across the Create page, Cowork Hiker dashboard, and Crew workflow](docs/public/assets/demos/anna-product-tour.gif)
 
-[中文](README.zh-CN.md) | [Development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary) | [Product walkthrough](#product-walkthrough) | [Quick start](#quick-start) | [What you can explore](#what-you-can-explore) | [Architecture](#how-work-moves-through-anna)
+*Create, Cowork, and Crew in one loop. The walkthrough illustrates the interface; the Hiker dashboard uses synthetic data. Live model and connector validation is documented separately below.*
+
+<details>
+<summary>Inside a Crew artifact review</summary>
+
+![Anna artifact reader with an inline design review](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
+
+A deliverable, its source task, the project channel, and the review decision stay connected in one workspace.
+
+</details>
 
 ## Meet Anna, your Codex companion
 
@@ -35,192 +56,95 @@ Anna's iris flower, ivory blouse, and purple skirt now come as a little desktop 
 
 *A still capture and animation from the shared pet artwork. Includes 9 animation states and 16 look directions; requires desktop support for custom v2 pets.*
 
-## Product walkthrough
+## Current status
 
-The walkthrough records the existing product design retained by the migration. It is not evidence of a live Harness or Hiker run.
+Anna is in active development. The current source is intended for developers and contributors exploring the project.
 
-![Anna product tour across the Create page, Cowork Hiker dashboard, and Crew workflow](docs/public/assets/demos/anna-product-tour.gif)
+| Area | Status |
+| --- | --- |
+| **Current `main`** | Home, Cowork, and Crew use a shared Node Harness Host with the Oh-my-Pi model/tool loop. Architecture and reliability improvements are ongoing. |
+| **Recorded live validation** | Home document generation, Prompt creation, Stop, and next-turn context; Crew Worker delivery, review/rework, and contextual Anna; Hiker dashboard reads and an Agent capability query. See the [August 31–September 1 validation record](docs/superpowers/handoff/2026-08-31-harness-product-parity.md) for scope and remaining gates. |
+| **External business operations** | The Hiker service used for that validation exposed read tools. Authorized write and read-back acceptance remain blocked on the service exposing the required capability. |
+| **Desktop distribution** | Validation currently targets macOS arm64. The local application build is unsigned and unnotarized; Windows/Linux release acceptance remains open. |
+| **Application releases** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) predates the current Harness execution path. The Codex pet has its own asset release. |
 
-*One loop across three surfaces: the Create page before a task starts, the complete Cowork Hiker customer-and-contract dashboard, and the Crew workflow canvas. The Hiker view uses synthetic fixture data and contains no real service response, credentials, or business data.*
+Production readiness, exhaustive recovery coverage, and benchmark results remain outside the current release claims. CI checks, interface demos, and live external-service runs provide different evidence; the [current acceptance goals](docs/product/anna-harness-product-parity-goal-2026-08-31.md) track those boundaries.
 
 ## Quick start
 
-Requirements:
-
-- Node.js `>=22.19.0`
-- Python 3.12 and `uv` for the managed business adapter
-- macOS arm64, the current desktop validation target
+Requirements: **macOS arm64**, **Node.js ≥22.19.0**, **Python 3.12**, and **uv**.
 
 ```bash
+git clone https://github.com/Foxtailsss-Andy/Anna-Agent.git
+cd Anna-Agent
 npm ci
 uv sync --locked --extra dev
 ANNA_OMP_BUN_ARCHIVE_URL=https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip npm run harness:omp:prepare
 npm run desktop:run
 ```
 
-Configure the provider and business connectors locally. Model credentials belong to the Node Host; the Python business adapter receives only its business configuration. Keep configuration and application state outside any Agent-readable workdir.
+To run Agent tasks, configure your model provider locally; business features also require their connector configuration. The current documented model setup uses DeepSeek through an OpenAI-compatible transport.
 
-Prepare the fixed Bun/OMP runtime once per fresh checkout. A worker source change requires a newly bound runtime. The launcher must not fall back to the old Python or Pi Agent loop. See [DEVELOPMENT.md](DEVELOPMENT.md) for configuration, state isolation, and validation.
-
-## What you can explore
-
-| Surface | What it demonstrates |
-| --- | --- |
-| **Home** | Chat/Create, shared LoopCard, workdirs, files/canvas, history, execution controls, and Trace. |
-| **Cowork** | Deterministic Hiker dashboards, an Agent assistant, and existing business approval workflows. |
-| **Crew** | Graph x Channel x Memory, assignment, Worker execution, artifact versions, review, and Showcase. |
-| **Harness** | OMP model/tool iteration with Host-owned context, permissions, Memory, canonical events, and Eval. |
-
-This update brings the preserved product onto the new execution path:
-
-- **Home:** Chat/Create tasks can run through verified OMP with the configured DeepSeek model, using native Todo, scoped tools, Stop, Trace, durable next-turn context, and reviewable artifacts.
-- **Cowork:** Hiker dashboards and the Agent assistant share the Harness path. The current connected service supports scoped reads; writes still depend on server capability and approval.
-- **Crew:** Contextual Anna and specialist Workers can use project and channel context to draft tasks, produce artifacts, and enter the existing review and rework flow.
-- **Harness:** The Node Host and OMP own model/tool iteration, Memory loading, canonical events, and Eval. Python remains a model-less business and connector adapter.
-
-Each surface is subject to the current Goal's live acceptance gates. Deterministic tests and demonstration fixtures are not evidence of a live provider or external business operation.
-
-## Channels and business systems
-
-These workflows are part of the product-preservation contract.
-
-Channels are Anna's collaboration layer. A channel keeps people, Anna, and specialist Agents aligned around the same tasks, active Runs, artifacts, mentions, review decisions, and project history. A message can add context, steer an active execution, request a person or Agent, or return the team to the exact task and artifact under discussion.
-
-MCP is Anna's external-system boundary. Anna can use MCP connectors to retrieve operational data, inspect records, and invoke business operations in ERP or other enterprise systems. Read access stays scoped; external writes retain permission checks, human approval, idempotency, read-back verification, and audit evidence when the connected workflow supports them.
+Follow [DEVELOPMENT.md](DEVELOPMENT.md) for configuration paths, state isolation, and troubleshooting. Keep model credentials, connector secrets, and runtime state outside the Agent-readable task workspace. External model providers and connectors receive the requests you configure; local-first describes where the desktop app and its state run.
 
 ## How work moves through Anna
 
-The Agent path is `Home / Cowork / Crew -> product adapter -> Node Harness Host -> actual OMP -> Host model transport / ToolGateway -> Contract Eval -> terminal event`. Business CRUD and connector operations retain their existing domain services. Agent history, Memory loading, and model/tool authority belong to the Harness.
-
-The product workflow retains explicit approval and review boundaries:
+Anna's shared execution layer is the **Harness**. It manages task context, permissions, durable events, and execution outcomes across the three workspaces.
 
 ```mermaid
 flowchart LR
-    A[Request] --> B[Run]
-    B --> C[Context + Skill]
-    C --> D[Model / Tool / MCP]
-    D --> E{Approval needed?}
-    E -->|yes| F[Wait / Review]
-    E -->|no| G[Artifact]
-    F --> G
-    G --> H[Trace + Eval]
-    H --> I[Continue / Rework / Deliver]
+    UI[Home / Cowork / Crew] --> Host[Harness Host]
+    Host --> OMP[Oh-my-Pi model/tool loop]
+    OMP --> Gateway[Tool Gateway / MCP]
+    Gateway --> OMP
+    Host --> Result[Artifacts / Trace / Eval]
 ```
 
-The shared runtime is organized around three durable foundations:
+- **Context and Memory:** the Host loads authorized task and channel context; confirmed Memory is distinct from a proposed memory candidate.
+- **Tools and permissions:** the Tool Gateway applies schema, scope, approval, and effect-recording rules. External actions depend on the connected service and granted permissions.
+- **Execution history:** canonical events link model calls, tool results, and terminal states to artifacts and Trace/Eval records.
+- **Business integration:** Python retains identity, business data, state machines, and connectors. Agent execution belongs to the Node Host and Oh-my-Pi.
 
-- **Identity:** workspace, user, channel, and permission scope;
-- **Judgment:** an explicit decision to continue, wait, request information, or finish;
-- **Memory:** a controlled distinction between task context, candidate memory, and confirmed business memory.
+See the [architecture terminology](CONTEXT.md) and [current implementation scope](docs/product/anna-harness-product-parity-goal-2026-08-31.md) for the contracts behind this design.
 
-When configuration is missing or a connector is unavailable, the state remains visible and recoverable. Anna does not convert an unavailable dependency into a successful result.
+## Build with us
 
-## Crew
+Useful contributions start with a concrete task: what you tried, what you expected, and what actually happened. Reproducible failures, interaction feedback, connector improvements, and documentation fixes are welcome.
 
-Crew turns multi-person work from a message stream into an observable project graph:
+- [Report an issue](https://github.com/Foxtailsss-Andy/Anna-Agent/issues) with reproduction steps and sanitized evidence.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) and choose a scoped item from the [community backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md).
+- Follow the [development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary) for the decisions, setbacks, and lessons behind Anna.
 
-- decompose work with SOP templates and dependencies;
-- assign, start, submit, review, approve, and return tasks for rework;
-- connect channel messages and artifact cards to concrete nodes;
-- inspect project progress and waiting gates from the canvas;
-- read and download Markdown or HTML deliverables inside the workflow.
-
-![Anna artifact reader with an inline design review](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
-
-*The artifact reader keeps the deliverable, source task, project channel, and approval decision in one review surface.*
-
-## Harness: the execution and governance layer
-
-Harness v2 focuses on recoverability and evidence quality:
-
-| Capability | Contract |
-| --- | --- |
-| **Durable Run / Event Store** | Persist canonical state and events instead of relying on one live process. |
-| **Channel-scoped isolation** | Keep workspace and channel boundaries explicit. |
-| **Tool Gateway** | Apply schema, permission, approval, idempotency, and audit controls. |
-| **Memory policy** | Separate proposed memory, confirmed memory, and disabled writes. |
-| **Trace / Eval** | Link context, model calls, tools, approvals, retries, and terminal evidence. |
-| **Scheduler / fencing** | Establish controlled proactive runs, ownership, recovery, and duplicate-execution protection. |
-
-The current migration covers the existing Home, Cowork, and Crew Agent paths, including less visible drafting and matching calls. The separate Preview panel is not the product entry. Old Python Agent execution must not act as a fallback.
-
-## Longer-term design
-
-| Need | Anna's approach |
-| --- | --- |
-| **Continue beyond one answer** | A Run retains state, events, artifacts, and the next action. |
-| **Keep automation controlled** | External writes retain permission, approval, and audit. |
-| **Recover from interruption** | Waiting, missing configuration, retries, and failure remain explicit states. |
-| **Review how a result was produced** | Trace/Eval evidence connects the execution path to the final artifact. |
-| **Keep local control** | Runtime data stays local by default; external providers and connectors are opt-in. |
-| **Extend into business domains** | Connectors, Skills, and Run Profiles add domain behavior around a shared runtime contract. |
-
-## Verification
-
-Run the core repository gates:
+<details>
+<summary>Repository verification commands</summary>
 
 ```bash
 npm run typecheck
 npm test -- --reporter=dot
-npm run frontend:smoke
+npm run frontend:product-smoke
 ./.venv/bin/python -m pytest -q
 npm run build
 npm run release:verify
 npm run evidence:verify:all
 ```
 
-For the desktop packaging smoke:
+For desktop packaging checks:
 
 ```bash
 npm run desktop:package
 npm run desktop:smoke-asar
 ```
 
-CI runs deterministic gates without a private provider, local runtime state, or signing identity. Python tests cover the retained business services and the disabled legacy-execution boundary. Real provider and Hiker evidence is recorded separately and is never inferred from fixture tests.
+Live provider and business-system validation require separate configuration and evidence. See [DEVELOPMENT.md](DEVELOPMENT.md).
 
-## Developer Preview boundary
+</details>
 
-This release is useful for:
+Please keep credentials, local state, runtime logs, provider responses, and real business data out of public contributions. Follow [SECURITY.md](SECURITY.md) to report vulnerabilities.
 
-- preserving the original Home, Cowork, and Crew workflows while migrating their Agent execution;
-- connecting one OpenAI-compatible provider locally;
-- validating scoped tools, execution controls, persistent history, and contextual collaboration;
-- contributing scoped improvements from the community backlog;
-- iterating from real traces and failure cases.
+## Credits and license
 
-This release does not claim:
+Anna grew from a personal exploration of AI agents and Harness design. Pi Agent and Oh-my-Pi have been important technical references. Thank you to the open-source community and everyone sharing feedback along the way.
 
-- production readiness or a hosted cloud runtime;
-- an externally enabled Hiker write capability when the connected server exposes only reads;
-- unrestricted coding tools, exhaustive recovery coverage, or SWE-bench results;
-- production Review-to-Validated-Patch approval;
-- guaranteed external WebSearch or MCP availability;
-- signed and notarized macOS installers;
-- Windows/Linux support or cross-platform release acceptance.
+**Hiker** is an external ERP collaboration by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). Its platform, server, deployment, and business data are not included here, and Hiker is not currently open source. Anna's license covers the Anna-side connector and UI integration, and does not extend to Hiker.
 
-## External project boundary
-
-**Hiker** is an external ERP project for small teams. Anna preserves its Hiker dashboard and MCP integration. Actual read/write capability depends on the connected server and granted permissions; a read-only server cannot satisfy write acceptance.
-
-Hiker is an external collaborative project authored by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). The Hiker platform, server source, deployment, and business data are not included in this repository, and Hiker is not currently open source. Anna's MIT License applies only to the Anna-side MCP connector, UI integration, and other files committed here; it does not extend to Hiker.
-
-## Repository and maintenance
-
-This GitHub repository was created on April 2, 2026 to plan the Anna project. As Harness technology continued to evolve, advanced paradigms such as Pi Agent provided substantial technical reference and inspiration for the project, ultimately shaping Anna. We are grateful to the GitHub community.
-
-[Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) is the canonical public repository. The publication milestone, naming boundary, and future GitHub-centered workflow are recorded in [Anna Agent GitHub Milestone - 2026-08-24](docs/product/anna-agent-github-milestone-2026-08-24.md).
-
-For deeper project and release detail, see:
-
-- [Current product-parity Goal and release gates](docs/product/anna-harness-product-parity-goal-2026-08-31.md)
-- [Community backlog and capability boundaries](docs/product/anna-harness-first-community-backlog-2026-08-31.md)
-- [Harness-first SPEC and acceptance gates - 2026-08-30](docs/product/anna-harness-first-spec-2026-08-30.md)
-- [Harness-first update: delivered scope, verification and open work](docs/product/anna-harness-first-update-2026-08-30.md)
-- [Harness-first SDD plan and migration status](docs/superpowers/plans/2026-08-30-harness-first/00-plan.md)
-- [Developer Preview Wayfinder](docs/product/anna-github-developer-preview-wayfinder-2026-08-23.md)
-- [Developer Preview Spec](docs/product/anna-github-developer-preview-spec-2026-08-23.md)
-- [Release tickets](docs/superpowers/plans/2026-08-23-github-developer-preview/00-tickets.md)
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not commit `.anna/`, databases, runtime logs, provider responses, API keys, generated packages, or real enterprise data.
-
-Anna is released under the [MIT License](LICENSE). Third-party dependency notices are described in [NOTICE.md](NOTICE.md).
+[Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) is the canonical public repository. Anna is released under the [MIT License](LICENSE); third-party dependency notices are listed in [NOTICE.md](NOTICE.md).

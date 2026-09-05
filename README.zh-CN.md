@@ -2,23 +2,44 @@
 
 ![Anna。Chat、Workflows、Associate。A Governed AI Agent for Enterprise Work。](docs/public/assets/anna-readme-banner-v2.png)
 
+**处理个人任务、连接业务系统、参与项目协作的 AI 伙伴。**
+
+Anna 是一个个人开源项目，探索如何让 AI Agent 从一次对话出发，持续推进任务，并交付可审阅的结果。它以本地优先的桌面应用为载体，通过 **Home、Cowork、Crew** 三个工作空间，将任务、业务系统和协作连接起来。
+
+我们希望工作过程始终清楚：Anna 正在做什么、可以使用哪些工具、哪里需要你作决定，以及结果是如何产生的。
+
+**Developer Preview（开发者预览）** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+
+[English](README.md) · [可以体验什么](#可以体验什么) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
+
 > **2026 年 9 月 5 日 · Anna 新的更新即将上线**
 >
 > 随着 [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra) 的发布，我们正借助 Codex 中的 Astra，集中排查和修复 Anna 底层存在的问题，持续优化架构与运行稳定性。目前这项工作正在进行中，具体改动与验证结果会随下一次更新一同公布。感谢大家关注这个个人项目，也欢迎继续分享反馈。
 
-Anna 是一个受治理、local-first 桌面 AI Agent，产品由 **Home、Cowork、Crew** 三大模块组成。本分支保留原有产品，将 Agent 执行迁移到单一 Node Harness Host 与实际 Oh-my-Pi Loop。
+## 可以体验什么
 
-- **Home：** 个人对话、任务执行，以及共享工作界面中的 Skill、Prompt、Python Tool 产物创建。
-- **Cowork：** 业务看板、Hiker MCP 助手及已有报销流程。
-- **Crew：** 项目图、频道、理解上下文的 Anna、专业 Worker、产物、评审及已确认项目 Memory。
+| 工作空间 | 适用时刻 | 可以做什么 |
+| --- | --- | --- |
+| **Home** | 处理个人任务，或制作可复用的工作资源。 | 带着文件开始对话，跟进任务计划，查看工具执行过程，审阅文档或 Prompt 产物。界面也保留 Skill 和 Python Tool 创建入口。 |
+| **Cowork** | 围绕已连接的业务系统开展工作。 | 查看业务看板，向 Hiker 助手询问可用数据，进入已有报销流程。具体可用操作由连接器能力与权限决定。 |
+| **Crew** | 与团队成员、专业 Worker 一起推进项目。 | 在项目图中组织任务与依赖，在频道中补充上下文、指派工作，审阅不同版本的产物，或提出意见后退回返工。 |
 
-迁移替换 Agent 执行权，保留业务状态机、界面与数据。Python 可以继续承担身份、业务存储和连接器服务，不持有模型凭据、不运行旧 Agent Loop。接入进度与真实验收分别记录，单元测试通过不能证明产品已可交付。
+Home 提供执行控制、历史、文件与 Trace 查看入口。Crew 将项目上下文、任务讨论、产物和评审决策关联起来，方便从一份结果回到产生它的工作过程。
 
-**当前分支：[Harness 产品功能保真 Goal](docs/product/anna-harness-product-parity-goal-2026-08-31.md)** | macOS arm64 | MIT License | [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+## 产品演示
 
-此前版本：[`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0)，发布于默认 Harness 切换之前。
+![Anna 在 Create、Cowork Hiker 看板和 Crew 工作流之间的产品演示](docs/public/assets/demos/anna-product-tour.gif)
 
-[English](README.md) | [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary) | [产品演示](#产品演示) | [快速开始](#快速开始) | [可以体验什么](#可以体验什么) | [架构](#anna-如何推进工作)
+*一个循环展示 Create、Cowork 与 Crew 界面。Hiker 看板使用合成数据；真实模型和连接器调用的验证记录见下方「当前进展」。*
+
+<details>
+<summary>查看 Crew 产物评审界面</summary>
+
+![Anna 产物阅读器与内联设计评审](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
+
+交付物、来源任务、项目频道与评审决策保留在同一个工作空间中。
+
+</details>
 
 ## 认识 Anna：你的 Codex 小伙伴
 
@@ -35,192 +56,95 @@ Anna 是一个受治理、local-first 桌面 AI Agent，产品由 **Home、Cowor
 
 *以上为共享宠物素材的静态截图与动画预览。包含 9 组动作和 16 个视线方向，需要支持自定义 v2 宠物的桌面版本。*
 
-## 产品演示
+## 当前进展
 
-以下演示记录迁移需要保留的原有产品设计，不作为真实 Harness 或 Hiker 调用证据。
+Anna 正在持续开发中，当前源码面向希望体验项目、参与改进的开发者与贡献者。
 
-![Anna 在 Create、Cowork Hiker 看板和 Crew 工作流之间的产品演示](docs/public/assets/demos/anna-product-tour.gif)
+| 范围 | 当前状态 |
+| --- | --- |
+| **当前 `main`** | Home、Cowork、Crew 通过共享 Node Harness Host 与 Oh-my-Pi 模型/工具循环执行任务，架构与稳定性优化仍在推进。 |
+| **已记录的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |
+| **外部业务操作** | 该次验证连接的 Hiker 服务只开放读取工具。授权写入与读回验收仍需等待服务端开放相应能力。 |
+| **桌面分发** | 当前验证目标为 macOS arm64。本地应用构建尚未签名与公证，Windows/Linux 发布验收仍待完成。 |
+| **应用版本** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) 发布于当前 Harness 执行路径之前。Codex 小宠物以独立素材版本发布。 |
 
-*一个 GIF 展示三个产品页面：尚未启动任务的 Create 页面、完整的 Cowork Hiker 客户与合同看板，以及 Crew 工作流画布。Hiker 页面使用合成 fixture，不包含真实服务响应、凭据或业务数据。*
+生产可用性、完整故障恢复覆盖及基准测试成绩仍待验证。CI、界面演示和真实外部服务调用各自证明不同范围，具体要求见 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
 
 ## 快速开始
 
-环境要求：
-
-- Node.js `>=22.19.0`
-- Python 3.12 与 `uv`，用于受管业务适配器
-- macOS arm64，当前桌面验收平台
+环境要求：**macOS arm64**、**Node.js ≥22.19.0**、**Python 3.12** 和 **uv**。
 
 ```bash
+git clone https://github.com/Foxtailsss-Andy/Anna-Agent.git
+cd Anna-Agent
 npm ci
 uv sync --locked --extra dev
 ANNA_OMP_BUN_ARCHIVE_URL=https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip npm run harness:omp:prepare
 npm run desktop:run
 ```
 
-在本地配置模型和业务连接器。模型凭据由 Node Host 持有，Python 业务适配器仅接收业务配置。配置和应用状态目录必须放在 Agent 可读工作目录之外。
+执行 Agent 任务需要在本地配置模型 Provider；业务功能还需要对应的连接器配置。当前文档中的模型配置使用 OpenAI-compatible transport 连接 DeepSeek。
 
-每个新 checkout 准备一次固定版本的 Bun/OMP runtime，Worker 源码变化后必须重新绑定 Runtime。启动器不得回退旧 Python 或 Pi Agent Loop。配置、状态隔离与验证见 [DEVELOPMENT.md](DEVELOPMENT.md)。
-
-## 可以体验什么
-
-| 产品面 | 当前呈现的能力 |
-| --- | --- |
-| **Home** | Chat/Create、共享 LoopCard、工作目录、文件/画布、历史、执行控制和 Trace。 |
-| **Cowork** | 确定性的 Hiker 看板、Agent 助手及已有业务审批流程。 |
-| **Crew** | Graph x Channel x Memory、指派、Worker 执行、产物版本、评审和 Showcase。 |
-| **Harness** | OMP 驱动模型/工具循环，Host 负责上下文、权限、Memory、规范事件与 Eval。 |
-
-本次更新将原有产品能力接入新的执行链路：
-
-- **Home：** Chat/Create 任务可通过受验证的 OMP 路径使用已配置的 DeepSeek 模型执行，并支持原生 Todo、受范围约束的工具、停止控制、Trace、可持续的下一轮上下文和可审阅产物。
-- **Cowork：** Hiker 看板与 Agent 助手共享 Harness 执行路径。当前连接的服务支持受范围约束的读取；写入仍取决于服务端能力与授权。
-- **Crew：** 理解上下文的 Anna 与专业 Worker 可使用项目和频道信息起草任务、生成产物，并进入原有评审与返工流程。
-- **Harness：** Node Host 与 OMP 负责模型/工具循环、Memory 装载、规范事件和 Eval；Python 继续作为不持有模型凭据的业务与连接器适配器。
-
-各产品面需通过当前 Goal 中的真实验收。确定性测试和演示 fixture 均不作为真实 Provider 或外部业务操作的证据。
-
-## 频道与业务系统
-
-以下流程属于本次产品功能保真的范围。
-
-频道是 Anna 的协同层。每个频道让人、Anna 和专业 Agent 围绕相同任务、活动 Run、产物、@提及、评审决策与项目历史保持一致。一条消息可以补充上下文、调整正在执行的工作、点名成员或 Agent，也可以把团队带回正在讨论的具体任务和产物。
-
-MCP 是 Anna 连接外部系统的边界。Anna 可以通过 MCP connector 获取经营数据、查看业务记录，并在 ERP 或其他企业系统中调用业务操作。读取范围受到约束；已接入治理闭环的外部写入会保留权限检查、人工审批、幂等、读回校验和审计证据。
+配置路径、状态隔离与排障步骤见 [DEVELOPMENT.md](DEVELOPMENT.md)。模型凭据、连接器密钥和运行状态应放在 Agent 可读任务目录之外。本地优先指桌面应用及状态在本机运行，外部模型与连接器仍会接收你配置的调用请求。
 
 ## Anna 如何推进工作
 
-Agent 链路为 `Home / Cowork / Crew -> 产品适配器 -> Node Harness Host -> 实际 OMP -> Host model transport / ToolGateway -> Contract Eval -> 终态事件`。业务 CRUD 和连接器操作复用已有领域服务；Agent 历史、Memory 装载及模型/工具执行权归属 Harness。
-
-产品工作流保留明确的审批与评审边界：
+Anna 的共享执行层称为 **Harness**，统一管理三个工作空间中的任务上下文、权限、持久化事件与执行结果。
 
 ```mermaid
 flowchart LR
-    A[需求] --> B[Run]
-    B --> C[上下文 + Skill]
-    C --> D[模型 / Tool / MCP]
-    D --> E{需要审批?}
-    E -->|是| F[等待 / 评审]
-    E -->|否| G[Artifact]
-    F --> G
-    G --> H[Trace + Eval]
-    H --> I[继续 / 返工 / 交付]
+    UI[Home / Cowork / Crew] --> Host[Harness Host]
+    Host --> OMP[Oh-my-Pi 模型与工具循环]
+    OMP --> Gateway[Tool Gateway / MCP]
+    Gateway --> OMP
+    Host --> Result[产物 / Trace / Eval]
 ```
 
-共享 Runtime 建立在三个长期基础上：
+- **上下文与 Memory：** Host 按授权加载任务和频道上下文，区分已确认记忆与候选记忆。
+- **工具与权限：** Tool Gateway 执行 schema、范围、审批与操作记录规则，外部动作取决于已连接的服务和授权。
+- **执行历史：** 规范事件将模型调用、工具结果和终态关联到产物与 Trace/Eval 记录。
+- **业务接入：** Python 保留身份、业务数据、状态机和连接器；Node Host 与 Oh-my-Pi 负责 Agent 执行。
 
-- **Identity：** 工作空间、用户、频道和权限范围；
-- **Judgment：** 对继续、等待、请求信息或结束作出明确判断；
-- **Memory：** 区分任务上下文、候选记忆和已确认业务记忆。
+更完整的设计约定见 [架构术语表](CONTEXT.md) 与 [当前实现范围](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
 
-配置缺失或 connector 不可用时，状态会保持可见并支持恢复。Anna 会如实呈现依赖状态和执行结果。
+## 一起改进 Anna
 
-## Crew
+欢迎从一个具体任务开始分享：你尝试了什么、期待什么结果、实际发生了什么。可复现的失败、交互体验反馈、连接器改进和文档修正都很有帮助。
 
-Crew 将多人工作组织为可观察的项目图：
+- [提交 Issue](https://github.com/Foxtailsss-Andy/Anna-Agent/issues)，附上复现步骤与脱敏后的证据。
+- 阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，从 [社区 Backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md) 中选择范围明确的改进。
+- 通过 [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)，了解 Anna 背后的决策、弯路与经验。
 
-- 使用 SOP 模板和依赖关系拆解任务；
-- 支持指派、启动、提交、评审、通过和退回返工；
-- 将频道消息与产物卡片关联到具体节点；
-- 从画布查看项目进度和等待处理的门禁；
-- 在工作流内阅读和下载 Markdown 或 HTML 交付物。
-
-![Anna 产物阅读器与内联设计评审](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
-
-*产物阅读器把交付物、来源任务、项目频道和审批决策放在同一个评审界面中。*
-
-## Harness：执行与治理层
-
-Harness v2 重点解决恢复能力和证据质量：
-
-| 能力 | 契约 |
-| --- | --- |
-| **Durable Run / Event Store** | 持久化规范状态与事件，降低对单个在线进程的依赖。 |
-| **Channel-scoped isolation** | 明确工作空间与频道边界。 |
-| **Tool Gateway** | 执行 schema、权限、审批、幂等和审计约束。 |
-| **Memory policy** | 区分候选记忆、已确认记忆和禁止写入的场景。 |
-| **Trace / Eval** | 关联上下文、模型调用、工具、审批、重试和终局证据。 |
-| **Scheduler / fencing** | 为主动运行、所有权、恢复和重复执行防护提供基础。 |
-
-当前迁移覆盖已有 Home、Cowork、Crew 的 Agent 路径，包括不直接可见的草稿生成与匹配调用。独立 Preview 面板不作为产品入口，旧 Python Agent 不拥有回退执行权。
-
-## 长期设计方向
-
-| 企业工作需要 | Anna 的实现方式 |
-| --- | --- |
-| **让工作持续超过一次回答** | Run 保留状态、事件、产物和下一步动作。 |
-| **控制自动化边界** | 外部写入保留权限、审批与审计。 |
-| **从中断中恢复** | 等待、配置缺失、重试和失败都具有明确状态。 |
-| **检查结果如何产生** | Trace/Eval 把执行路径连接到最终产物。 |
-| **保留本地控制权** | Runtime 数据默认留在本地；外部 provider 和 connector 由用户显式启用。 |
-| **扩展到企业业务域** | Connector、Skill 和 Run Profile 围绕共享 Runtime 契约增加领域能力。 |
-
-## 验证
-
-运行核心仓库门禁：
+<details>
+<summary>仓库验证命令</summary>
 
 ```bash
 npm run typecheck
 npm test -- --reporter=dot
-npm run frontend:smoke
+npm run frontend:product-smoke
 ./.venv/bin/python -m pytest -q
 npm run build
 npm run release:verify
 npm run evidence:verify:all
 ```
 
-桌面打包 Smoke：
+桌面打包检查：
 
 ```bash
 npm run desktop:package
 npm run desktop:smoke-asar
 ```
 
-CI 的确定性门禁不依赖私有 provider、本机运行状态或签名身份。Python 测试覆盖保留的业务服务及旧 Agent 禁用边界；真实 Provider 和 Hiker 验收单独记录，不能从 fixture 测试通过推导。
+真实 Provider 与业务系统验收需要单独配置和记录，详见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
-## Developer Preview 边界
+</details>
 
-当前版本适合：
+公开贡献中请移除凭据、本地状态、运行日志、Provider 响应和真实业务数据。安全问题请按 [SECURITY.md](SECURITY.md) 提交。
 
-- 保留原有 Home、Cowork、Crew 工作流并迁移其 Agent 执行；
-- 在本地连接一个 OpenAI-compatible provider；
-- 验证受控工具、执行控制、持久化历史和上下文协作；
-- 参与社区 Backlog 中范围明确的改进；
-- 基于真实 Trace 和失败案例继续迭代。
+## 致谢与许可
 
-当前版本暂不承诺：
+Anna 起源于对 AI Agent 和 Harness 设计的个人探索。Pi Agent 与 Oh-my-Pi 为项目提供了重要技术参考，感谢开源社区，以及一路分享反馈的朋友。
 
-- production-ready 或 hosted cloud runtime；
-- 只读 Hiker 服务端尚未开放的写入能力；
-- 无限制 coding tools、穷尽恢复组合或 SWE-bench 成绩；
-- 生产级 Review-to-Validated-Patch 审批闭环；
-- 外部 WebSearch 或 MCP 服务持续可用；
-- 已签名和 notarized 的 macOS 安装包；
-- Windows/Linux 支持及跨平台发布验收。
+**Hiker** 是由 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif) 开发的外部 ERP 合作项目。本仓库不包含 Hiker 平台、服务端、部署与业务数据，Hiker 目前尚未开源。Anna 的许可覆盖 Anna 侧连接器与界面集成，不延伸至 Hiker。
 
-## 外部项目边界
-
-**Hiker** 是面向小型团队的外部 ERP 项目。Anna 保留其 Hiker 看板与 MCP 集成，实际读写能力取决于连接的服务端和授权；只读服务端无法满足写入验收。
-
-Hiker 是外部合作项目，作者为 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif)。本仓库不包含 Hiker 平台、服务端源码、部署和业务数据，Hiker 目前尚未开源。Anna 的 MIT License 只覆盖 Anna 侧 MCP connector、界面集成及仓库中提交的其他文件，不延伸至 Hiker。
-
-## 仓库与维护
-
-该 GitHub 仓库创建于 2026 年 4 月 2 日，最初用于规划 Anna 项目。随着 Harness 技术持续发展，Pi Agent 等先进范式为本项目提供了大量技术参考与启发，并最终形成今天的 Anna。感谢 GitHub 社区。
-
-[Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) 是唯一公开维护仓库。发布里程碑、命名边界和后续 GitHub 维护流程记录在 [Anna Agent GitHub Milestone - 2026-08-24](docs/product/anna-agent-github-milestone-2026-08-24.md)。
-
-深入了解项目和发布边界：
-
-- [当前产品功能保真 Goal 与上线门禁](docs/product/anna-harness-product-parity-goal-2026-08-31.md)
-- [社区 Backlog 与能力边界](docs/product/anna-harness-first-community-backlog-2026-08-31.md)
-- [Harness-first SPEC 与验收标准 - 2026-08-30](docs/product/anna-harness-first-spec-2026-08-30.md)
-- [Harness-first 更新：交付范围、验证结果与待完成项](docs/product/anna-harness-first-update-2026-08-30.md)
-- [Harness-first SDD 计划与迁移状态](docs/superpowers/plans/2026-08-30-harness-first/00-plan.md)
-- [Developer Preview Wayfinder](docs/product/anna-github-developer-preview-wayfinder-2026-08-23.md)
-- [Developer Preview Spec](docs/product/anna-github-developer-preview-spec-2026-08-23.md)
-- [Release tickets](docs/superpowers/plans/2026-08-23-github-developer-preview/00-tickets.md)
-
-提交 Pull Request 前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，报告安全问题前请阅读 [SECURITY.md](SECURITY.md)。请勿提交 `.anna/`、数据库、运行日志、provider 响应、API key、生成包或真实企业数据。
-
-Anna 使用 [MIT License](LICENSE)。第三方依赖说明见 [NOTICE.md](NOTICE.md)。
+[Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) 是唯一公开维护仓库。Anna 使用 [MIT License](LICENSE)，第三方依赖说明见 [NOTICE.md](NOTICE.md)。
