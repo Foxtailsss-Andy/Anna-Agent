@@ -89,23 +89,32 @@ Follow [DEVELOPMENT.md](DEVELOPMENT.md) for configuration paths, state isolation
 
 ## How work moves through Anna
 
-Anna's shared execution layer is the **Harness**. It manages task context, permissions, durable events, and execution outcomes across the three workspaces.
+Anna advances a task through a **decide → act → observe → decide again** loop. The **Harness** surrounds that loop with context, permissions, execution limits, persistent state, and result checks.
 
 ```mermaid
-flowchart LR
-    UI[Home / Cowork / Crew] --> Host[Harness Host]
-    Host --> OMP[Oh-my-Pi model/tool loop]
-    OMP --> Gateway[Tool Gateway / MCP]
-    Gateway --> OMP
-    Host --> Result[Artifacts / Trace / Eval]
+flowchart TD
+    Task[Task from Home / Cowork / Crew] --> Context[Load context and authorized Memory]
+    Context --> Decide{Decide the next step}
+    Decide -->|Action needed| Gate[Check permissions / request approval if needed]
+    Gate -->|Allowed| Act[Execute a tool or call a connected system]
+    Act --> Observe[Read the result / record success or failure]
+    Observe --> Decide
+    Decide -->|Ready to finish| Check[Validate execution records and end state]
+    Check --> Outcome[Record the outcome and available artifacts]
 ```
 
-- **Context and Memory:** the Host loads authorized task and channel context; confirmed Memory is distinct from a proposed memory candidate.
-- **Tools and permissions:** the Tool Gateway applies schema, scope, approval, and effect-recording rules. External actions depend on the connected service and granted permissions.
-- **Execution history:** canonical events link model calls, tool results, and terminal states to artifacts and Trace/Eval records.
-- **Business integration:** Python retains identity, business data, state machines, and connectors. Agent execution belongs to the Node Host and Oh-my-Pi.
+| Stage | What happens |
+| --- | --- |
+| **1. Prepare context** | Load the request, relevant conversation, task files, available tools, and authorized channel Memory within the task's scope. |
+| **2. Decide and plan** | The model uses that context and previous observations to choose the next action or propose a result, updating the task plan as work progresses. |
+| **3. Check permission** | The Tool Gateway validates arguments and access scope. Actions that require approval wait for authorization before execution. |
+| **4. Act** | Run an allowed tool to read a file, produce an artifact, or call an external system through a connector. Available operations depend on the task's permissions and the connected service. |
+| **5. Observe and continue** | Return the actual tool result, error, or changed state to the model as context for its next decision. Work can continue through multiple iterations. |
+| **6. Check and conclude** | When the loop proposes an outcome, the Harness validates execution records and the end state (Eval), then saves the result and any artifacts. Artifact checks and human review follow the relevant workflow; completion, failure, and cancellation remain distinct states. |
 
-See the [architecture terminology](CONTEXT.md) and [current implementation scope](docs/product/anna-harness-product-parity-goal-2026-08-31.md) for the contracts behind this design.
+The loop is bounded by execution budgets and stop conditions. The Harness persists events and state so Trace can connect model calls, tool results, and the final outcome. Longer-term Memory retains its separate proposal and confirmation rules.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md), the [architecture terminology](CONTEXT.md), and the [current acceptance scope](docs/product/anna-harness-product-parity-goal-2026-08-31.md) for implementation details and validation boundaries.
 
 ## Build with us
 

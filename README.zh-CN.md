@@ -89,23 +89,32 @@ npm run desktop:run
 
 ## Anna 如何推进工作
 
-Anna 的共享执行层称为 **Harness**，统一管理三个工作空间中的任务上下文、权限、持久化事件与执行结果。
+Anna 通过 **判断 → 行动 → 观察 → 再判断** 的循环推进任务。**Harness** 围绕这个循环，提供上下文、权限、执行预算、状态保存与结果校验，让每一步都有明确的条件和记录。
 
 ```mermaid
-flowchart LR
-    UI[Home / Cowork / Crew] --> Host[Harness Host]
-    Host --> OMP[Oh-my-Pi 模型与工具循环]
-    OMP --> Gateway[Tool Gateway / MCP]
-    Gateway --> OMP
-    Host --> Result[产物 / Trace / Eval]
+flowchart TD
+    Task[来自 Home / Cowork / Crew 的任务] --> Context[加载上下文与已授权记忆]
+    Context --> Decide{判断下一步}
+    Decide -->|需要行动| Gate[检查权限 / 必要时请求审批]
+    Gate -->|获准执行| Act[调用工具或连接外部系统]
+    Act --> Observe[读取实际结果 / 记录成功或失败]
+    Observe --> Decide
+    Decide -->|准备结束| Check[校验执行记录与结束状态]
+    Check --> Outcome[记录结束状态与已有产物]
 ```
 
-- **上下文与 Memory：** Host 按授权加载任务和频道上下文，区分已确认记忆与候选记忆。
-- **工具与权限：** Tool Gateway 执行 schema、范围、审批与操作记录规则，外部动作取决于已连接的服务和授权。
-- **执行历史：** 规范事件将模型调用、工具结果和终态关联到产物与 Trace/Eval 记录。
-- **业务接入：** Python 保留身份、业务数据、状态机和连接器；Node Host 与 Oh-my-Pi 负责 Agent 执行。
+| 阶段 | 具体发生什么 |
+| --- | --- |
+| **1. 准备上下文** | 在任务授权范围内，加载用户需求、相关对话、任务文件、可用工具，以及已授权的频道记忆。 |
+| **2. 判断与规划** | 模型结合上下文和此前的观察结果，选择下一步动作或提出结果，并随任务推进更新计划。 |
+| **3. 检查权限** | Tool Gateway（工具网关）校验参数与访问范围；需要审批的动作先等待授权，再进入执行。 |
+| **4. 执行动作** | 通过获准的工具读取文件、生成产物，或经连接器调用外部系统。具体能做什么，由任务权限和已连接服务的能力共同决定。 |
+| **5. 观察并继续** | 将工具的实际返回、错误或状态变化放回上下文，供模型判断下一步，任务可以经过多轮循环持续推进。 |
+| **6. 校验与结束** | 循环提出结束结果后，Harness 校验执行记录与结束状态（Eval），保存结果和已有产物。产物按对应工作流验证或进入人工评审，完成、失败与中止保留各自状态。 |
 
-更完整的设计约定见 [架构术语表](CONTEXT.md) 与 [当前实现范围](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
+整个循环受执行预算与停止条件约束。Harness 持久化事件和状态，让 Trace（执行轨迹）串联模型调用、工具结果与最终结局；长期记忆仍遵循单独的提议与确认规则。
+
+具体实现与验证范围见 [开发文档](DEVELOPMENT.md)、[架构术语表](CONTEXT.md) 和 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
 
 ## 一起改进 Anna
 
