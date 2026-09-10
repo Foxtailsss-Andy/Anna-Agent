@@ -491,7 +491,7 @@ test("public worker client rejects a restored model request with mutated raw SDK
   const withMutatedContext = workerSource.replace(
     `const frame = this.makeFrame("model.request", {
       modelId,
-      context: exposeToolDefinitions ? { ...context, tools: this.input?.allowedTools ?? [] } : context,
+      context: exposeToolDefinitions ? { ...context, tools: this.activeTools } : context,
     }, requestId);`,
     `const frame = this.makeFrame("model.request", {
       modelId,

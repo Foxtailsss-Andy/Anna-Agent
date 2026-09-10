@@ -145,6 +145,8 @@ export interface StartInput {
   readonly goal: string;
   readonly modelId: string;
   readonly allowedTools: readonly ToolDefinition[];
+  /** Tools visible to the first model request; this may grow only through a Host update. */
+  readonly activeTools?: readonly ToolDefinition[];
   readonly snapshotDigest: string;
   readonly originalExecutionFingerprint: JsonValue;
   /** Fresh-run conversation seed, snapshotted separately from restore transcript. */
@@ -180,6 +182,7 @@ export type HostFrame =
   | (FrameBase & { readonly kind: "model.end"; readonly index: number; readonly message: AssistantMessage })
   | (FrameBase & { readonly kind: "model.error"; readonly index: number; readonly code: "transport_failed" | "budget_exhausted" | "cancelled" | "protocol_failed" })
   | (FrameBase & { readonly kind: "tool.result"; readonly toolCallId: string; readonly status: "succeeded" | "failed" | "unknown"; readonly output?: JsonValue })
+  | (FrameBase & { readonly kind: "tools.update"; readonly tools: readonly ToolDefinition[] })
   | (FrameBase & { readonly kind: "abort"; readonly reason: "cancelled" | "timed_out" | "protocol_failed" | "shutdown" });
 
 export type OmpFrame = WorkerFrame | HostFrame;
@@ -237,6 +240,11 @@ export function parseHostFrame(value: unknown): HostFrame {
       assertWorkerSeq(record.workerSeq);
       if (Object.hasOwn(record, "output")) assertJsonValue(record.output);
       return { ...record, kind: "tool.result", toolCallId: record.toolCallId, status: record.status, ...(Object.hasOwn(record, "output") ? { output: record.output } : {}) } as HostFrame;
+    case "tools.update":
+      assertKeys(record, [...BASE_KEYS, "tools"]);
+      assertWorkerSeq(record.workerSeq);
+      if (!Array.isArray(record.tools)) throw new Error("updated tools must be an array");
+      return { ...record, kind: "tools.update", tools: record.tools.map(parseToolDefinition) } as unknown as HostFrame;
     case "abort":
       assertKeys(record, [...BASE_KEYS, "reason"]);
       assertEnum(record.reason, ["cancelled", "timed_out", "protocol_failed", "shutdown"], "abort reason");
@@ -326,6 +334,7 @@ function parseStartInput(value: unknown): StartInput {
   const record = asRecord(value);
   assertKeys(record, [
     "systemPrompt", "goal", "modelId", "allowedTools", "snapshotDigest", "originalExecutionFingerprint",
+    ...(Object.hasOwn(record, "activeTools") ? ["activeTools"] : []),
     ...(Object.hasOwn(record, "initialMessages") ? ["initialMessages"] : []),
     ...(Object.hasOwn(record, "transcript") ? ["transcript"] : []),
   ]);
@@ -336,6 +345,9 @@ function parseStartInput(value: unknown): StartInput {
   assertJsonValue(record.originalExecutionFingerprint);
   if (!Array.isArray(record.allowedTools)) throw new Error("allowedTools must be an array");
   const allowedTools = record.allowedTools.map(parseToolDefinition);
+  const activeTools = Object.hasOwn(record, "activeTools")
+    ? (Array.isArray(record.activeTools) ? record.activeTools.map(parseToolDefinition) : (() => { throw new Error("activeTools must be an array"); })())
+    : undefined;
   const initialMessages = Object.hasOwn(record, "initialMessages")
     ? parseMessageArray(record.initialMessages, "initialMessages")
     : undefined;
@@ -347,6 +359,7 @@ function parseStartInput(value: unknown): StartInput {
       goal: record.goal,
       modelId: record.modelId,
       allowedTools,
+      ...(activeTools === undefined ? {} : { activeTools }),
       snapshotDigest: record.snapshotDigest,
       originalExecutionFingerprint: record.originalExecutionFingerprint,
       ...(initialMessages === undefined ? {} : { initialMessages }),
@@ -358,6 +371,7 @@ function parseStartInput(value: unknown): StartInput {
     goal: record.goal,
     modelId: record.modelId,
     allowedTools,
+    ...(activeTools === undefined ? {} : { activeTools }),
     snapshotDigest: record.snapshotDigest,
     originalExecutionFingerprint: record.originalExecutionFingerprint,
     ...(initialMessages === undefined ? {} : { initialMessages }),

@@ -103,6 +103,16 @@ export {
   type ToolPolicy,
 } from "./tool-gateway";
 export {
+  buildCapabilityCatalog,
+  buildCapabilityDefinition,
+  capabilityDefinitionHash,
+  parseCapabilityPolicySnapshot,
+  WORKBENCH_CAPABILITY_POLICY_VERSION,
+  type CapabilityCatalogSnapshot,
+  type CapabilityDefinitionSnapshot,
+  type CapabilityPolicySnapshot,
+} from "./capability-catalog";
+export {
   createDeterministicFakeSandbox,
   type DeterministicFakeSandbox,
   type DeterministicFakeSandboxOptions,

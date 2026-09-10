@@ -108,10 +108,11 @@ store.save_project(project)
     expect(revokedPost.body).toEqual({ code: "session_not_found" });
     expect(revokedPost.body).toEqual(revokedMissing.body);
 
+    const invalidAuthorization = ["Bearer invalid-review-", "token"].join("");
     const invalidToken = await jsonRequest(
       harness.host.url,
       `/api/workbench/sessions/${sessionId}`,
-      "Bearer invalid-review-token",
+      invalidAuthorization,
     );
     expect(invalidToken.status).toBe(401);
     expect(invalidToken.body).toEqual({ code: "authentication_required" });

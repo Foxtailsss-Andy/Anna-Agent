@@ -15,6 +15,7 @@ import type {
   StreamId,
   ToolGateway,
 } from "@anna/harness-v2";
+import type { CapabilityPolicySnapshot } from "@anna/harness-v2";
 import { buildRunContext, parseJsonValue } from "@anna/harness-v2";
 
 import { verifyRuntimeManifest } from "./runtime-manifest";
@@ -50,9 +51,14 @@ export interface OmpLoopKernelOptions {
   readonly workspaceRoot: string;
   readonly attemptParent?: string;
   readonly modelTransport: OmpHostModelTransport;
-  readonly createToolGateway: (command: StartRun) => ToolGateway;
+  readonly createToolGateway: (
+    command: StartRun,
+    loadedCapabilityIds?: readonly string[],
+  ) => ToolGateway | Promise<ToolGateway>;
   readonly prepareContext?: OmpContextPreparation;
   readonly toolDefinitionsFor?: (command: StartRun) => readonly ToolDefinition[] | Promise<readonly ToolDefinition[]>;
+  readonly initialToolDefinitionsFor?: (command: StartRun) => readonly ToolDefinition[] | Promise<readonly ToolDefinition[]>;
+  readonly activeToolDefinitionsFor?: (command: StartRun) => readonly ToolDefinition[] | Promise<readonly ToolDefinition[]>;
   readonly initialMessagesFor?: (command: StartRun) => readonly Message[] | Promise<readonly Message[]>;
   readonly beforeModel?: (command: StartRun, context: ModelContext) => Promise<void> | void;
   readonly onEvent?: (event: OmpKernelEvent) => Promise<void> | void;
@@ -247,6 +253,11 @@ export class OmpLoopKernel implements LoopKernel {
       }, this.now, this.createEventId);
       history = readable === undefined ? history : await readEvents(readable, command.runId);
     }
+    const loadedCapabilityIds = capabilityIdsFromHistory(
+      history,
+      command.runProfileSnapshot.capabilityPolicy,
+      command.runProfileSnapshot.allowedTools,
+    );
     const admittedToolDefinitions = await resolveToolDefinitions(this.options.toolDefinitionsFor, command);
 
     const remainingBeforePreparation = remainingWallTime(command, budgetStartedAt);
@@ -308,10 +319,21 @@ export class OmpLoopKernel implements LoopKernel {
         transcriptLength: transcript.length,
       }, this.now, this.createEventId);
     }
+    const remainingBeforeGateway = remainingWallTime(command, budgetStartedAt);
+    if (remainingBeforeGateway === 0) return appendTerminal("timed_out");
+    if (signal.aborted) return appendTerminal("cancelled");
+    const gateway = await this.options.createToolGateway(command, loadedCapabilityIds);
+    const remainingAfterGateway = remainingWallTime(command, budgetStartedAt);
+    if (remainingAfterGateway === 0) return appendTerminal("timed_out");
+    if (signal.aborted) return appendTerminal("cancelled");
+    const initialToolDefinitions = await resolveSubsetToolDefinitions(
+      this.options.initialToolDefinitionsFor,
+      command,
+      admittedToolDefinitions,
+    );
     const remainingBeforeWorker = remainingWallTime(command, budgetStartedAt);
     if (remainingBeforeWorker === 0) return appendTerminal("timed_out");
     if (signal.aborted) return appendTerminal("cancelled");
-    const gateway = this.options.createToolGateway(command);
     const runtimeRoot = this.options.runtimeRoot;
     let modelRequests = history.filter((event) => event.type === "run.model.requested").length;
     let toolCalls = restoredToolDispatchCount(history) + restoredNativeTodoCount(transcript);
@@ -348,6 +370,7 @@ export class OmpLoopKernel implements LoopKernel {
         goal: command.goal,
         modelId: command.runProfileSnapshot.model.name,
         allowedTools: admittedToolDefinitions,
+        ...(initialToolDefinitions === admittedToolDefinitions ? {} : { activeTools: initialToolDefinitions }),
         snapshotDigest: prepared.snapshotDigest,
         originalExecutionFingerprint: prepared.originalExecutionFingerprint,
         ...(initialMessages === undefined || initialMessages.length === 0 ? {} : { initialMessages }),
@@ -372,6 +395,12 @@ export class OmpLoopKernel implements LoopKernel {
               context.messages,
               context.tools,
             ),
+            ...(context.tools === undefined && command.runProfileSnapshot.capabilityPolicy === undefined
+              ? {}
+              : {
+                  toolDefinitions: parseJsonValue(context.tools ?? [], "OMP model tool definitions"),
+                  toolDefinitionHashes: (context.tools ?? []).map((tool) => sha256(stableJson(tool))),
+                }),
           },
           this.now,
           this.createEventId,
@@ -481,7 +510,7 @@ export class OmpLoopKernel implements LoopKernel {
         const remainingAfterDispatch = remainingWallTime(command, budgetStartedAt);
         if (remainingAfterDispatch === 0) throw new OmpBudgetExceededError("OMP tool dispatch wall budget exhausted");
         if (signal.aborted || toolSignal.aborted) throw new OmpAttemptCancelledError();
-        const toolResult = await gateway.execute({
+        let toolResult = await gateway.execute({
           workspaceId: command.workspaceId,
           channelId: command.channelId,
           runId: command.runId,
@@ -495,6 +524,49 @@ export class OmpLoopKernel implements LoopKernel {
             ...(command.laneId === undefined ? {} : { laneId: command.laneId }),
           }),
         }, toolSignal);
+        const capabilityReceipt = capabilityLoadReceipt(
+          name,
+          toolResult.status,
+          input,
+          toolResult.output,
+          command.runProfileSnapshot.capabilityPolicy,
+        );
+        if (capabilityReceipt !== undefined) {
+          const receiptSeq = await nextSequenceFromSink(readable, command.runId);
+          const receiptEventId = this.createEventId();
+          await appendEvent(
+            sink,
+            command,
+            receiptSeq,
+            "capability.loaded",
+            {
+              schemaVersion: 1,
+              toolCallId,
+              ...(dispatchEventId === undefined ? {} : { dispatchEventId }),
+              ...(command.runProfileSnapshot.capabilityPolicy === undefined ? {} : {
+                catalogHash: command.runProfileSnapshot.capabilityPolicy.catalog.hash,
+              }),
+              capabilities: [...capabilityReceipt.capabilities],
+            } as JsonValue,
+            this.now,
+            () => receiptEventId,
+          );
+          toolResult = {
+            ...toolResult,
+            output: {
+              ...(isRecord(toolResult.output) ? toolResult.output : {}),
+              receipt: {
+                kind: "capability.load",
+                event_id: receiptEventId,
+                seq: receiptSeq,
+                ...(command.runProfileSnapshot.capabilityPolicy === undefined ? {} : {
+                  catalog_hash: command.runProfileSnapshot.capabilityPolicy.catalog.hash,
+                }),
+                capabilities: [...capabilityReceipt.capabilities],
+              } as JsonValue,
+            },
+          };
+        }
         if (readable !== undefined && dispatchEventId !== undefined) {
           await appendEvent(
             sink,
@@ -526,6 +598,9 @@ export class OmpLoopKernel implements LoopKernel {
         });
         return toolResult;
       },
+      ...(this.options.activeToolDefinitionsFor === undefined ? {} : {
+        activeToolsFor: () => this.options.activeToolDefinitionsFor!(command),
+      }),
       persistObservation: async (observation) => {
         await this.options.onEvent?.({ type: "observation", observation });
         if (observation.type === "message_end" && observation.message.role === "toolResult"
@@ -956,6 +1031,26 @@ function validateModelCheckpoints(
     const requestPayload = request !== undefined && isRecord(request.payload)
       ? request.payload as Record<string, JsonValue>
       : undefined;
+    const expectedCheckpointTools = request === undefined
+      ? admittedToolDefinitions
+      : checkpointToolDefinitionsFor(history, request, command, admittedToolDefinitions);
+    if (requestPayload?.toolDefinitions === undefined
+      && command.runProfileSnapshot.capabilityPolicy !== undefined) {
+      throw new OmpModelCheckpointMismatchError();
+    }
+    const checkpointTools = requestPayload?.toolDefinitions === undefined
+      ? admittedToolDefinitions
+      : parseCheckpointToolDefinitions(requestPayload.toolDefinitions, admittedToolDefinitions, expectedCheckpointTools);
+    if (command.runProfileSnapshot.capabilityPolicy !== undefined) {
+      const hashes = requestPayload?.toolDefinitionHashes;
+      if (!Array.isArray(hashes)
+        || hashes.length !== checkpointTools.length
+        || hashes.some((hash, index) =>
+          typeof hash !== "string"
+          || hash !== sha256(stableJson(checkpointTools[index]!)))) {
+        throw new OmpModelCheckpointMismatchError();
+      }
+    }
     if (
       request === undefined
       || requestPayload?.requestIndex !== requestIndex
@@ -965,8 +1060,8 @@ function validateModelCheckpoints(
       || requestPayload.inputDigest !== modelInputDigest(
         systemPrompt,
         [...initialMessages, ...messages.slice(0, transcriptIndex)],
-        admittedToolDefinitions.some((tool) => tool.name !== "read_only")
-          ? admittedToolDefinitions
+        checkpointTools.some((tool) => tool.name !== "read_only")
+          ? checkpointTools
           : undefined,
       )
     ) {
@@ -975,6 +1070,57 @@ function validateModelCheckpoints(
     requestIndexes.add(requestIndex);
     transcriptIndexes.add(transcriptIndex);
   }
+}
+
+function parseCheckpointToolDefinitions(
+  input: JsonValue,
+  admitted: readonly ToolDefinition[],
+  expectedActive: readonly ToolDefinition[],
+): readonly ToolDefinition[] {
+  if (!Array.isArray(input)) throw new OmpModelCheckpointMismatchError();
+  const admittedByName = new Map(admitted.map((tool) => [tool.name, tool]));
+  const parsed = input.map((candidate) => {
+    const record = isRecord(candidate) ? candidate as Record<string, JsonValue> : undefined;
+    if (record === undefined
+      || typeof record.name !== "string"
+      || typeof record.description !== "string"
+      || !isRecord(record.parameters)) throw new OmpModelCheckpointMismatchError();
+    const name = record.name as string;
+    const description = record.description as string;
+    const parameters = record.parameters as Record<string, JsonValue>;
+    const expected = admittedByName.get(name);
+    if (expected === undefined || stableJson(expected.parameters) !== stableJson(parameters)
+      || expected.description !== description) throw new OmpModelCheckpointMismatchError();
+    return {
+      name,
+      description,
+      parameters,
+    };
+  });
+  if (new Set(parsed.map((tool) => tool.name)).size !== parsed.length
+    || parsed.length !== expectedActive.length
+    || parsed.some((tool, index) => stableJson(tool) !== stableJson(expectedActive[index]))) {
+    throw new OmpModelCheckpointMismatchError();
+  }
+  return parsed;
+}
+
+function checkpointToolDefinitionsFor(
+  history: readonly CanonicalEvent[],
+  request: CanonicalEvent,
+  command: StartRun,
+  admitted: readonly ToolDefinition[],
+): readonly ToolDefinition[] {
+  const policy = command.runProfileSnapshot.capabilityPolicy;
+  if (policy === undefined) return admitted;
+  const loadedIds = new Set(capabilityIdsFromHistory(
+    history.filter((event) => event.seq < request.seq),
+    policy,
+    command.runProfileSnapshot.allowedTools,
+  ));
+  return admitted.filter((tool) => tool.name === "capabilities.search"
+    || tool.name === "capabilities.load"
+    || loadedIds.has(tool.name));
 }
 
 function memoryHitPayload(memory: AcceptedChannelMemory, rank: number): JsonValue {
@@ -1050,6 +1196,141 @@ async function resolveToolDefinitions(
   }
   if (seen.size !== expected.size) throw new Error("OMP tool definitions do not cover the admitted profile");
   return cloneJson(definitions);
+}
+
+async function resolveSubsetToolDefinitions(
+  provider: OmpLoopKernelOptions["initialToolDefinitionsFor"],
+  command: StartRun,
+  admitted: readonly ToolDefinition[],
+): Promise<readonly ToolDefinition[]> {
+  const definitions = provider === undefined ? admitted : await provider(command);
+  const admittedByName = new Map(admitted.map((definition) => [definition.name, definition]));
+  const seen = new Set<string>();
+  for (const definition of definitions) {
+    const expected = admittedByName.get(definition.name);
+    if (expected === undefined || seen.has(definition.name)
+      || stableJson(definition) !== stableJson(expected)) {
+      throw new Error("OMP active tool definitions do not match the admitted profile");
+    }
+    seen.add(definition.name);
+  }
+  return cloneJson(definitions);
+}
+
+function capabilityIdsFromHistory(
+  history: readonly CanonicalEvent[],
+  policy: CapabilityPolicySnapshot | undefined,
+  allowedTools: readonly string[] = policy?.catalog.capabilities.map((item) => item.id) ?? [],
+): readonly string[] {
+  if (history.some((event) => event.type === "capability.loaded") && policy === undefined) {
+    throw new OmpKernelControlUnavailableError("restore");
+  }
+  const definitions = new Map(policy?.catalog.capabilities.map((item) => [item.id, item]) ?? []);
+  const admitted = new Set(allowedTools);
+  const transcriptMessages = history
+    .filter((event) => event.type === "omp.transcript.message")
+    .map((event) => {
+      const payload = isRecord(event.payload) ? event.payload as Record<string, JsonValue> : undefined;
+      if (payload?.message === undefined) {
+        throw new OmpKernelControlUnavailableError("restore");
+      }
+      return parseStoredMessage(payload.message);
+    });
+  const authorizingCalls = new Map<string, RestoredToolCall>();
+  collectToolCalls(transcriptMessages, authorizingCalls);
+  const ids: string[] = [];
+  for (const event of history.filter((item) => item.type === "capability.loaded")) {
+    if (!isRecord(event.payload)) throw new OmpKernelControlUnavailableError("restore");
+    const payload = event.payload as Record<string, JsonValue>;
+    if (payload.schemaVersion !== 1
+      || typeof payload.toolCallId !== "string"
+      || typeof payload.dispatchEventId !== "string"
+      || payload.catalogHash !== policy!.catalog.hash
+      || !Array.isArray(payload.capabilities)) {
+      throw new OmpKernelControlUnavailableError("restore");
+    }
+    const dispatchEvent = history.find((candidate) =>
+      candidate.type === "omp.tool.dispatch" && candidate.id === payload.dispatchEventId);
+    if (dispatchEvent === undefined) throw new OmpKernelControlUnavailableError("restore");
+    const dispatch = parseToolDispatchCheckpoint(dispatchEvent);
+    const authorizingCall = authorizingCalls.get(payload.toolCallId);
+    if (
+      authorizingCall === undefined
+      || authorizingCall.name !== "capabilities.load"
+      || dispatch.toolCallId !== payload.toolCallId
+      || dispatch.tool !== "capabilities.load"
+      || dispatch.inputDigest !== sha256(stableJson(authorizingCall.arguments))
+      || dispatch.transcriptIndex !== authorizingCall.transcriptIndex
+    ) {
+      throw new OmpKernelControlUnavailableError("restore");
+    }
+    const responseEvent = history.find((candidate) => {
+      const responsePayload = candidate.type === "omp.tool.response" && isRecord(candidate.payload)
+        ? candidate.payload as Record<string, JsonValue>
+        : undefined;
+      if (responsePayload === undefined) return false;
+      return responsePayload.toolCallId === payload.toolCallId
+        && responsePayload.dispatchEventId === payload.dispatchEventId;
+    });
+    if (responseEvent === undefined || !isRecord(responseEvent.payload)
+      || !isRecord((responseEvent.payload as Record<string, JsonValue>).result)
+      || ((responseEvent.payload as Record<string, JsonValue>).result as Record<string, JsonValue>).status !== "succeeded") {
+      throw new OmpKernelControlUnavailableError("restore");
+    }
+    if (!isRecord(authorizingCall.arguments) || !Array.isArray(authorizingCall.arguments.ids)
+      || authorizingCall.arguments.ids.some((id) => typeof id !== "string")) {
+      throw new OmpKernelControlUnavailableError("restore");
+    }
+    const requestedIds = [...new Set(authorizingCall.arguments.ids as string[])];
+    const expectedReceipt = requestedIds.map((id) => {
+      if (!admitted.has(id)) throw new OmpKernelControlUnavailableError("restore");
+      const definition = definitions.get(id);
+      if (definition === undefined) throw new OmpKernelControlUnavailableError("restore");
+      return {
+        id: definition.id,
+        version: definition.version,
+        hash: definition.hash,
+        source: definition.source,
+        effect: definition.effect,
+        input_schema: definition.inputSchema,
+      };
+    });
+    if (payload.capabilities.length !== expectedReceipt.length
+      || payload.capabilities.some((item, index) => !isRecord(item)
+        || stableJson(item) !== stableJson(expectedReceipt[index]))) {
+      throw new OmpKernelControlUnavailableError("restore");
+    }
+    for (const id of requestedIds) if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+function capabilityLoadReceipt(
+  name: string,
+  status: "succeeded" | "failed" | "unknown",
+  input: JsonValue,
+  output: JsonValue | undefined,
+  policy: CapabilityPolicySnapshot | undefined,
+): { readonly capabilities: readonly JsonValue[] } | undefined {
+  if (name !== "capabilities.load" || status !== "succeeded" || policy === undefined) return undefined;
+  if (!isRecord(input)) return undefined;
+  const inputRecord = input as Record<string, JsonValue>;
+  if (!Array.isArray(inputRecord.ids) || inputRecord.ids.some((id: JsonValue) => typeof id !== "string")) return undefined;
+  if (!isRecord(output) || (output as Record<string, JsonValue>).accepted !== true) return undefined;
+  const definitions = new Map(policy.catalog.capabilities.map((item) => [item.id, item]));
+  const ids = [...new Set((inputRecord.ids as JsonValue[]).map((id) => id as string))];
+  const capabilities = ids.map((id) => definitions.get(id));
+  if (capabilities.some((item) => item === undefined)) return undefined;
+  return {
+    capabilities: capabilities.map((item) => ({
+      id: item!.id,
+      version: item!.version,
+      hash: item!.hash,
+      source: item!.source,
+      effect: item!.effect,
+      input_schema: item!.inputSchema,
+    })),
+  };
 }
 
 function initialMessagesFromHistory(history: readonly CanonicalEvent[]): Message[] | undefined {

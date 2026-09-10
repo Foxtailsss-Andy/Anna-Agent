@@ -107,6 +107,30 @@ jobs:
             evals/workbench/wb01/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
 
+      - name: Run WB-02 capability evidence CLI guards
+        run: node --test scripts/workbench-capability-evidence.test.mjs
+
+      - name: Run WB-02 capability increment evidence
+        if: always()
+        env:
+          ANNA_WB02_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run workbench:capability:evidence
+
+      - name: Verify WB-02 capability evidence manifest
+        if: always()
+        env:
+          ANNA_WB02_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run evidence:verify -- evals/workbench/wb02/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}/evidence/manifest.json
+
+      - name: Retain WB-02 capability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wb02-capability-evidence
+          path: |
+            evals/workbench/wb02/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+
   product:
     runs-on: macos-latest
     timeout-minutes: 20

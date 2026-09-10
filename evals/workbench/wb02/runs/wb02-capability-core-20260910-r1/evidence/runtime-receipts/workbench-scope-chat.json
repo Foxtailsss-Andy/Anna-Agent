@@ -1,0 +1,77 @@
+{
+  "session_id": "60be24be-eb33-4244-aa55-fa38a20d7677",
+  "run_id": "c6f4797d-af4f-4b2b-b342-740ee3b0ff41",
+  "surface": "chat",
+  "project_id": "proj_1",
+  "model_requests": [
+    {
+      "event_id": "77d4195e-0bdd-4181-86bc-5598934fca0e",
+      "seq": 6,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "54dc5d15-258d-499c-aaff-0565f83fd83a",
+      "seq": 15,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "fa4a8ad8-ca2b-4fb9-a01c-989543283ca9",
+      "seq": 25,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    },
+    {
+      "event_id": "861ede7b-3d4f-4d0c-b913-52b69709af72",
+      "seq": 34,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    }
+  ],
+  "capability_loads": [
+    {
+      "event_id": "591b8069-0fcf-4727-aa7a-d8a8a1f070de",
+      "seq": 20,
+      "catalog_hash": "sha256:5d41551df7acfc0b446b320afe60b6c92856175a03fcea49e380cb9914b189eb",
+      "capability_ids": [
+        "crew.project.read"
+      ],
+      "capability_hashes": [
+        "sha256:3d6544e5e792c7eefd6b25dba1b6bddc4d5dfb9977e55888f0134275e8651b67"
+      ],
+      "load_tool_call_id": "load-chat",
+      "load_dispatch_event_id": "3f78b0ba-6541-478b-8d03-d8695976a212"
+    }
+  ],
+  "observation_marker": "WB02_SURFACE_PROJECT_MARKER",
+  "usage": "unavailable"
+}

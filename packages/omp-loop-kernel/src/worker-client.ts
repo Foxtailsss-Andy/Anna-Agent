@@ -24,6 +24,7 @@ export interface ManagedOmpWorkerOptions extends ManagedWorkerLaunchSpec {
   readonly wallTimeMs?: number;
   readonly modelTransport: (context: ModelContext, signal: AbortSignal) => AsyncIterable<HostModelResponse>;
   readonly toolGateway: (name: string, input: JsonValue, toolCallId: string, signal: AbortSignal) => Promise<{status: "succeeded" | "failed" | "unknown"; output?: JsonValue}>;
+  readonly activeToolsFor?: () => readonly import("./protocol").ToolDefinition[] | Promise<readonly import("./protocol").ToolDefinition[]>;
   readonly persistObservation?: (event: Observation) => Promise<void>;
   readonly beforeModel?: (context: ModelContext) => Promise<void>;
   readonly onControlReady?: (control: ManagedOmpWorkerControl) => void;
@@ -49,6 +50,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
   const acknowledgedToolReplies = new Set<string>();
   const usedCalls = new Set<string>();
   const initialMessages = options.input.initialMessages ?? [];
+  let activeTools = [...(options.input.activeTools ?? options.input.allowedTools)];
   const expectedMessages: Message[] = [
     ...initialMessages,
     ...(options.input.transcript === undefined
@@ -189,7 +191,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
     if (seen.size > 100_000) throw new Error("OMP frame count exceeded limit");
     if (frame.kind === "ready") {
       if (ready || frame.requestId !== bootstrapId || frame.runtime.bunVersion !== "1.3.14" || frame.runtime.ompVersion !== "18.0.11"
-        || [...frame.runtime.activeTools].sort().join("\0") !== options.input.allowedTools.map(tool => tool.name).sort().join("\0")) throw new Error("OMP readiness identity mismatch");
+        || [...frame.runtime.activeTools].sort().join("\0") !== activeTools.map(tool => tool.name).sort().join("\0")) throw new Error("OMP readiness identity mismatch");
       ready = frame.runtime;
       clearTimeout(startupTimer);
       await send({ ...response(frame), kind: "receipt", forFrameId: frame.frameId, accepted: true, throughWorkerSeq: sequence });
@@ -254,7 +256,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
       }
       case "model.request": {
         if (frame.modelId !== options.input.modelId || frame.context.systemPrompt !== options.input.systemPrompt
-          || !sameToolDefinitions(frame.context.tools, options.input.allowedTools)) throw new Error("OMP model input mismatch");
+          || !sameToolDefinitions(frame.context.tools, activeTools)) throw new Error("OMP model input mismatch");
         const projectedExpected = projectedMessagesFor(
           restoreProjection,
           options.input.transcript,
@@ -273,8 +275,8 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         const canonicalContext: ModelContext = {
           systemPrompt: options.input.systemPrompt,
           messages: [...expectedMessages],
-          ...(options.input.allowedTools.some((tool) => tool.name !== "read_only")
-            ? { tools: [...options.input.allowedTools] }
+          ...(activeTools.some((tool) => tool.name !== "read_only")
+            ? { tools: [...activeTools] }
             : {}),
         };
         const providerContext = hasSteeringEnvelope(frame.context.messages) ? frame.context : canonicalContext;
@@ -293,7 +295,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         for (const content of final.content) {
           if (content.type !== "toolCall") continue;
           if (pendingCalls.has(content.id) || usedCalls.has(content.id)
-            || !options.input.allowedTools.some(tool => tool.name === content.name)) throw new Error("OMP model returned invalid tool identity");
+            || !activeTools.some(tool => tool.name === content.name)) throw new Error("OMP model returned invalid tool identity");
         }
         const authorizingIndex = expectedMessages.length;
         const callIds: string[] = [];
@@ -315,7 +317,7 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         return;
       }
       case "tool.request": {
-        if (!options.input.allowedTools.some(tool => tool.name === frame.name)) throw new Error("OMP undeclared tool request");
+        if (!activeTools.some(tool => tool.name === frame.name)) throw new Error("OMP undeclared tool request");
         const expected = pendingCalls.get(frame.toolCallId);
         const siblings = expected === undefined ? [] : authorizingCalls.get(expected.authorizingIndex) ?? [frame.toolCallId];
         const siblingIndex = siblings.indexOf(frame.toolCallId);
@@ -334,6 +336,20 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
         usedCalls.add(frame.toolCallId);
         pendingOperation = true;
         const tool = await options.toolGateway(frame.name, frame.input, frame.toolCallId, controller.signal);
+        const nextTools = options.activeToolsFor === undefined
+          ? activeTools
+          : [...await options.activeToolsFor()];
+        if (!sameToolDefinitions(nextTools, activeTools)) {
+          const admitted = new Map(options.input.allowedTools.map((item) => [item.name, item]));
+          for (const item of nextTools) {
+            const expectedDefinition = admitted.get(item.name);
+            if (expectedDefinition === undefined || !sameToolDefinitions([item], [expectedDefinition])) {
+              throw new Error("OMP active tools update exceeds the admitted profile");
+            }
+          }
+          await send({ ...response(frame), kind: "tools.update", tools: nextTools });
+          activeTools = nextTools;
+        }
         const resultMessage: Message = { role: "toolResult", toolCallId: frame.toolCallId, toolName: frame.name,
           status: tool.status, content: tool.output === undefined ? tool.status : typeof tool.output === "string" ? tool.output : JSON.stringify(tool.output) };
         expectedMessages.push(resultMessage);

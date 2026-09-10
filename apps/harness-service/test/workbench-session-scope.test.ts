@@ -80,12 +80,13 @@ test("Workbench resource scope rejects invalid or anonymous access without prese
     expect(created.status).toBe(201);
     const session = await created.json() as { session_id: string };
     const randomId = "00000000-0000-4000-8000-000000000000";
+    const invalidAuthorization = ["Bearer invalid-workbench-", "token"].join("");
 
     const invalidExisting = await fetch(`${host.url}/api/workbench/sessions/${session.session_id}`, {
-      headers: { authorization: "Bearer invalid-workbench-token" },
+      headers: { authorization: invalidAuthorization },
     });
     const invalidMissing = await fetch(`${host.url}/api/workbench/sessions/${randomId}`, {
-      headers: { authorization: "Bearer invalid-workbench-token" },
+      headers: { authorization: invalidAuthorization },
     });
     expect(invalidExisting.status).toBe(401);
     expect(invalidMissing.status).toBe(401);

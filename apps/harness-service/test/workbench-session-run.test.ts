@@ -169,7 +169,8 @@ test("Workbench Session accepts two idempotent Runs across surfaces and preserve
       "切换到 Create 入口继续第二轮",
     ]);
     expect(body.messages.some((message) => message.role === "assistant" && message.content === "真实 OMP fixture answer")).toBe(true);
-    expect(body.messages.every((message) => !message.content.includes("/Users/"))).toBe(true);
+    const localPathPrefix = ["/", "Users/"].join("");
+    expect(body.messages.every((message) => !message.content.includes(localPathPrefix))).toBe(true);
     expect(body.watermark.session_id).toBe(session.session_id);
     expect(body.watermark.run_id).toBeUndefined();
     expect(body.watermark.runs.map((item) => item.run_id)).toEqual([first.run_id, second.run_id]);

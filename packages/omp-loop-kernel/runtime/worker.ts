@@ -53,6 +53,7 @@ class WorkerRuntime {
   private readonly reader: Interface;
   private binding: WorkerBinding | undefined;
   private input: StartInput | undefined;
+  private activeTools: readonly ToolDefinition[] = [];
   private session: CreateAgentSessionResult["session"] | undefined;
   private authStorage: OmpAuthStorage | undefined;
   private nextWorkerSeq = 0;
@@ -100,6 +101,7 @@ class WorkerRuntime {
   private async start(frame: Extract<HostFrame, { kind: "start" }>): Promise<void> {
     const input = this.input;
     if (input === undefined || this.binding === undefined) throw new Error("worker start state is missing");
+    this.activeTools = input.activeTools ?? input.allowedTools;
     const projection: RestoreProjection | undefined = input.transcript === undefined
       ? undefined
       : projectRestoreTranscript(input.transcript);
@@ -272,7 +274,7 @@ class WorkerRuntime {
     };
     const created = await createAgentSession(options);
     this.session = created.session;
-    const admittedProxyTools = input.allowedTools
+    const admittedProxyTools = this.activeTools
       .filter((tool) => tool.name !== "todo")
       .map((tool) => this.createProxyTool(tool));
     if (admittedProxyTools.length > 0) {
@@ -281,7 +283,7 @@ class WorkerRuntime {
     // The SDK's CustomTool shape omits AgentTool concurrency. Set the policy
     // on the live admitted proxies through the public Agent API so a single
     // Host gateway call is in flight at a time for this bounded profile.
-    const admittedToolNames = new Set(input.allowedTools.map((tool) => tool.name));
+    const admittedToolNames = new Set(this.activeTools.map((tool) => tool.name));
     const serializedTools: AgentTool[] = created.session.agent.state.tools.map((tool): AgentTool => {
       if (!admittedToolNames.has(tool.name)) return tool;
       if (tool.concurrency === "exclusive") return tool;
@@ -475,10 +477,10 @@ class WorkerRuntime {
     if (this.aborted || this.stopping) throw new HostModelError("cancelled", "model request cancelled");
     if (this.pendingModel !== undefined) throw new Error("OMP model request overlap");
     const requestId = randomUUID();
-    const exposeToolDefinitions = this.input?.allowedTools.some((tool) => tool.name !== "read_only") === true;
+    const exposeToolDefinitions = this.activeTools.some((tool) => tool.name !== "read_only");
     const frame = this.makeFrame("model.request", {
       modelId,
-      context: exposeToolDefinitions ? { ...context, tools: this.input?.allowedTools ?? [] } : context,
+      context: exposeToolDefinitions ? { ...context, tools: this.activeTools } : context,
     }, requestId);
     return new Promise<ModelReply>((resolvePromise, rejectPromise) => {
       const pending: PendingModel = {
@@ -563,6 +565,35 @@ class WorkerRuntime {
       // later by the normal session event stream and becomes the durability
       // point at the Host, so this frame never acts as a synthetic ACK.
       await this.session.steer(frame.message.content);
+      return;
+    }
+    if (frame.kind === "tools.update") {
+      if (!this.ready || this.session === undefined || this.stopping || this.aborted) {
+        throw new Error("OMP tools update received before the session was ready");
+      }
+      const input = this.input;
+      if (input === undefined) throw new Error("OMP tools update input is missing");
+      const admitted = new Map(input.allowedTools.map((tool) => [tool.name, tool]));
+      const next = frame.tools.map((tool) => {
+        const original = admitted.get(tool.name);
+        if (original === undefined || JSON.stringify(original) !== JSON.stringify(tool)) {
+          throw new Error("OMP tools update exceeds admitted profile");
+        }
+        return tool;
+      });
+      if (new Set(next.map((tool) => tool.name)).size !== next.length) {
+        throw new Error("OMP tools update contains duplicate tools");
+      }
+      this.activeTools = next;
+      const nextNames = new Set(next.map((tool) => tool.name));
+      const nativeTools = this.session.agent.state.tools.filter((tool) => tool.name === "todo" && nextNames.has(tool.name));
+      const proxies = next.filter((tool) => tool.name !== "todo").map((tool) => this.createProxyTool(tool));
+      const serializedTools: AgentTool[] = [...nativeTools, ...proxies].map((tool): AgentTool =>
+        nextNames.has(tool.name) && tool.concurrency !== "exclusive"
+          ? { ...tool, concurrency: "exclusive" as const }
+          : tool,
+      );
+      this.session.agent.setTools(serializedTools);
       return;
     }
     if (frame.kind === "abort") {

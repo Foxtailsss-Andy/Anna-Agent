@@ -1229,6 +1229,7 @@ function publicWorkbenchEvent(event: CanonicalEvent): Record<string, unknown> {
     seq: event.seq,
     timestamp: event.timestamp,
   };
+  const payload = isRecord(event.payload) ? event.payload as Record<string, any> : undefined;
   if (event.type === "omp.transcript.message") {
     const message = recordValue(recordValue(event.payload).message);
     if (message.role === "assistant") {
@@ -1237,6 +1238,44 @@ function publicWorkbenchEvent(event: CanonicalEvent): Record<string, unknown> {
     }
   } else if (event.type.startsWith("run.")) {
     body.status = event.type.slice("run.".length);
+    if (event.type === "run.failed" && payload !== undefined) {
+      const reason = payload.reason;
+      const errorCode = payload.error_code;
+      if (typeof reason === "string") body.reason = reason;
+      if (typeof errorCode === "string") body.error_code = errorCode;
+    }
+    if (event.type === "run.model.requested" && payload !== undefined) {
+      if (Array.isArray(payload.toolDefinitions)) {
+        body.tool_definition_names = payload.toolDefinitions
+          .filter(isRecord)
+          .map((tool) => tool.name)
+          .filter((name): name is string => typeof name === "string");
+      }
+      if (Array.isArray(payload.toolDefinitionHashes)) {
+        body.tool_definition_hashes = payload.toolDefinitionHashes
+          .filter((hash): hash is string => typeof hash === "string");
+      }
+    }
+  } else if (event.type === "capability.loaded" && payload !== undefined) {
+    body.catalog_hash = typeof payload.catalogHash === "string" ? payload.catalogHash : undefined;
+    body.load_tool_call_id = typeof payload.toolCallId === "string" ? payload.toolCallId : undefined;
+    body.load_dispatch_event_id = typeof payload.dispatchEventId === "string" ? payload.dispatchEventId : undefined;
+    if (Array.isArray(payload.capabilities)) {
+      body.capability_ids = payload.capabilities
+        .filter(isRecord)
+        .map((capability) => capability.id)
+        .filter((id): id is string => typeof id === "string");
+      body.capability_hashes = payload.capabilities
+        .filter(isRecord)
+        .map((capability) => capability.hash)
+        .filter((hash): hash is string => typeof hash === "string");
+    }
+  } else if (event.type === "omp.tool.dispatch" && payload !== undefined) {
+    body.tool_name = typeof payload.tool === "string" ? payload.tool : undefined;
+    body.input_digest = typeof payload.inputDigest === "string" ? payload.inputDigest : undefined;
+  } else if (event.type === "omp.tool.response" && payload !== undefined) {
+    const result = isRecord(payload.result) ? payload.result : undefined;
+    body.tool_status = typeof result?.status === "string" ? result.status : undefined;
   }
   return body;
 }

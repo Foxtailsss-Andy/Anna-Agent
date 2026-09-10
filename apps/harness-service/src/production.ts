@@ -59,6 +59,15 @@ import type { OmpHostModelTransport } from "../../../packages/omp-loop-kernel/sr
 import type { Message, ToolDefinition as OmpToolDefinition } from "../../../packages/omp-loop-kernel/src/protocol";
 import { createOmpModelTransport } from "./omp-model-transport";
 import type { ProductTask } from "./product-session";
+import {
+  capabilityLoadTool,
+  capabilitySearchTool,
+  capabilityDefinitionFromPolicy,
+  capabilityToolDescription,
+  capabilityToolParameters,
+  createWorkbenchCapabilityPolicy,
+  createWorkbenchCapabilityController,
+} from "./workbench-capabilities";
 
 export interface LiveHarnessV2RuntimeOptions {
   readonly runtimeConfigPath?: string;
@@ -311,6 +320,12 @@ export async function createLiveHarnessV2Runtime(
     throw new Error("verified OMP runtime is required for Product Host");
   }
   const surfaces = options.surfaces ?? ["create", "cowork", "hub"];
+  const configuredSkillPath = options.skillPath
+    ?? (typeof process.env.ANNA_HARNESS_V2_SKILL_PATH === "string"
+      && process.env.ANNA_HARNESS_V2_SKILL_PATH.trim() !== ""
+      ? process.env.ANNA_HARNESS_V2_SKILL_PATH
+      : undefined);
+  const explicitSkillConfigured = configuredSkillPath !== undefined;
   const webSearch = config.web_search_endpoint === undefined
     ? undefined
     : createWebSearchProvider({
@@ -324,13 +339,14 @@ export async function createLiveHarnessV2Runtime(
     : kernelDescriptor;
   const profile = await createLiveProfile(
     config.model_name,
-    options.skillPath,
+    configuredSkillPath,
     webSearch !== undefined,
     "general",
     "channel",
     selectedKernelDescriptor,
     options.requireOmp === true,
   );
+  const explicitSkillEntries = explicitSkillConfigured ? profile.skills : [];
   const createProfile = await createLiveProfile(
     config.model_name,
     undefined,
@@ -342,7 +358,7 @@ export async function createLiveHarnessV2Runtime(
   );
   const chatProfile = await createLiveProfile(
     config.model_name,
-    options.skillPath,
+    configuredSkillPath,
     webSearch !== undefined,
     "chat",
     "channel",
@@ -351,7 +367,7 @@ export async function createLiveHarnessV2Runtime(
   );
   const hikerProfile = await createLiveProfile(
     config.model_name,
-    options.skillPath,
+    configuredSkillPath,
     webSearch !== undefined,
     "hiker",
     "channel",
@@ -360,7 +376,7 @@ export async function createLiveHarnessV2Runtime(
   );
   const reimbursementProfile = await createLiveProfile(
     config.model_name,
-    options.skillPath,
+    configuredSkillPath,
     webSearch !== undefined,
     "reimbursement",
     "channel",
@@ -369,7 +385,7 @@ export async function createLiveHarnessV2Runtime(
   );
   const crewProfile = await createLiveProfile(
     config.model_name,
-    options.skillPath,
+    configuredSkillPath,
     webSearch !== undefined,
     "crew",
     "channel",
@@ -404,30 +420,86 @@ export async function createLiveHarnessV2Runtime(
       ?? process.env.ANNA_HARNESS_V2_WORKSPACE_ROOT
       ?? ".anna/workspace",
   );
-  const createRunToolGateway = (command: StartRun) => createProductionToolGateway({
-    eventStore,
-    command,
-    workspaceRoot,
-    workspaceRootFor: () => options.productTaskPeek?.(String(command.runId))?.workdir_path,
-    dynamicTools: dynamicGatewayTools(command, options.productTaskPeek?.(String(command.runId))),
-    dynamicToolCall: (request, signal) => canonicalToolName(request.name).startsWith("create.emit_")
-      ? callLocalProductTool(request)
-      : canonicalToolName(request.name) === "workdir.read_file"
-        ? callLocalProductTool(request)
-        : options.businessOrigin === undefined
-          ? callLocalProductTool(request)
-          : callBusinessTool({
-          origin: options.businessOrigin!,
-          serviceToken: options.businessServiceToken,
-          command,
-          request,
-          signal,
-          productTaskFor: options.productTaskFor,
-          productTaskPeek: options.productTaskPeek,
-          fetchImpl: options.businessFetchImpl,
-        }),
-    ...(webSearch === undefined ? {} : { webSearch }),
-  });
+  const loadedCapabilityIdsByRun = new Map<string, Set<string>>();
+  const createRunToolGateway = (
+    command: StartRun,
+    initialLoadedIds: readonly string[] = [],
+    resolvedTask?: ProductTask,
+  ) => {
+    const runId = String(command.runId);
+    const task = resolvedTask ?? options.productTaskPeek?.(runId);
+    const loadedIds = loadedCapabilityIdsByRun.get(runId) ?? new Set(initialLoadedIds);
+    loadedCapabilityIdsByRun.set(runId, loadedIds);
+    const callLocalOrBusiness = (request: Parameters<ToolGateway["execute"]>[0], signal: AbortSignal): Promise<ToolResult> => {
+      const canonical = canonicalToolName(request.name);
+      if (canonical.startsWith("create.emit_") || canonical === "workdir.read_file") {
+        return callLocalProductTool(request);
+      }
+      if (options.businessOrigin === undefined) return callLocalProductTool(request);
+      return callBusinessTool({
+        origin: options.businessOrigin,
+        serviceToken: options.businessServiceToken,
+        command,
+        request,
+        signal,
+        productTaskFor: options.productTaskFor,
+        productTaskPeek: options.productTaskPeek,
+        fetchImpl: options.businessFetchImpl,
+      });
+    };
+    const capabilityPolicy = command.runProfileSnapshot.capabilityPolicy;
+    const capabilityController = capabilityPolicy === undefined
+      ? undefined
+      : createWorkbenchCapabilityController({
+          projectId: task?.project_id,
+          loadedIds: [...loadedIds],
+          capabilityPolicy,
+          allowedTools: command.runProfileSnapshot.allowedTools,
+          dynamicToolCall: callLocalOrBusiness,
+        });
+    const dynamicTools = dynamicGatewayTools(command, task);
+    return createProductionToolGateway({
+      eventStore,
+      command,
+      workspaceRoot,
+      workspaceRootFor: () => task?.workdir_path,
+      dynamicTools,
+      dynamicToolCall: async (request, signal) => {
+        const canonical = canonicalToolName(request.name);
+        if (capabilityPolicy !== undefined && (
+          canonical === capabilitySearchTool
+          || canonical === capabilityLoadTool
+          || capabilityDefinitionFromPolicy(capabilityPolicy, canonical) !== undefined
+        )) {
+          if (capabilityController === undefined) {
+            return { status: "failed", output: { reason: "capability_controller_unavailable" } };
+          }
+          const result = await capabilityController.execute(request, signal);
+          loadedCapabilityIdsByRun.set(runId, new Set(capabilityController.loadedIds));
+          return result;
+        }
+        return callLocalOrBusiness(request, signal);
+      },
+      trustedAuthorize: (request) => authorizeWorkbenchTool({
+        origin: options.businessOrigin,
+        serviceToken: options.businessServiceToken,
+        command,
+        request,
+        productTaskFor: options.productTaskFor,
+        productTaskPeek: options.productTaskPeek,
+        fetchImpl: options.businessFetchImpl,
+      }),
+      ...(webSearch === undefined ? {} : { webSearch }),
+    });
+  };
+  const taskForOmp = async (command: StartRun): Promise<ProductTask | undefined> => {
+    const runId = String(command.runId);
+    return options.productTaskPeek?.(runId) ?? options.productTaskFor?.(runId);
+  };
+  const createRunToolGatewayForOmp = async (
+    command: StartRun,
+    initialLoadedIds: readonly string[] = [],
+  ) => createRunToolGateway(command, initialLoadedIds, await taskForOmp(command));
   const piKernel = options.createKernel?.({
     endpoint: config.model_endpoint,
     apiKey: config.model_api_key,
@@ -453,10 +525,17 @@ export async function createLiveHarnessV2Runtime(
       expectedManifestDigest: `sha256:${ompDescriptor.runtime.runtimeManifestSha256}`,
       workspaceRoot,
       prepareContext,
-      createToolGateway: createRunToolGateway,
-      toolDefinitionsFor: (command) => ompToolDefinitions(
+      createToolGateway: createRunToolGatewayForOmp,
+      toolDefinitionsFor: async (command) => ompToolDefinitions(command, await taskForOmp(command)),
+      initialToolDefinitionsFor: async (command) => ompActiveToolDefinitions(
         command,
-        options.productTaskPeek?.(String(command.runId)),
+        await taskForOmp(command),
+        loadedCapabilityIdsByRun.get(String(command.runId)),
+      ),
+      activeToolDefinitionsFor: async (command) => ompActiveToolDefinitions(
+        command,
+        await taskForOmp(command),
+        loadedCapabilityIdsByRun.get(String(command.runId)),
       ),
       ...(options.productTaskFor === undefined
         ? {}
@@ -500,7 +579,10 @@ export async function createLiveHarnessV2Runtime(
       if (owners.has(key)) throw new Error("Run already has an active owner");
       owners.set(key, { command, kernel: selected });
       try { return await selected.start(command, sink, signal); }
-      finally { owners.delete(key); }
+      finally {
+        owners.delete(key);
+        loadedCapabilityIdsByRun.delete(String(command.runId));
+      }
     },
     steer: (runId, message) => ownerFor(runId, message).steer(runId, message),
     answer: (runId, answer) => ownerFor(runId).answer(runId, answer),
@@ -522,7 +604,7 @@ export async function createLiveHarnessV2Runtime(
     profileFor: (surfaceId, body, fallback) => {
       const runId = isRecord(body) && typeof body.run_id === "string" ? body.run_id : undefined;
       const task = runId === undefined ? undefined : options.productTaskPeek?.(runId);
-      return narrowProductProfile(surfaceId, fallback, task, options.modelProfiles);
+      return narrowProductProfile(surfaceId, fallback, task, options.modelProfiles, explicitSkillEntries);
     },
     surfaces,
     evidenceMode: "live",
@@ -879,7 +961,11 @@ function narrowProductProfile(
   profile: ResolvedRunProfile,
   task?: ProductTask,
   modelProfiles?: LiveHarnessV2RuntimeOptions["modelProfiles"],
+  explicitSkillEntries: readonly SkillCatalogEntry[] = [],
 ): ResolvedRunProfile {
+  if (task?.schema_version === 2) {
+    return workbenchV2Profile(surfaceId, profile, task, modelProfiles, explicitSkillEntries);
+  }
   const model = selectedProductModel(profile, task, modelProfiles);
   const catalog = productToolCatalog(task);
   const catalogProvided = Array.isArray(task?.context?.tool_catalog);
@@ -887,6 +973,10 @@ function narrowProductProfile(
     ? profile.allowedTools.filter((name) => {
       const canonical = canonicalToolName(name);
       if (canonical === "todo" || canonical === "web_search") return true;
+      if (canonical === capabilitySearchTool || canonical === capabilityLoadTool) return true;
+      if (canonical === "crew.project.read" || canonical === "crew.channel.read") {
+        return task?.project_id !== undefined;
+      }
       if (canonical === "workdir.read_file") return task?.workdir_path !== undefined;
       return catalogProvided && (canonical === "chat.emit_page" || canonical === "chat.emit_document")
         && catalog.has(canonical);
@@ -896,6 +986,8 @@ function narrowProductProfile(
       : profile.allowedTools.filter((name) => {
         const canonical = canonicalToolName(name);
         return canonical === "read_only" || canonical === "todo" || canonical === "web_search"
+          || canonical === capabilitySearchTool || canonical === capabilityLoadTool
+          || ((canonical === "crew.project.read" || canonical === "crew.channel.read") && task?.project_id !== undefined)
           || catalog.has(canonical);
       });
   const taskSystemPrompt = task?.system_prompt?.trim();
@@ -943,6 +1035,70 @@ function narrowProductProfile(
       evalPolicy: profile.evalPolicy,
       artifactContract: profile.artifactContract,
       terminalRules: profile.terminalRules,
+      ...(profile.kernel === undefined ? {} : { kernel: profile.kernel }),
+    },
+  });
+}
+
+function workbenchV2Profile(
+  surfaceId: V2SurfaceId,
+  profile: ResolvedRunProfile,
+  task: ProductTask,
+  modelProfiles?: LiveHarnessV2RuntimeOptions["modelProfiles"],
+  explicitSkillEntries: readonly SkillCatalogEntry[] = [],
+): ResolvedRunProfile {
+  const model = selectedProductModel(profile, task, modelProfiles);
+  const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool];
+  if (task.project_id !== undefined) capabilityNames.push("crew.project.read", "crew.channel.read");
+  const skills = explicitSkillEntries;
+  const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
+  const forbiddenTools = new Set(skills.flatMap((skill) => skill.forbiddenTools));
+  const allowedTools = [...new Set(capabilityNames)].filter((name) =>
+    (skills.length === 0
+      || name === capabilitySearchTool
+      || name === capabilityLoadTool
+      || skillAllowedTools.has(name))
+    && !forbiddenTools.has(name));
+  const workerInstructions = surfaceId === "create"
+    ? "Complete the requested Workbench goal with the admitted capabilities. Do not require an artifact unless the request asks for one."
+    : "Complete the requested Workbench goal with the admitted capabilities.";
+  const skillIds = skills.map((skill) => skill.id);
+  const capabilityPolicy = createWorkbenchCapabilityPolicy();
+  return resolveRunProfile({
+    catalog: skills as SkillCatalogEntry[],
+    channelPolicy: {
+      toolPolicy: { allowedTools },
+      allowedSkillIds: skillIds,
+      allowedModels: [model],
+      budgetLimits: profile.budget,
+      memoryPolicy: {
+        allowedReadModes: [profile.memoryPolicy.read],
+        allowedWriteModes: [profile.memoryPolicy.write],
+      },
+    },
+    workerProfile: {
+      id: profile.workerProfile.id,
+      version: profile.workerProfile.version,
+      instructions: workerInstructions,
+      allowedSkillIds: skillIds,
+      allowedTools,
+      modelPolicy: { allowedModels: [model] },
+      budgetDefaults: profile.budget,
+      artifactContract: profile.artifactContract,
+    },
+    runProfile: {
+      id: profile.id,
+      version: profile.version,
+      model,
+      skillIds,
+      contextTransforms: profile.contextTransforms,
+      toolPolicy: { allowedTools },
+      budget: profile.budget,
+      memoryPolicy: profile.memoryPolicy,
+      evalPolicy: profile.evalPolicy,
+      artifactContract: profile.artifactContract,
+      terminalRules: profile.terminalRules,
+      capabilityPolicy,
       ...(profile.kernel === undefined ? {} : { kernel: profile.kernel }),
     },
   });
@@ -1004,6 +1160,9 @@ function toolNamesForSurface(
   webSearchEnabled: boolean,
   productMode = false,
 ): string[] {
+  const capabilityNames = productMode
+    ? [capabilitySearchTool, capabilityLoadTool, "crew.project.read", "crew.channel.read"]
+    : [];
   const names = surface === "create"
     ? productMode
       ? ["todo", "create.emit_skill_draft", "create.emit_prompt_draft", "create.emit_python_tool_draft"]
@@ -1014,10 +1173,11 @@ function toolNamesForSurface(
         ? ["todo", ...HIKER_TOOL_NAMES.map(providerToolName)]
         : surface === "reimbursement"
           ? ["todo", ...REIMBURSEMENT_TOOL_NAMES.map(providerToolName)]
-          : surface === "crew"
-            ? ["read_only", "todo", ...CREW_TOOL_NAMES.map(providerToolName)]
-            : ["read_only"];
-  return webSearchEnabled ? [...names, "web_search"] : names;
+            : surface === "crew"
+              ? ["read_only", "todo", ...CREW_TOOL_NAMES.map(providerToolName)]
+              : ["read_only"];
+  const combined = [...names, ...capabilityNames.filter((name) => !names.includes(name))];
+  return webSearchEnabled ? [...combined, "web_search"] : combined;
 }
 
 interface ProductToolCatalogEntry {
@@ -1033,10 +1193,20 @@ async function ompToolDefinitions(
   task?: ProductTask,
 ): Promise<readonly OmpToolDefinition[]> {
   const catalog = productToolCatalog(task);
+  const capabilityPolicy = command.runProfileSnapshot.capabilityPolicy;
   return command.runProfileSnapshot.allowedTools.map((name): OmpToolDefinition => {
     const canonical = canonicalToolName(name);
     const builtin = builtinOmpToolDefinition(name, canonical);
     if (builtin !== undefined) return builtin;
+    const capabilityDescription = capabilityToolDescription(canonical, capabilityPolicy);
+    const capabilityParameters = capabilityToolParameters(canonical, capabilityPolicy);
+    if (capabilityDescription !== undefined && capabilityParameters !== undefined) {
+      return {
+        name,
+        description: capabilityDescription,
+        parameters: capabilityParameters as OmpToolDefinition["parameters"],
+      };
+    }
     const entry = canonical.startsWith("create.emit_")
       ? createToolCatalogEntry(canonical)
       : catalog.get(canonical) ?? catalog.get(name);
@@ -1051,20 +1221,43 @@ async function ompToolDefinitions(
   });
 }
 
+async function ompActiveToolDefinitions(
+  command: StartRun,
+  task: ProductTask | undefined,
+  loadedIds: ReadonlySet<string> | undefined,
+): Promise<readonly OmpToolDefinition[]> {
+  const all = await ompToolDefinitions(command, task);
+  if (command.runProfileSnapshot.capabilityPolicy === undefined) return all;
+  if (task?.project_id === undefined) return all;
+  const names = new Set<string>([capabilitySearchTool, capabilityLoadTool]);
+  for (const id of loadedIds ?? []) names.add(id);
+  return all.filter((definition) => names.has(canonicalToolName(definition.name)));
+}
+
 function dynamicGatewayTools(
   command: StartRun,
   task?: ProductTask,
 ): readonly HarnessToolDefinition[] {
   const builtIn = new Set(["read_only", "create_artifact", "web_search"]);
   const catalog = productToolCatalog(task);
+  const capabilityPolicy = command.runProfileSnapshot.capabilityPolicy;
   return command.runProfileSnapshot.allowedTools
     .filter((name) => !builtIn.has(canonicalToolName(name)) && canonicalToolName(name) !== "todo")
     .map((name) => {
       const canonical = canonicalToolName(name);
+      const capabilityDescription = capabilityToolDescription(canonical, capabilityPolicy);
+      const capabilityParameters = capabilityToolParameters(canonical, capabilityPolicy);
       const entry = localProductToolCatalogEntry(canonical)
         ?? (canonical.startsWith("create.emit_")
         ? createToolCatalogEntry(canonical)
         : catalog.get(canonical) ?? catalog.get(name));
+      if (capabilityDescription !== undefined && capabilityParameters !== undefined) {
+        return {
+          name,
+          replayPolicy: "safe" as const,
+          inputSchema: schemaFromJson(capabilityParameters),
+        };
+      }
       if (entry === undefined) {
         throw new Error(`business tool catalog does not offer admitted tool: ${canonical}`);
       }
@@ -1298,18 +1491,56 @@ function localProductToolCatalogEntry(name: string): ProductToolCatalogEntry | u
 }
 
 function schemaFromJson(schema: Record<string, unknown>): Schema<unknown> {
-  const properties = isRecord(schema.properties) ? new Set(Object.keys(schema.properties)) : new Set<string>();
-  const required = Array.isArray(schema.required)
-    ? schema.required.filter((value): value is string => typeof value === "string")
-    : [];
   return {
     parse(input: unknown) {
-      if (!isRecord(input)) throw new Error("tool input must be an object");
-      if (Object.keys(input).some((key) => !properties.has(key))) throw new Error("tool input contains an unknown field");
-      if (required.some((key) => !(key in input))) throw new Error("tool input is missing a required field");
+      validateJsonSchemaValue(schema, input, "tool input");
       return input;
     },
   };
+}
+
+function validateJsonSchemaValue(schema: Record<string, unknown>, value: unknown, path: string): void {
+  const type = schema.type;
+  if (type === "object") {
+    if (!isRecord(value)) throw new Error(`${path} must be an object`);
+    const properties = isRecord(schema.properties) ? schema.properties : {};
+    const required = Array.isArray(schema.required)
+      ? schema.required.filter((item): item is string => typeof item === "string")
+      : [];
+    if (schema.additionalProperties === false && Object.keys(value).some((key) => !Object.hasOwn(properties, key))) {
+      throw new Error(`${path} contains an unknown field`);
+    }
+    for (const key of required) {
+      if (!Object.hasOwn(value, key)) throw new Error(`${path}.${key} is required`);
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const childSchema = properties[key];
+      if (childSchema !== undefined && isRecord(childSchema)) validateJsonSchemaValue(childSchema, child, `${path}.${key}`);
+    }
+  } else if (type === "array") {
+    if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
+    if (typeof schema.minItems === "number" && value.length < schema.minItems) throw new Error(`${path} has too few items`);
+    if (isRecord(schema.items)) value.forEach((item, index) => validateJsonSchemaValue(schema.items as Record<string, unknown>, item, `${path}[${index}]`));
+  } else if (type === "string") {
+    if (typeof value !== "string") throw new Error(`${path} must be a string`);
+  } else if (type === "number" || type === "integer") {
+    if (typeof value !== "number" || !Number.isFinite(value) || (type === "integer" && !Number.isInteger(value))) {
+      throw new Error(`${path} must be a ${type}`);
+    }
+  } else if (type === "boolean" && typeof value !== "boolean") {
+    throw new Error(`${path} must be a boolean`);
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.some((candidate) => stableJsonValue(candidate) === stableJsonValue(value))) {
+    throw new Error(`${path} has an invalid value`);
+  }
+}
+
+function stableJsonValue(value: unknown): string {
+  return JSON.stringify(value, (_key, item) =>
+    item !== null && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)))
+      : item,
+  );
 }
 
 function isStrictJsonSchema(value: Record<string, unknown>): boolean {
@@ -1448,6 +1679,44 @@ async function callLocalProductTool(
     };
   }
   return { status: "failed", output: { reason: "business_adapter_not_configured" } };
+}
+
+async function authorizeWorkbenchTool(options: {
+  origin?: string;
+  serviceToken?: string;
+  command: StartRun;
+  request: ToolRequest;
+  productTaskFor?: (runId: string) => ProductTask | undefined | Promise<ProductTask | undefined>;
+  productTaskPeek?: (runId: string) => ProductTask | undefined;
+  fetchImpl?: typeof fetch;
+}): Promise<"allow" | "deny"> {
+  const task = options.productTaskPeek?.(String(options.command.runId))
+    ?? await options.productTaskFor?.(String(options.command.runId));
+  if (task?.schema_version !== 2) {
+    return options.command.runProfileSnapshot.capabilityPolicy === undefined ? "allow" : "deny";
+  }
+  if (options.origin === undefined || options.serviceToken === undefined || options.serviceToken.trim() === "") {
+    return "deny";
+  }
+  const fetchImpl = options.fetchImpl ?? fetch;
+  try {
+    const response = await fetchImpl(`${options.origin.replace(/\/$/, "")}/_business/workbench/scope`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "x-anna-service-token": options.serviceToken,
+      },
+      body: JSON.stringify({
+        workspace_id: String(options.command.workspaceId),
+        actor_user_id: task.actor_user_id,
+        ...(task.project_id === undefined ? {} : { project_id: task.project_id }),
+      }),
+    });
+    return response.ok ? "allow" : "deny";
+  } catch {
+    return "deny";
+  }
 }
 
 async function callBusinessTool(options: {

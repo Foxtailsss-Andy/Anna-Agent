@@ -10,6 +10,10 @@ import { SchemaValidationError, expectRecord } from "./schema";
 import type { SkillCatalogEntry } from "./skill-catalog";
 import type { ToolDefinition } from "./tool-gateway";
 import {
+  parseCapabilityPolicySnapshot,
+  type CapabilityPolicySnapshot,
+} from "./capability-catalog";
+import {
   parseKernelDescriptor,
   type KernelDescriptorV1,
 } from "./kernel-descriptor";
@@ -102,6 +106,7 @@ export interface RunProfile {
   evalPolicy: EvalPolicy;
   artifactContract: ArtifactContract;
   terminalRules: TerminalRules;
+  readonly capabilityPolicy?: CapabilityPolicySnapshot;
   readonly kernel?: KernelDescriptorV1;
 }
 
@@ -133,6 +138,7 @@ export interface ResolvedRunProfile {
   readonly evalPolicy: Readonly<EvalPolicy>;
   readonly artifactContract: Readonly<ArtifactContract>;
   readonly terminalRules: Readonly<TerminalRules>;
+  readonly capabilityPolicy?: CapabilityPolicySnapshot;
   readonly kernel?: KernelDescriptorV1;
 }
 
@@ -485,8 +491,9 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     "evalPolicy",
     "artifactContract",
     "terminalRules",
+    "capabilityPolicy",
     "kernel",
-  ], ["kernel"]);
+  ], ["capabilityPolicy", "kernel"]);
   const workerProfile = exactRecord(value.workerProfile, "RunProfileSnapshot.workerProfile", [
     "id",
     "version",
@@ -510,8 +517,11 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     );
   }
 
-  if (!Array.isArray(value.skills) || value.skills.length === 0) {
-    throw new SchemaValidationError("RunProfileSnapshot.skills must be a non-empty array");
+  const capabilityPolicy = Object.hasOwn(value, "capabilityPolicy")
+    ? parseCapabilityPolicySnapshot(value.capabilityPolicy)
+    : undefined;
+  if (!Array.isArray(value.skills) || (value.skills.length === 0 && capabilityPolicy === undefined)) {
+    throw new SchemaValidationError("RunProfileSnapshot.skills must be a non-empty array unless a capability policy is present");
   }
   if (!Array.isArray(value.contextTransforms) || value.contextTransforms.length === 0) {
     throw new SchemaValidationError(
@@ -626,6 +636,7 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
         "RunProfileSnapshot.terminalRules.stopCondition",
       ),
     },
+    ...(capabilityPolicy === undefined ? {} : { capabilityPolicy }),
     ...(kernel === undefined ? {} : { kernel }),
   };
   const hash = snapshotString(value.hash, "RunProfileSnapshot.hash");
@@ -651,6 +662,7 @@ export function resolveRunProfile(
   options: ResolveRunProfileOptions,
 ): ResolvedRunProfile {
   const runProfile = options.runProfile;
+  const hasCapabilityPolicy = runProfile?.capabilityPolicy !== undefined;
   const channelTools = copyStringArray(
     options.channelPolicy?.toolPolicy?.allowedTools,
     "ChannelPolicy.toolPolicy.allowedTools",
@@ -659,7 +671,7 @@ export function resolveRunProfile(
   const channelSkillIds = copyStringArray(
     options.channelPolicy?.allowedSkillIds,
     "ChannelPolicy.allowedSkillIds",
-    true,
+    !hasCapabilityPolicy,
   );
   const channelModels = snapshotModels(
     options.channelPolicy?.allowedModels,
@@ -692,7 +704,7 @@ export function resolveRunProfile(
   const workerSkillIds = copyStringArray(
     options.workerProfile?.allowedSkillIds,
     "WorkerProfile.allowedSkillIds",
-    true,
+    !hasCapabilityPolicy,
   );
   const workerTools = copyStringArray(
     options.workerProfile?.allowedTools,
@@ -709,11 +721,14 @@ export function resolveRunProfile(
   );
   const id = requireNonEmptyString(runProfile?.id, "RunProfile.id") as RunProfileId;
   const version = requireNonEmptyString(runProfile?.version, "RunProfile.version");
+  const capabilityPolicy = runProfile?.capabilityPolicy === undefined
+    ? undefined
+    : parseCapabilityPolicySnapshot(runProfile.capabilityPolicy);
   const model = snapshotModel(runProfile?.model, "RunProfile.model");
   const runSkillIds = copyStringArray(
     runProfile?.skillIds,
     "RunProfile.skillIds",
-    true,
+    capabilityPolicy === undefined,
   );
   const profileTools = copyStringArray(
     runProfile?.toolPolicy?.allowedTools,
@@ -812,9 +827,11 @@ export function resolveRunProfile(
   });
   const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
   const forbiddenTools = new Set(skills.flatMap((skill) => skill.forbiddenTools));
+  const capabilityHostTools = new Set(["capabilities.search", "capabilities.load"]);
   const allowedTools = channelTools.filter(
     (tool) =>
-      skillAllowedTools.has(tool)
+      ((capabilityPolicy !== undefined && (skills.length === 0 || capabilityHostTools.has(tool)))
+        || skillAllowedTools.has(tool))
       && workerTools.includes(tool)
       && profileTools.includes(tool)
       && !forbiddenTools.has(tool),
@@ -842,6 +859,7 @@ export function resolveRunProfile(
     evalPolicy,
     artifactContract,
     terminalRules,
+    ...(capabilityPolicy === undefined ? {} : { capabilityPolicy }),
     ...(kernel === undefined ? {} : { kernel }),
   };
 

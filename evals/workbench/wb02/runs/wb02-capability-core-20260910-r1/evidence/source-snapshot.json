@@ -1,0 +1,470 @@
+{
+  "sourceScopePathsBefore": [
+    ".github/workflows/ci.yml",
+    "apps/harness-service/package.json",
+    "apps/harness-service/src/pi-kernel-build-identity.ts",
+    "apps/harness-service/src/product-facade.ts",
+    "apps/harness-service/src/product-session.ts",
+    "apps/harness-service/src/production-tools.ts",
+    "apps/harness-service/src/production.ts",
+    "apps/harness-service/src/workbench-capabilities.ts",
+    "apps/harness-service/src/workbench-migration.ts",
+    "apps/harness-service/src/workbench-session.ts",
+    "apps/harness-service/test/workbench-capability-loading.test.ts",
+    "apps/harness-service/test/workbench-capability-restore.test.ts",
+    "apps/harness-service/test/workbench-capability-review.test.ts",
+    "apps/harness-service/test/workbench-capability-scope.test.ts",
+    "apps/harness-service/test/workbench-session-fixture.ts",
+    "package-lock.json",
+    "package.json",
+    "packages/harness-v2/src/capability-catalog.ts",
+    "packages/harness-v2/src/index.ts",
+    "packages/harness-v2/src/run-profile.ts",
+    "packages/omp-loop-kernel/package.json",
+    "packages/omp-loop-kernel/runtime/package-lock.json",
+    "packages/omp-loop-kernel/runtime/package.json",
+    "packages/omp-loop-kernel/runtime/protocol.ts",
+    "packages/omp-loop-kernel/runtime/worker.ts",
+    "packages/omp-loop-kernel/src/index.ts",
+    "packages/omp-loop-kernel/src/kernel-identity.ts",
+    "packages/omp-loop-kernel/src/kernel-source.ts",
+    "packages/omp-loop-kernel/src/managed-launcher.ts",
+    "packages/omp-loop-kernel/src/omp-loop-kernel.ts",
+    "packages/omp-loop-kernel/src/protocol.ts",
+    "packages/omp-loop-kernel/src/runtime-manifest.ts",
+    "packages/omp-loop-kernel/src/worker-client.ts",
+    "scripts/workbench-capability-evidence.mjs",
+    "scripts/workbench-capability-evidence.test.mjs",
+    "services/api/app/routes/business.py",
+    "tests/contracts/test_workbench_capabilities.py",
+    "uv.lock"
+  ],
+  "sourceScopePathsAfter": [
+    ".github/workflows/ci.yml",
+    "apps/harness-service/package.json",
+    "apps/harness-service/src/pi-kernel-build-identity.ts",
+    "apps/harness-service/src/product-facade.ts",
+    "apps/harness-service/src/product-session.ts",
+    "apps/harness-service/src/production-tools.ts",
+    "apps/harness-service/src/production.ts",
+    "apps/harness-service/src/workbench-capabilities.ts",
+    "apps/harness-service/src/workbench-migration.ts",
+    "apps/harness-service/src/workbench-session.ts",
+    "apps/harness-service/test/workbench-capability-loading.test.ts",
+    "apps/harness-service/test/workbench-capability-restore.test.ts",
+    "apps/harness-service/test/workbench-capability-review.test.ts",
+    "apps/harness-service/test/workbench-capability-scope.test.ts",
+    "apps/harness-service/test/workbench-session-fixture.ts",
+    "package-lock.json",
+    "package.json",
+    "packages/harness-v2/src/capability-catalog.ts",
+    "packages/harness-v2/src/index.ts",
+    "packages/harness-v2/src/run-profile.ts",
+    "packages/omp-loop-kernel/package.json",
+    "packages/omp-loop-kernel/runtime/package-lock.json",
+    "packages/omp-loop-kernel/runtime/package.json",
+    "packages/omp-loop-kernel/runtime/protocol.ts",
+    "packages/omp-loop-kernel/runtime/worker.ts",
+    "packages/omp-loop-kernel/src/index.ts",
+    "packages/omp-loop-kernel/src/kernel-identity.ts",
+    "packages/omp-loop-kernel/src/kernel-source.ts",
+    "packages/omp-loop-kernel/src/managed-launcher.ts",
+    "packages/omp-loop-kernel/src/omp-loop-kernel.ts",
+    "packages/omp-loop-kernel/src/protocol.ts",
+    "packages/omp-loop-kernel/src/runtime-manifest.ts",
+    "packages/omp-loop-kernel/src/worker-client.ts",
+    "scripts/workbench-capability-evidence.mjs",
+    "scripts/workbench-capability-evidence.test.mjs",
+    "services/api/app/routes/business.py",
+    "tests/contracts/test_workbench_capabilities.py",
+    "uv.lock"
+  ],
+  "sourceHashesBefore": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "306bd6202716f4fdbd5e1aaf45a2578c8e6abc7767f1d64586416649c1d57216",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/package.json",
+      "sha256": "a670e1bf3d4a7524ddd687ed0b80f6321ce15d67bb1a606386bb62fe61b99f9e",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/pi-kernel-build-identity.ts",
+      "sha256": "187b2a8856e0f93733a6b19321db60ca8283002d1f9c2a70dc5fdd2626e96129",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-facade.ts",
+      "sha256": "2fb8531d182db008b0c29715fe712444e61ac1ac3f6616795c735bfe2614f26b",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-session.ts",
+      "sha256": "0d2a8a79339e08e27d62a20223c085bf5b1df956b220b55612a4d7eed31bf2ba",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/production-tools.ts",
+      "sha256": "d9c150cfd31d48872bb93c77eee741eca6e36e402ef1f35aa0a6d35d2372f0c8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/production.ts",
+      "sha256": "38f4cd5533a88838a62c393cc02a042891e48a82f2665527ffe61857c902b8e8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-capabilities.ts",
+      "sha256": "fc32ac25b25a65523cfccde6e85f2cee5a693c0783f6786db6eb775cd2c7d9e4",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-migration.ts",
+      "sha256": "b9273703c7503fc4076b6d2e152b1249f972546220fbe701c2403f632e631ab1",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-session.ts",
+      "sha256": "9b64045d661e3b13993425c5f00fa964264aab9b54630b7a83ee49098e309764",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "sha256": "21507839efd6aa2ed7c3eb7aae3b6346ac584bd59d67bba1a2656321ab16f8df",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-restore.test.ts",
+      "sha256": "7e18940f4dfabfd2cc770bcaadc89a634189116a10fab74e75747a9dc0f23ff6",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-review.test.ts",
+      "sha256": "4d8049c4168c5d37ca380d9da0c0715368f5e00ddc05ebb3d50d76ca7c26cc5c",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-scope.test.ts",
+      "sha256": "1ee75545bba5e16b6925baed92e7aaf9e5cdd352cefb3acbfddc1003fd160b8c",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-fixture.ts",
+      "sha256": "48d0c620b0a781aa0eec5c74145d369feba02bc33b0f386a8249a2ef513f12ca",
+      "present": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "bed08ce653b0fb35984b24ea7fc841a9fa4eff0b11e249c45ff9ac1b0c33a898",
+      "present": true
+    },
+    {
+      "path": "package.json",
+      "sha256": "05e27ca18ee1d4c16a0ebf05849a87faeae64bd468b0b67dcfac7e0740060173",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/capability-catalog.ts",
+      "sha256": "30979c427a41ad50bb70745aae5154633bd368d8013702e951d4de48be363f0e",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/index.ts",
+      "sha256": "4b238677ec3e018956e1f0be08ae472a593d05dc1535155b3e83d88dabfcda60",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/run-profile.ts",
+      "sha256": "ce3cfcaa4fb754de78eaa479d004d174846a47e066755c9a144680352fda9c41",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/package.json",
+      "sha256": "364a371b9093f03ee055653f912e2aebbef1321b9965286f3b090a0f9a929280",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/package-lock.json",
+      "sha256": "f5a96c28a0187d549959fbe33c78596198491df29be9ea18424bf814fea88ceb",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/package.json",
+      "sha256": "dc6a0e29f5fa0e8459cc8254362e2db610855eb8d09e4ff006f0a2e61e5c5106",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/protocol.ts",
+      "sha256": "f8130c5d1af12316b0875f1e0368a436a1e125e0c155fc3cb66a4d8d76fa2a56",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/worker.ts",
+      "sha256": "1cf42eb0907170cfd1c198b5e0c990ff55cf3b741e02c8db6bbed13c395d91b8",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/index.ts",
+      "sha256": "fc31ff271d881b71ee96d00676f7481a9f14301e2af86561f61e415ab30b5664",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/kernel-identity.ts",
+      "sha256": "e860e46552bbb0aa650c1fb1a276db9dd00b5fc8d500c5bf7cb5d46fa598b7fa",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/kernel-source.ts",
+      "sha256": "7fa2490bdbeafb9da44e6c4eeb6000669315caa7501aa6d6e59d8bfb285f8faf",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/managed-launcher.ts",
+      "sha256": "5d45b5105f5f25ffded7e6a2e96cbaf1183163d7b3d1870dd86dc1f33c0af438",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/omp-loop-kernel.ts",
+      "sha256": "53922c1dffc3a4cd432bdd756a88b2ef4d31467b8845b38955f4b3f020deeb17",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/protocol.ts",
+      "sha256": "f2a27e5179bcd7dd37eee60e1b93da11068a4b32cc76e1be8d38e5c560a67f75",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/runtime-manifest.ts",
+      "sha256": "2eed783000e90640325adb76d50ed45a2799819051ea368833894bcdc3c9ff96",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/worker-client.ts",
+      "sha256": "3770e5ae482ddc20f804bf8cc2ebebf1d1d8a02da02f7858216e7cf0028454dd",
+      "present": true
+    },
+    {
+      "path": "scripts/workbench-capability-evidence.mjs",
+      "sha256": "d1c2441f569f8cfec1b660ec1976b8cd55866d861c2ea1abf3708b9dc3dd99dc",
+      "present": true
+    },
+    {
+      "path": "scripts/workbench-capability-evidence.test.mjs",
+      "sha256": "85871009cc021192da347110eb2800acfb20b44ac26bf10b51cdf039ef8c36ae",
+      "present": true
+    },
+    {
+      "path": "services/api/app/routes/business.py",
+      "sha256": "c9c1034e182411321c0654b719743d0be3b272d4c456c9bb15aa588d730bb2d6",
+      "present": true
+    },
+    {
+      "path": "tests/contracts/test_workbench_capabilities.py",
+      "sha256": "54f2f0bc25a53a7f70bf70c51086a78a5934b06cfd05e7def2ed43d064405afa",
+      "present": true
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "860c46a80bdc4df44ca2dc4ebcb17f64b961e9850954d82ba12438d98a6ac5b8",
+      "present": true
+    }
+  ],
+  "sourceHashesAfter": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "306bd6202716f4fdbd5e1aaf45a2578c8e6abc7767f1d64586416649c1d57216",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/package.json",
+      "sha256": "a670e1bf3d4a7524ddd687ed0b80f6321ce15d67bb1a606386bb62fe61b99f9e",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/pi-kernel-build-identity.ts",
+      "sha256": "187b2a8856e0f93733a6b19321db60ca8283002d1f9c2a70dc5fdd2626e96129",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-facade.ts",
+      "sha256": "2fb8531d182db008b0c29715fe712444e61ac1ac3f6616795c735bfe2614f26b",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-session.ts",
+      "sha256": "0d2a8a79339e08e27d62a20223c085bf5b1df956b220b55612a4d7eed31bf2ba",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/production-tools.ts",
+      "sha256": "d9c150cfd31d48872bb93c77eee741eca6e36e402ef1f35aa0a6d35d2372f0c8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/production.ts",
+      "sha256": "38f4cd5533a88838a62c393cc02a042891e48a82f2665527ffe61857c902b8e8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-capabilities.ts",
+      "sha256": "fc32ac25b25a65523cfccde6e85f2cee5a693c0783f6786db6eb775cd2c7d9e4",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-migration.ts",
+      "sha256": "b9273703c7503fc4076b6d2e152b1249f972546220fbe701c2403f632e631ab1",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-session.ts",
+      "sha256": "9b64045d661e3b13993425c5f00fa964264aab9b54630b7a83ee49098e309764",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "sha256": "21507839efd6aa2ed7c3eb7aae3b6346ac584bd59d67bba1a2656321ab16f8df",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-restore.test.ts",
+      "sha256": "7e18940f4dfabfd2cc770bcaadc89a634189116a10fab74e75747a9dc0f23ff6",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-review.test.ts",
+      "sha256": "4d8049c4168c5d37ca380d9da0c0715368f5e00ddc05ebb3d50d76ca7c26cc5c",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-capability-scope.test.ts",
+      "sha256": "1ee75545bba5e16b6925baed92e7aaf9e5cdd352cefb3acbfddc1003fd160b8c",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-fixture.ts",
+      "sha256": "48d0c620b0a781aa0eec5c74145d369feba02bc33b0f386a8249a2ef513f12ca",
+      "present": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "bed08ce653b0fb35984b24ea7fc841a9fa4eff0b11e249c45ff9ac1b0c33a898",
+      "present": true
+    },
+    {
+      "path": "package.json",
+      "sha256": "05e27ca18ee1d4c16a0ebf05849a87faeae64bd468b0b67dcfac7e0740060173",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/capability-catalog.ts",
+      "sha256": "30979c427a41ad50bb70745aae5154633bd368d8013702e951d4de48be363f0e",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/index.ts",
+      "sha256": "4b238677ec3e018956e1f0be08ae472a593d05dc1535155b3e83d88dabfcda60",
+      "present": true
+    },
+    {
+      "path": "packages/harness-v2/src/run-profile.ts",
+      "sha256": "ce3cfcaa4fb754de78eaa479d004d174846a47e066755c9a144680352fda9c41",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/package.json",
+      "sha256": "364a371b9093f03ee055653f912e2aebbef1321b9965286f3b090a0f9a929280",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/package-lock.json",
+      "sha256": "f5a96c28a0187d549959fbe33c78596198491df29be9ea18424bf814fea88ceb",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/package.json",
+      "sha256": "dc6a0e29f5fa0e8459cc8254362e2db610855eb8d09e4ff006f0a2e61e5c5106",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/protocol.ts",
+      "sha256": "f8130c5d1af12316b0875f1e0368a436a1e125e0c155fc3cb66a4d8d76fa2a56",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/runtime/worker.ts",
+      "sha256": "1cf42eb0907170cfd1c198b5e0c990ff55cf3b741e02c8db6bbed13c395d91b8",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/index.ts",
+      "sha256": "fc31ff271d881b71ee96d00676f7481a9f14301e2af86561f61e415ab30b5664",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/kernel-identity.ts",
+      "sha256": "e860e46552bbb0aa650c1fb1a276db9dd00b5fc8d500c5bf7cb5d46fa598b7fa",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/kernel-source.ts",
+      "sha256": "7fa2490bdbeafb9da44e6c4eeb6000669315caa7501aa6d6e59d8bfb285f8faf",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/managed-launcher.ts",
+      "sha256": "5d45b5105f5f25ffded7e6a2e96cbaf1183163d7b3d1870dd86dc1f33c0af438",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/omp-loop-kernel.ts",
+      "sha256": "53922c1dffc3a4cd432bdd756a88b2ef4d31467b8845b38955f4b3f020deeb17",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/protocol.ts",
+      "sha256": "f2a27e5179bcd7dd37eee60e1b93da11068a4b32cc76e1be8d38e5c560a67f75",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/runtime-manifest.ts",
+      "sha256": "2eed783000e90640325adb76d50ed45a2799819051ea368833894bcdc3c9ff96",
+      "present": true
+    },
+    {
+      "path": "packages/omp-loop-kernel/src/worker-client.ts",
+      "sha256": "3770e5ae482ddc20f804bf8cc2ebebf1d1d8a02da02f7858216e7cf0028454dd",
+      "present": true
+    },
+    {
+      "path": "scripts/workbench-capability-evidence.mjs",
+      "sha256": "d1c2441f569f8cfec1b660ec1976b8cd55866d861c2ea1abf3708b9dc3dd99dc",
+      "present": true
+    },
+    {
+      "path": "scripts/workbench-capability-evidence.test.mjs",
+      "sha256": "85871009cc021192da347110eb2800acfb20b44ac26bf10b51cdf039ef8c36ae",
+      "present": true
+    },
+    {
+      "path": "services/api/app/routes/business.py",
+      "sha256": "c9c1034e182411321c0654b719743d0be3b272d4c456c9bb15aa588d730bb2d6",
+      "present": true
+    },
+    {
+      "path": "tests/contracts/test_workbench_capabilities.py",
+      "sha256": "54f2f0bc25a53a7f70bf70c51086a78a5934b06cfd05e7def2ed43d064405afa",
+      "present": true
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "860c46a80bdc4df44ca2dc4ebcb17f64b961e9850954d82ba12438d98a6ac5b8",
+      "present": true
+    }
+  ],
+  "modulesHashBefore": "sha256:481b04d1c6770a2361548c2758cc70c2942d51b2e975dd9221a961ba59a6cfac",
+  "modulesHashAfter": "sha256:481b04d1c6770a2361548c2758cc70c2942d51b2e975dd9221a961ba59a6cfac",
+  "sourceShaBefore": "eec76df8cc7fc40d412f5f3e253fd15d0a4c07b1",
+  "sourceShaAfter": "eec76df8cc7fc40d412f5f3e253fd15d0a4c07b1"
+}

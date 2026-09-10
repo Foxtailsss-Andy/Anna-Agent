@@ -108,22 +108,53 @@ def build_router(
         x_anna_service_token: str | None = Header(default=None),
     ) -> dict[str, str]:
         require_token(x_anna_service_token)
-        resolved = resolve_workbench_identity(authorization)
+        if authorization is not None:
+            resolved = resolve_workbench_identity(authorization)
+            resolved_workspace_id = resolved.workspace_id
+            resolved_actor_user_id = resolved.user_id
+        elif request.workspace_id is not None and request.actor_user_id is not None:
+            if local_session is not None:
+                local = local_session()
+                if local.workspace_id == request.workspace_id and local.user_id == request.actor_user_id:
+                    resolved_workspace_id = local.workspace_id
+                    resolved_actor_user_id = local.user_id
+                else:
+                    member = next(
+                        (candidate for candidate in identity.list_members(request.workspace_id) if candidate.id == request.actor_user_id),
+                        None,
+                    )
+                    if member is None:
+                        raise HTTPException(status_code=404, detail="scope not found")
+                    resolved_workspace_id = member.workspace_id
+                    resolved_actor_user_id = member.id
+            else:
+                member = next(
+                    (candidate for candidate in identity.list_members(request.workspace_id) if candidate.id == request.actor_user_id),
+                    None,
+                )
+                if member is None:
+                    raise HTTPException(status_code=404, detail="scope not found")
+                resolved_workspace_id = member.workspace_id
+                resolved_actor_user_id = member.id
+        else:
+            resolved = resolve_workbench_identity(None)
+            resolved_workspace_id = resolved.workspace_id
+            resolved_actor_user_id = resolved.user_id
         # Scope mismatches deliberately collapse to 404 so callers cannot use
         # this service seam to probe another actor or workspace.
-        if request.workspace_id is not None and resolved.workspace_id != request.workspace_id:
+        if request.workspace_id is not None and resolved_workspace_id != request.workspace_id:
             raise HTTPException(status_code=404, detail="scope not found")
-        if request.actor_user_id is not None and resolved.user_id != request.actor_user_id:
+        if request.actor_user_id is not None and resolved_actor_user_id != request.actor_user_id:
             raise HTTPException(status_code=404, detail="scope not found")
-        channel_id = f"chat_channel:{resolved.workspace_id}"
+        channel_id = f"chat_channel:{resolved_workspace_id}"
         response = {
-            "workspace_id": resolved.workspace_id,
-            "actor_user_id": resolved.user_id,
+            "workspace_id": resolved_workspace_id,
+            "actor_user_id": resolved_actor_user_id,
             "channel_id": channel_id,
         }
         if request.project_id is not None:
             project = crew.get_project(request.project_id)
-            if project is None or project.workspace_id != resolved.workspace_id:
+            if project is None or project.workspace_id != resolved_workspace_id:
                 raise HTTPException(status_code=404, detail="scope not found")
             response["project_id"] = project.id
             response["channel_id"] = f"crew_channel:{project.id}"
@@ -314,6 +345,30 @@ def build_router(
         """
         require_token(x_anna_service_token)
         require_scope(request.workspace_id, request.actor_user_id, request.run_id)
+        if request.name in {"crew.project.read", "crew.channel.read"}:
+            if not any(member.id == request.actor_user_id for member in identity.list_members(request.workspace_id)):
+                raise HTTPException(status_code=404, detail="crew scope not found")
+            project_id = request.arguments.get("project_id")
+            if not isinstance(project_id, str) or not project_id.strip():
+                raise HTTPException(status_code=422, detail="project_id is required")
+            project = crew.get_project(project_id)
+            if project is None or project.workspace_id != request.workspace_id:
+                raise HTTPException(status_code=404, detail="crew scope not found")
+            if request.name == "crew.project.read":
+                return {
+                    "name": request.name,
+                    "effect": "read",
+                    "result": {"project": project.model_dump(mode="json")},
+                }
+            return {
+                "name": request.name,
+                "effect": "read",
+                "result": {
+                    "project_id": project.id,
+                    "channel_id": f"crew_channel:{project.id}",
+                    "channel_messages": [message.model_dump(mode="json") for message in crew.list_channel(project.id)],
+                },
+            }
         allowed = {
             "crew.emit_project_plan",
             "crew.emit_assignments",

@@ -127,6 +127,7 @@ export interface ProductionToolGatewayOptions {
   /** Product adapters may add a typed, allowlisted business tool surface. */
   readonly dynamicTools?: readonly ToolDefinition[];
   readonly dynamicToolCall?: (request: Parameters<ToolGateway["execute"]>[0], signal: AbortSignal) => Promise<ToolResult>;
+  readonly trustedAuthorize?: (request: Parameters<ToolGateway["execute"]>[0]) => Promise<"allow" | "deny">;
   readonly now?: () => string;
   readonly createEventId?: () => string;
 }
@@ -168,7 +169,8 @@ export function createProductionToolGateway(
           && request.parentRunId === boundParentRunId
           && request.parentEventId === boundParentEventId
           && request.laneId === boundLaneId;
-        return sameRun && allowedTools.has(request.name) ? "allow" : "deny";
+        if (!sameRun || !allowedTools.has(request.name)) return "deny";
+        return options.trustedAuthorize === undefined ? "allow" : options.trustedAuthorize(request);
       },
     },
     sandbox: {

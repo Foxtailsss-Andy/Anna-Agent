@@ -1,0 +1,65 @@
+{
+  "run_index": 0,
+  "actual_run_id": "1ae54aad-54ec-45a8-a2e9-fef1a19e323e",
+  "session_id": "ccfd1d93-1a55-495d-8efc-98ef73f11ff3",
+  "source_event_id": "wb02-revocation-1",
+  "actual_status": "completed",
+  "target_project_id": "proj_1",
+  "workspace_after_mutation": "ws_other",
+  "business_scope_recheck_statuses": [
+    200,
+    200,
+    404,
+    200,
+    200,
+    200
+  ],
+  "business_crew_tool_call_count": 1,
+  "target_business_io_reached": false,
+  "capability_loads": [
+    {
+      "event_id": "df6952b6-6f61-4310-9f15-8b5ac05c07e6",
+      "seq": 20
+    }
+  ],
+  "tool_observations": [
+    {
+      "event_id": "75b19d76-c876-471d-a026-1167103e2079",
+      "seq": 10,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.search"
+    },
+    {
+      "event_id": "2fe34f3c-01a1-48a6-a304-c04510c33ffa",
+      "seq": 11,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "cd5376b7-e613-4516-bac9-4325a2b29599",
+      "seq": 19,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.load"
+    },
+    {
+      "event_id": "e77c63fe-12c8-4756-8565-c44b22bbf0b8",
+      "seq": 21,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "f7b0fbc8-b240-45d4-b6aa-4c3b84b9b7dc",
+      "seq": 29,
+      "type": "omp.tool.dispatch",
+      "tool_name": "crew.project.read"
+    },
+    {
+      "event_id": "d11b8951-2728-4429-9baf-ad7843608237",
+      "seq": 30,
+      "type": "omp.tool.response",
+      "tool_status": "failed"
+    }
+  ],
+  "observation_branch": "revoked-before-business-read",
+  "usage": "unavailable"
+}
