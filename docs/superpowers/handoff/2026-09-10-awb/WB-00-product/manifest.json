@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "caseId": "WB-00-product-observation",
+  "generatedAt": "2026-09-10T03:15:49.650Z",
+  "evidenceMode": "D",
+  "provider": null,
+  "gitHead": "d461a1a344d82d7bd95ca5073b0a1e2a700d2162",
+  "files": [
+    {
+      "path": "cowork-hiker-read.png",
+      "size": 93565,
+      "sha256": "ec208499e09b8085b93e4b81be29fe90c3a0da504f4b5dead20e3c7e8883bee1"
+    },
+    {
+      "path": "crew-project-context-entry.png",
+      "size": 284550,
+      "sha256": "b4e509af90cb5e2e8c1f9938dc3ce65f23935363fe8e22b5e4730bdb686ecdfe"
+    },
+    {
+      "path": "home-create-default-skill.png",
+      "size": 174063,
+      "sha256": "40c48ad025838c6fdca477da427a790ea6f9bac3569f00d3f9bcb633c7540822"
+    },
+    {
+      "path": "observation.json",
+      "size": 17333,
+      "sha256": "bfac5ffb8dd6e5ad63952ead0ec9a3e988d0afece097a9cd962592ea18548616"
+    }
+  ]
+}

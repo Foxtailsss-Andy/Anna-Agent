@@ -1,0 +1,384 @@
+{
+  "spec_version": "1.2",
+  "requirement_ids": [
+    "R-01",
+    "R-02",
+    "R-17",
+    "R-18",
+    "R-19"
+  ],
+  "acceptance_ids": [
+    "AC-18a"
+  ],
+  "wb_ticket": "WB-00",
+  "evaluation_baseline_id": "wb00-product-2026-09-10T03-14-19-781Z",
+  "platform": "darwin-arm64",
+  "source_sha": "d461a1a344d82d7bd95ca5073b0a1e2a700d2162",
+  "runtime": {
+    "host": "<local-host>",
+    "business": "<local-business>",
+    "host_pid": 36334,
+    "business_pid": 36333,
+    "omp_runtime_root": "<repository>/build/omp-runtime/darwin-arm64",
+    "host_config_path": "<temporary-user-data>/config/host.json",
+    "business_config_path": "<temporary-user-data>/config/business.json",
+    "model_status": {
+      "provider": "openai-compatible",
+      "model_name": "deepseek-v4-pro",
+      "configured": false,
+      "status": "not_configured",
+      "error_code": "model_not_configured"
+    },
+    "business_health": {
+      "status": "ok"
+    },
+    "omp_manifest": {
+      "path": "<repository>/build/omp-runtime/darwin-arm64/manifest.json",
+      "declared_sha256": "sha256:d3ff0284f9d7a4489d66e78fb5b1d3819471a59f4c9dcd01d0e118b6994a241d",
+      "expected_sha256": "d3ff0284f9d7a4489d66e78fb5b1d3819471a59f4c9dcd01d0e118b6994a241d",
+      "sha_match": true,
+      "schema_version": 1,
+      "file_count": 21465,
+      "worker_execution_attempted": false
+    }
+  },
+  "commands": [
+    "node scripts/wb00-product-observation.mjs",
+    "real Node Product Host + managed Python business peer (createDesktopRuntime)",
+    "Playwright Chromium headless original React UI"
+  ],
+  "scenarios": [
+    {
+      "observed_at": "2026-09-10T03:14:30.181Z",
+      "id": "home-create-default-kind",
+      "case_id": "OBS-CREATE-DEFAULT-KIND",
+      "evidence_modes": [
+        "D"
+      ],
+      "status": "fail",
+      "expected_outcome": "Home/Create ordinary input should not be forced to a Create kind.",
+      "actual_outcome": "Original React Create composer sent an ordinary prompt with kind=skill; the finite SSE receipt is preserved below.",
+      "request": {
+        "method": "POST",
+        "path": "/api/create/runs/stream",
+        "query": null,
+        "body": {
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss",
+          "prompt": "请回答一个普通问题：Anna 的工作台是什么？",
+          "kind": "skill",
+          "permission_mode": "ask"
+        }
+      },
+      "response": {
+        "status": 200,
+        "path": "/api/create/runs/stream",
+        "body": "data: {\"type\": \"event\", \"event\": {\"type\": \"create.skill.run.created\", \"run_id\": \"create_run_001\", \"payload\": {\"prompt_hash\": \"32bbf176c7244f1c910216c41db3d69073af2b2b5eca5f204ba7f54a16655322\", \"agent_id\": null, \"workdir_id\": null, \"permission_mode\": \"ask\"}, \"created_at\": \"2026-09-10T03:14:28.796718+00:00\"}}\n\ndata: {\"type\": \"error\", \"run\": {\"id\": \"create_run_001\", \"workspace_id\": \"ws_crew_demo\", \"actor_user_id\": \"acc_boss\", \"prompt\": \"请回答一个普通问题：Anna 的工作台是什么？\", \"kind\": \"skill\", \"agent_id\": null, \"workdir_id\": null, \"permission_mode\": \"ask\", \"status\": \"failed\", \"artifact\": null, \"validation\": null, \"sandbox_result\": null, \"activation_eligibility\": null, \"audit_events\": [{\"type\": \"create.skill.run.created\", \"run_id\": \"create_run_001\", \"payload\": {\"prompt_hash\": \"32bbf176c7244f1c910216c41db3d69073af2b2b5eca5f204ba7f54a16655322\", \"agent_id\": null, \"workdir_id\": null, \"permission_mode\": \"ask\"}, \"created_at\": \"2026-09-10T03:14:28.796718+00:00\"}, {\"type\": \"create.failed\", \"run_id\": \"create_run_001\", \"payload\": {\"error_code\": \"model_not_configured\", \"message\": \"Harness Host Create task failed\"}, \"created_at\": \"2026-09-10T03:14:28.907208+00:00\"}], \"error_code\": \"model_not_configured\", \"error_message\": \"Harness Host Create task failed\"}}\n\n"
+      },
+      "screenshot": "home-create-default-skill.png",
+      "blocking_reason": "Observed current baseline behavior; AC-01/02 capability gap belongs to WB-02/03."
+    },
+    {
+      "observed_at": "2026-09-10T03:14:32.931Z",
+      "id": "crew-project-context-entry",
+      "case_id": "L-04",
+      "evidence_modes": [
+        "D"
+      ],
+      "status": "blocked",
+      "expected_outcome": "Crew project question should append to the same project channel and use project context.",
+      "actual_outcome": "UI appended @Anna question through the real channel API; contextual Host answer could not be produced without a model.",
+      "project_id": "crew_showcase_770cc1b39661",
+      "project_request": {
+        "method": "POST",
+        "path": "/api/crew/showcase/ensure",
+        "query": null,
+        "body": null
+      },
+      "project_response": {
+        "method": "POST",
+        "request_body": null,
+        "status": 200,
+        "path": "/api/crew/showcase/ensure",
+        "body": "{\"scenario_id\":\"weekly_action_closure_v1\",\"scenario_version\":3,\"project\":{\"id\":\"crew_showcase_770cc1b39661\",\"workspace_id\":\"ws_crew_demo\",\"owner_user_id\":\"acc_boss\",\"goal_text\":\"周会行动项闭环：会议纪要、责任人返工、并行核对、评审与下游同步\",\"sop_template_id\":\"feature_iteration\",\"status\":\"active\",\"source\":\"showcase\",\"showcase\":{\"scenario_id\":\"weekly_action_closure_v1\",\"version\":3,\"locale\":\"zh-CN\",\"mode\":\"deterministic\"},\"tasks\":[{\"id\":\"crew_showcase_770cc1b39661_brief\",\"project_id\":\"crew_showcase_770cc1b39661\",\"key\":\"brief\",\"title\":\"周会原始纪要\",\"description\":\"归档周会原始信息、模糊行动项和不可伪造规则。\",\"status\":\"done\",\"role_required\":\"产品\",\"assignee_member_id\":\"acc_boss\",\"depends_on\":[],\"is_gate\":false,\"reviews_task_id\":null,\"acceptance_criteria\":\"议题、原始纪要、模糊行动项和不可伪造规则齐备。\",\"artifact\":\"# 周会原始纪要\\n\\n- 背景：周一增长例会后，Slack、飞书里留下了多条模糊行动项。\\n- 原始记录：漏斗激活率下降要查；客户培训材料要补；账单权限口径下周前要统一。\\n- 目标：30 分钟内形成可追踪行动项、协作看板、数据口径核对和纪要发布评审。\\n- 边界：示例可以预置事实，但不能伪造模型输出、工具执行、token 或 execution 成功。\\n\",\"artifact_versions\":[{\"version\":1,\"content\":\"# 周会原始纪要\\n\\n- 背景：周一增长例会后，Slack、飞书里留下了多条模糊行动项。\\n- 原始记录：漏斗激活率下降要查；客户培训材料要补；账单权限口径下周前要统一。\\n- 目标：30 分钟内形成可追踪行动项、协作看板、数据口径核对和纪要发布评审。\\n- 边界：示例可以预置事实，但不能伪造模型输出、工具执行、token 或 execution 成功。\\n\",\"submitted_at\":\"2026-08-16T01:02:00+00:00\"}],\"review_comment\":null,\"blocker\":null,\"run_ref\":null,\"run_started_at\":null,\"origin\":\"sop\",\"created_from_message_id\":null},{\"id\":\"crew_showcase_770cc1b39661_prd\",\"project_id\":\"crew_showcase_770cc1b39661\",\"key\":\"prd\",\"title\":\"行动项清单\",\"description\":\"从纪要抽取行动项，并经过一次驳回返工链。\",\"status\":\"done\",\"role_required\":\"文案\",\"assignee_member_id\":\"acc_agent_scribe\",\"depends_on\":[\"crew_showcase_770cc1b39661_brief\"],\"is_gate\":false,\"reviews_task_id\":null,\"acceptance_criteria\":\"每个行动项都有 DRI、截止时间、验收标准、依赖和同步对象。\",\"artifact\":\"# 行动项清单 v2\\n\\n| 行动项 | DRI | 截止时间 | 验收标准 | 依赖 |\\n| --- | --- | --- | --- | --- |\\n| 核对激活率下降 | Andy | 周二 18:00 | 给出分母、时间窗和下降原因 | 数据口径核对 |\\n| 补客户培训材料 | Agent·Scribe | 周三 12:00 | 覆盖 Top 3 问题和新版截图 | 行动项评审通过 |\\n| 统一账单权限口径 | Boss | 周二 16:00 | 列出 5 个关键账号的权限口径 | Andy 核对角色配置 |\\n\\n本示例不伪造模型、工具、token 或 execution 成功。\\n\",\"artifact_versions\":[{\"version\":1,\"content\":\"# 行动项清单 v1\\n\\n- 查漏斗激活率下降。\\n- 补客户培训材料。\\n- 统一账单权限口径。\\n\\n缺口：没有 DRI、截止时间、验收标准、依赖和同步对象。\\n\",\"submitted_at\":\"2026-08-16T01:04:00+00:00\"},{\"version\":2,\"content\":\"# 行动项清单 v2\\n\\n| 行动项 | DRI | 截止时间 | 验收标准 | 依赖 |\\n| --- | --- | --- | --- | --- |\\n| 核对激活率下降 | Andy | 周二 18:00 | 给出分母、时间窗和下降原因 | 数据口径核对 |\\n| 补客户培训材料 | Agent·Scribe | 周三 12:00 | 覆盖 Top 3 问题和新版截图 | 行动项评审通过 |\\n| 统一账单权限口径 | Boss | 周二 16:00 | 列出 5 个关键账号的权限口径 | Andy 核对角色配置 |\\n\\n本示例不伪造模型、工具、token 或 executi"
+      },
+      "channel_request": {
+        "method": "POST",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "query": null,
+        "body": {
+          "body": "@Anna 当前项目的进展和下一步是什么？",
+          "mentions": [
+            "anna"
+          ]
+        }
+      },
+      "channel_response": {
+        "method": "POST",
+        "request_body": {
+          "body": "@Anna 当前项目的进展和下一步是什么？",
+          "mentions": [
+            "anna"
+          ]
+        },
+        "status": 200,
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "body": {
+          "id": "crew_showcase_770cc1b39661:m1",
+          "project_id": "crew_showcase_770cc1b39661",
+          "workspace_id": "ws_crew_demo",
+          "seq": 1,
+          "author_kind": "member",
+          "author_member_id": "acc_boss",
+          "worker_profile_ref": null,
+          "caused_by_execution_id": null,
+          "kind": "say",
+          "body": "@Anna 当前项目的进展和下一步是什么？",
+          "task_id": null,
+          "run_ref": null,
+          "mentions": [
+            "anna"
+          ],
+          "audit_ref": "",
+          "payload": null,
+          "created_at": "2026-09-10T03:14:31.428319+00:00"
+        }
+      },
+      "screenshot": "crew-project-context-entry.png",
+      "blocking_reason": "EXT-PROVIDER: model_not_configured; no model output fabricated."
+    },
+    {
+      "observed_at": "2026-09-10T03:14:34.423Z",
+      "id": "cowork-board-independent-business-read",
+      "case_id": "L-06",
+      "evidence_modes": [
+        "D"
+      ],
+      "status": "blocked",
+      "expected_outcome": "Cowork Hiker local read completes independently of an Agent run, or exposes a real failure.",
+      "actual_outcome": "The Hiker dashboard request reached the real business adapter and returned failed; no connector output was invented.",
+      "request": {
+        "method": "POST",
+        "path": "/api/cowork/hiker/dashboard/runs",
+        "query": null,
+        "body": {
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss"
+        }
+      },
+      "response": {
+        "method": "POST",
+        "request_body": {
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss"
+        },
+        "status": 200,
+        "path": "/api/cowork/hiker/dashboard/runs",
+        "body": {
+          "id": "hiker_run_001",
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss",
+          "status": "failed",
+          "snapshot": null,
+          "audit_events": [
+            {
+              "type": "hiker.dashboard.run.created",
+              "run_id": "hiker_run_001",
+              "payload": {},
+              "created_at": "2026-09-10T03:14:32.965460+00:00"
+            },
+            {
+              "type": "hiker.dashboard.failed",
+              "run_id": "hiker_run_001",
+              "payload": {
+                "error_code": "connector_not_configured",
+                "message": "Hiker MCP connector is not connected"
+              },
+              "created_at": "2026-09-10T03:14:32.965551+00:00"
+            }
+          ],
+          "error_code": "connector_not_configured",
+          "error_message": "Hiker MCP connector is not connected"
+        }
+      },
+      "business_health": {
+        "status": 200,
+        "body": {
+          "status": "ok"
+        }
+      },
+      "screenshot": "cowork-hiker-read.png",
+      "blocking_reason": "EXT-MCP-READ: Hiker connector is not configured in this baseline."
+    },
+    {
+      "observed_at": "2026-09-10T03:14:34.427Z",
+      "id": "running-page-switch-and-new-session",
+      "case_id": "OBS-RUNNING-CONTINUITY",
+      "evidence_modes": [
+        "D"
+      ],
+      "status": "not_run",
+      "expected_outcome": "A genuinely running Run should survive page switching and a second Session should remain independent.",
+      "actual_outcome": "No provider-backed running Run existed; the active Cowork sidebar also did not expose New Task.",
+      "request_count_before_new_task": 37,
+      "request_count_after_new_task": 37,
+      "blocking_reason": "EXT-PROVIDER: no configured model; running overlap and independent Session behavior are not_run."
+    }
+  ],
+  "cleanup": {
+    "host_stopped": true,
+    "business_stopped": true,
+    "browser_closed": true
+  },
+  "dirty_diff_digest": "ec07460e70c9c746ea352b82651cd5f3676f42c2edb7ad0237844c7f1a5dce8d",
+  "network": {
+    "request_count": 37,
+    "relevant_requests": [
+      {
+        "method": "GET",
+        "path": "/api/create/drafts",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/notifications",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/create/drafts",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/create/runs/stream",
+        "query": null,
+        "body": {
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss",
+          "prompt": "请回答一个普通问题：Anna 的工作台是什么？",
+          "kind": "skill",
+          "permission_mode": "ask"
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/api/create/drafts",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/create/drafts",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/templates",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/crew/showcase/ensure",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/templates",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/memory",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "query": null,
+        "body": {
+          "body": "@Anna 当前项目的进展和下一步是什么？",
+          "mentions": [
+            "anna"
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/create/drafts",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "POST",
+        "path": "/api/cowork/hiker/dashboard/runs",
+        "query": null,
+        "body": {
+          "workspace_id": "ws_crew_demo",
+          "actor_user_id": "acc_boss"
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661",
+        "query": null,
+        "body": null
+      },
+      {
+        "method": "GET",
+        "path": "/api/crew/projects/crew_showcase_770cc1b39661/channel",
+        "query": null,
+        "body": null
+      }
+    ]
+  },
+  "derivation": {
+    "original_observation_sha256": "46c1194b68c18fb8d0ea982cef4b1a9554cf2aa1166b09f9bfc2307eb56b7faf",
+    "sanitization": "Replaced repository, temporary user-data paths and loopback origins with aliases; screenshot bytes unchanged.",
+    "observation_script_sha256": "3ca72fb7e5b38de02948ae494db7faa6a7ebaff77f7c920fef486d69cda9f35a"
+  }
+}
