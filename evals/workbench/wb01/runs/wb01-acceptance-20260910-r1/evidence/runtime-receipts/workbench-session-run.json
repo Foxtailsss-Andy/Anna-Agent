@@ -1,0 +1,30 @@
+{
+  "case": "session-run-idempotency-restart",
+  "session_id": "29b5759d-8e51-4779-9cd7-d3918c7eb66f",
+  "runs": [
+    {
+      "run_id": "2fd18b79-9635-4d1e-8d19-161bc97c8f7a",
+      "source_event_id": "wb01-source-1",
+      "surface": "chat"
+    },
+    {
+      "run_id": "deaeddae-5c39-415f-a3fc-028bce1d556b",
+      "source_event_id": "wb01-source-2",
+      "surface": "create"
+    }
+  ],
+  "watermarks": [
+    {
+      "run_id": "2fd18b79-9635-4d1e-8d19-161bc97c8f7a",
+      "event_id": "ec286c04-8d33-485a-8682-061c0f6bfcc2",
+      "seq": 11
+    },
+    {
+      "run_id": "deaeddae-5c39-415f-a3fc-028bce1d556b",
+      "event_id": "a3fa41ce-e86f-4507-ad07-779c415a0247",
+      "seq": 11
+    }
+  ],
+  "model_transport_calls": 4,
+  "usage": "unavailable"
+}

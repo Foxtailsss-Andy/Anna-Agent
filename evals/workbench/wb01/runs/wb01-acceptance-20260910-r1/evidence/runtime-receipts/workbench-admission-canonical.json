@@ -1,0 +1,7 @@
+{
+  "case": "canonical-admission-retry",
+  "run_id": "c8180b61-ae60-4e6d-a099-a8e8831fa515",
+  "status": "completed",
+  "model_transport_calls": 1,
+  "usage": "unavailable"
+}

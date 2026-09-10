@@ -86,6 +86,27 @@ jobs:
       - name: Run Python tests
         run: uv run pytest -q
 
+      - name: Run WB-01 session increment evidence
+        if: always()
+        env:
+          ANNA_WB01_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run workbench:session:evidence
+
+      - name: Verify WB-01 session evidence manifest
+        if: always()
+        env:
+          ANNA_WB01_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run evidence:verify -- evals/workbench/wb01/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}/evidence/manifest.json
+
+      - name: Retain WB-01 session evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wb01-session-evidence
+          path: |
+            evals/workbench/wb01/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+
   product:
     runs-on: macos-latest
     timeout-minutes: 20

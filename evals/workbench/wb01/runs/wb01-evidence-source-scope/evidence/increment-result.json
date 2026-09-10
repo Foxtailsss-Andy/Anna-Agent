@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "1.2",
+  "wbTicket": "WB-01",
+  "requirementIds": [
+    "R-03",
+    "R-15",
+    "R-17"
+  ],
+  "acceptanceIds": [
+    "AC-03",
+    "AC-15",
+    "AC-17a",
+    "AC-18b"
+  ],
+  "evaluationBaselineId": "wb00-baseline-20260910",
+  "baselineRound": "wb00-baseline-20260910-r5",
+  "datasetVersion": "wb00-dataset-v1.1",
+  "evalRoundId": "wb01-evidence-source-scope",
+  "sourceSha": "cfe0731700268fd466b588a65641c1d162487443",
+  "dirtyDiffDigest": "sha256:be07d03704f9d3f65450e26db296f0ce9b23ff208a5af52b9935f41a7dcf045d",
+  "dirtySummary": " M, M,??,??",
+  "ownedFileHashes": [
+    {
+      "path": "scripts/workbench-session-evidence.mjs",
+      "sha256": "8832b0df6b670ad51f94ff142e385b67041e61a330b71dd8e7669f4aa92ea3d1",
+      "present": true
+    },
+    {
+      "path": "scripts/workbench-session-evidence.test.mjs",
+      "sha256": "cdd3ac6280c3465c2e17ff231a301877f18d616fdd487b4d3df75a023711bace",
+      "present": true
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "799832480a1b6ee2b7adc798084c393f2756b0d383c6a9c156dec044d0e92bba",
+      "present": true
+    },
+    {
+      "path": "package.json",
+      "sha256": "6bca723ab081b3c66778a2244250ac8b90f20c8d65567447e42ffe291f4f37d9",
+      "present": true
+    }
+  ],
+  "sourceScopePaths": [
+    "apps/harness-service/src/product-session.ts",
+    "apps/harness-service/src/product-facade.ts",
+    "apps/harness-service/src/main.ts",
+    "services/api/app/main.py",
+    "services/api/app/routes/business.py",
+    "tests/business/test_workbench_scope.py",
+    "package.json",
+    "apps/harness-service/package.json",
+    "package-lock.json",
+    "uv.lock",
+    "apps/harness-service/src/workbench-session.ts",
+    "apps/harness-service/test/workbench-admission-failure.test.ts",
+    "apps/harness-service/test/workbench-session-contract.test.ts",
+    "apps/harness-service/test/workbench-session-migration.test.ts",
+    "apps/harness-service/test/workbench-session-run.test.ts",
+    "apps/harness-service/test/workbench-session-scope.test.ts"
+  ],
+  "sourceHashesBefore": [
+    {
+      "path": "apps/harness-service/src/product-session.ts",
+      "sha256": "f76e55abd48a1e7d9e37e5ecae49340f115c1a0dbf385903c58def250764ff09",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-facade.ts",
+      "sha256": "4d0fa37c77e601df3f9201b529cf9f3c56ab48a8d38a9f9a6bd0faaef47884d0",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/main.ts",
+      "sha256": "6e6a3a5d5775f0ff3e2ab8672b860bd1d68ec3d23a41d4623908343985bb7454",
+      "present": true
+    },
+    {
+      "path": "services/api/app/main.py",
+      "sha256": "c3934bbcfe1aa92d0c042e734073cf80ce372847e65c737b8b6a3adf03eae87c",
+      "present": true
+    },
+    {
+      "path": "services/api/app/routes/business.py",
+      "sha256": "861845a0939aa6242bd199b3fa6c29047e8ac364e21ceae716bc4a661e7530db",
+      "present": true
+    },
+    {
+      "path": "tests/business/test_workbench_scope.py",
+      "sha256": "248200cf9886ae2a01070a10d4943105bd77bf27bf113af076cfffde348ec487",
+      "present": true
+    },
+    {
+      "path": "package.json",
+      "sha256": "6bca723ab081b3c66778a2244250ac8b90f20c8d65567447e42ffe291f4f37d9",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/package.json",
+      "sha256": "a670e1bf3d4a7524ddd687ed0b80f6321ce15d67bb1a606386bb62fe61b99f9e",
+      "present": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "bed08ce653b0fb35984b24ea7fc841a9fa4eff0b11e249c45ff9ac1b0c33a898",
+      "present": true
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "860c46a80bdc4df44ca2dc4ebcb17f64b961e9850954d82ba12438d98a6ac5b8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-session.ts",
+      "sha256": "f826a6503512f0ff0cf424724fc05ebdc90815c056f7d25f3879b0b2cecbfbb3",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-admission-failure.test.ts",
+      "sha256": "bc6ef1c9c7646d19551f3b5f62646cf07b4ac25adc532534543ddfbac2302678",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-contract.test.ts",
+      "sha256": "e29afa9ecc8ef285fe854c6ac8c73aad92b60a34c18dcb1f1827aa84da601072",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-migration.test.ts",
+      "sha256": null,
+      "present": false
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-run.test.ts",
+      "sha256": "6882955f38fdda3618cdbcfa49ecb30d0622fa486cd38748831dd38e5d530e4b",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-scope.test.ts",
+      "sha256": "c9d3071a07ba7a3baad9dff5866879f190bcfa39431492fe4e380631117c3c95",
+      "present": true
+    }
+  ],
+  "sourceHashesAfter": [
+    {
+      "path": "apps/harness-service/src/product-session.ts",
+      "sha256": "f76e55abd48a1e7d9e37e5ecae49340f115c1a0dbf385903c58def250764ff09",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/product-facade.ts",
+      "sha256": "4d0fa37c77e601df3f9201b529cf9f3c56ab48a8d38a9f9a6bd0faaef47884d0",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/main.ts",
+      "sha256": "6e6a3a5d5775f0ff3e2ab8672b860bd1d68ec3d23a41d4623908343985bb7454",
+      "present": true
+    },
+    {
+      "path": "services/api/app/main.py",
+      "sha256": "c3934bbcfe1aa92d0c042e734073cf80ce372847e65c737b8b6a3adf03eae87c",
+      "present": true
+    },
+    {
+      "path": "services/api/app/routes/business.py",
+      "sha256": "861845a0939aa6242bd199b3fa6c29047e8ac364e21ceae716bc4a661e7530db",
+      "present": true
+    },
+    {
+      "path": "tests/business/test_workbench_scope.py",
+      "sha256": "248200cf9886ae2a01070a10d4943105bd77bf27bf113af076cfffde348ec487",
+      "present": true
+    },
+    {
+      "path": "package.json",
+      "sha256": "6bca723ab081b3c66778a2244250ac8b90f20c8d65567447e42ffe291f4f37d9",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/package.json",
+      "sha256": "a670e1bf3d4a7524ddd687ed0b80f6321ce15d67bb1a606386bb62fe61b99f9e",
+      "present": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "bed08ce653b0fb35984b24ea7fc841a9fa4eff0b11e249c45ff9ac1b0c33a898",
+      "present": true
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "860c46a80bdc4df44ca2dc4ebcb17f64b961e9850954d82ba12438d98a6ac5b8",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/src/workbench-session.ts",
+      "sha256": "f826a6503512f0ff0cf424724fc05ebdc90815c056f7d25f3879b0b2cecbfbb3",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-admission-failure.test.ts",
+      "sha256": "bc6ef1c9c7646d19551f3b5f62646cf07b4ac25adc532534543ddfbac2302678",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-contract.test.ts",
+      "sha256": "e29afa9ecc8ef285fe854c6ac8c73aad92b60a34c18dcb1f1827aa84da601072",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-migration.test.ts",
+      "sha256": null,
+      "present": false
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-run.test.ts",
+      "sha256": "6882955f38fdda3618cdbcfa49ecb30d0622fa486cd38748831dd38e5d530e4b",
+      "present": true
+    },
+    {
+      "path": "apps/harness-service/test/workbench-session-scope.test.ts",
+      "sha256": "c9d3071a07ba7a3baad9dff5866879f190bcfa39431492fe4e380631117c3c95",
+      "present": true
+    }
+  ],
+  "sourceShaBefore": "cfe0731700268fd466b588a65641c1d162487443",
+  "sourceShaAfter": "cfe0731700268fd466b588a65641c1d162487443",
+  "sourceChanged": false,
+  "implementationBoundary": "Session/Run/Scope contract focused checks and Python scope; product implementation remains separately reviewed.",
+  "evidenceModes": [
+    "D"
+  ],
+  "runTestCoverage": "included_in_focused_ts_command",
+  "oStatus": "metadata_only; supervisor owns final O scope",
+  "platform": "darwin-arm64",
+  "ompManifestSha256": "sha256:d3ff0284f9d7a4489d66e78fb5b1d3819471a59f4c9dcd01d0e118b6994a241d",
+  "runtimeModelConfigFingerprint": "unavailable",
+  "usage": "unavailable",
+  "engineeringModel": "controller:gpt-6-astra/xhigh;coding:gpt-5.6-luna/xhigh",
+  "externalStatus": {
+    "provider": "blocked: EXT-PROVIDER",
+    "mcp": "blocked: EXT-MCP-READ"
+  },
+  "baseline_delta": "Against wb00-baseline-20260910-r5: adds D Session/Scope/admission/Python checks; migration is not_run, O is metadata-only, L/M are blocked, P is not_run.",
+  "generatedAt": "2026-09-10T04:12:20.202Z",
+  "receipts": [
+    {
+      "id": "ts-session-contract",
+      "command": "npm run test --workspace=@anna/harness-service -- --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+      "exitCode": 1,
+      "status": "fail",
+      "testSummary": "Duration  17.41s (transform 654ms, setup 0ms, import 1.58s, tests 30.84s, environment 0ms) | ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ | FAIL  test/workbench-session-run.test.ts > Workbench Session accepts two idempotent Runs across surfaces and preserves public messages | npm error Lifecycle script `test` failed with error: | npm error command failed | npm error command sh -c vitest run --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+      "tests": [
+        "test/workbench-admission-failure.test.ts",
+        "test/workbench-session-contract.test.ts",
+        "test/workbench-session-run.test.ts",
+        "test/workbench-session-scope.test.ts"
+      ]
+    },
+    {
+      "id": "missing-workbench-session-migration.test.ts",
+      "command": "not_run: required test file missing",
+      "exitCode": null,
+      "status": "not_run",
+      "tests": [
+        "test/workbench-session-migration.test.ts"
+      ],
+      "blockingReason": "required_test_not_generated"
+    },
+    {
+      "id": "python-scope",
+      "command": "uv run pytest -q tests/business/test_workbench_scope.py",
+      "exitCode": 0,
+      "status": "pass",
+      "testSummary": "1 passed, 1 warning in 0.39s",
+      "tests": [
+        "tests/business/test_workbench_scope.py"
+      ]
+    }
+  ],
+  "status": "fail",
+  "blockingReason": "required_test_not_generated"
+}

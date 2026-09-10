@@ -41,6 +41,7 @@
     "evidence:verify:all": "node scripts/verify-evidence-manifests.mjs evals/harness-v2",
     "workbench:baseline": "node scripts/workbench-baseline.mjs",
     "workbench:baseline:verify": "node scripts/workbench-baseline-verify.mjs evals/workbench/wb00",
+    "workbench:session:evidence": "node scripts/workbench-session-evidence.mjs",
     "harness:v2:test": "npm run test --workspace=@anna/harness-v2 --workspace=@anna/event-store --workspace=@anna/scheduler --workspace=@anna/pi-loop-kernel --workspace=@anna/omp-loop-kernel --workspace=@anna/harness-service --workspace=@anna/trace --workspace=@anna/eval",
     "harness:v2:build": "npm run build --workspace=@anna/harness-service",
     "harness:v2:approval-bridge": "node apps/harness-service/dist/review-approval-main.js",

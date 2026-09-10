@@ -1,0 +1,15 @@
+{
+  "id": "ts-session-contract",
+  "command": "npm run test --workspace=@anna/harness-service -- --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-migration.test.ts test/workbench-session-review-regressions.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+  "exitCode": 0,
+  "status": "pass",
+  "testSummary": "> vitest run --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-migration.test.ts test/workbench-session-review-regressions.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts | Test Files  6 passed (6) | Tests  9 passed (9) | Duration  70.24s (transform 741ms, setup 0ms, import 2.88s, tests 133.74s, environment 0ms)",
+  "tests": [
+    "test/workbench-admission-failure.test.ts",
+    "test/workbench-session-contract.test.ts",
+    "test/workbench-session-migration.test.ts",
+    "test/workbench-session-review-regressions.test.ts",
+    "test/workbench-session-run.test.ts",
+    "test/workbench-session-scope.test.ts"
+  ]
+}

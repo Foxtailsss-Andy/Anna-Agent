@@ -1,0 +1,13 @@
+{
+  "id": "ts-session-contract",
+  "command": "npm run test --workspace=@anna/harness-service -- --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+  "exitCode": 0,
+  "status": "pass",
+  "testSummary": "> vitest run --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts | Test Files  4 passed (4) | Tests  4 passed (4) | Duration  22.95s (transform 654ms, setup 0ms, import 1.68s, tests 42.44s, environment 0ms)",
+  "tests": [
+    "test/workbench-admission-failure.test.ts",
+    "test/workbench-session-contract.test.ts",
+    "test/workbench-session-run.test.ts",
+    "test/workbench-session-scope.test.ts"
+  ]
+}

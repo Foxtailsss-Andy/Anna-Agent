@@ -1,0 +1,10 @@
+{
+  "id": "missing-workbench-session-migration.test.ts",
+  "command": "not_run: required test file missing",
+  "exitCode": null,
+  "status": "not_run",
+  "blockingReason": "required_test_not_generated",
+  "tests": [
+    "test/workbench-session-migration.test.ts"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "case": "session-scope-isolation",
+  "workspace_id": "ws_crew_demo",
+  "actor_user_id": "acc_boss",
+  "project_id": "proj_1",
+  "session_ids": [
+    "bdb714a5-1987-4cad-8423-2a8cf9849bcd",
+    "dfd00dc3-dfa9-4d76-9925-95dc8df0b0e8",
+    "2f9d0ed7-5f28-4937-a89b-de8d7e31680a"
+  ],
+  "runs": [
+    {
+      "run_id": "cee92111-c3c1-400b-8c15-785fd29abe51",
+      "source_event_id": "wb01-project-private-source",
+      "watermark": {
+        "run_id": "cee92111-c3c1-400b-8c15-785fd29abe51",
+        "event_id": "9293c96f-e9ec-4d71-910c-2d2d3cee9a4c",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "aa804fb1-25f8-46ca-a751-6f9b791001e5",
+      "source_event_id": "wb01-project-private-source-b",
+      "watermark": {
+        "run_id": "aa804fb1-25f8-46ca-a751-6f9b791001e5",
+        "event_id": "f91f7d8d-bdb7-4f48-85df-2b1d4bddcd32",
+        "seq": 11
+      }
+    }
+  ],
+  "model_transport_calls": 2,
+  "unauthorized_projection": "blocked",
+  "usage": "unavailable"
+}

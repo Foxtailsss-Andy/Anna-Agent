@@ -1,0 +1,10 @@
+{
+  "id": "python-scope",
+  "command": "uv run pytest -q tests/business/test_workbench_scope.py",
+  "exitCode": 0,
+  "status": "pass",
+  "testSummary": "1 passed, 1 warning in 0.39s",
+  "tests": [
+    "tests/business/test_workbench_scope.py"
+  ]
+}

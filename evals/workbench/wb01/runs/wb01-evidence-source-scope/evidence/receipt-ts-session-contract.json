@@ -1,0 +1,13 @@
+{
+  "id": "ts-session-contract",
+  "command": "npm run test --workspace=@anna/harness-service -- --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+  "exitCode": 1,
+  "status": "fail",
+  "testSummary": "Duration  17.41s (transform 654ms, setup 0ms, import 1.58s, tests 30.84s, environment 0ms) | ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ | FAIL  test/workbench-session-run.test.ts > Workbench Session accepts two idempotent Runs across surfaces and preserves public messages | npm error Lifecycle script `test` failed with error: | npm error command failed | npm error command sh -c vitest run --run test/workbench-admission-failure.test.ts test/workbench-session-contract.test.ts test/workbench-session-run.test.ts test/workbench-session-scope.test.ts",
+  "tests": [
+    "test/workbench-admission-failure.test.ts",
+    "test/workbench-session-contract.test.ts",
+    "test/workbench-session-run.test.ts",
+    "test/workbench-session-scope.test.ts"
+  ]
+}

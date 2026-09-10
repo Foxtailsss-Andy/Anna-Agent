@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { basename, delimiter, dirname, extname, join, relative, resolve, sep } from "node:path";
@@ -26,6 +27,12 @@ import {
   validatedProductTask,
   type ProductTask,
 } from "./product-session";
+import {
+  WorkbenchSessionStore,
+  type WorkbenchRunRecord,
+  type WorkbenchSessionRecord,
+} from "./workbench-session";
+import { planProductV1Migration } from "./workbench-migration";
 
 const maxJsonBodyBytes = 1_024 * 1_024;
 const terminalEvents = new Set([
@@ -58,6 +65,8 @@ export interface ProductHostOptions {
   readonly serviceToken: string;
   readonly sessionStore?: ProductSessionStore;
   readonly sessionStorePath?: string;
+  readonly workbenchSessionStore?: WorkbenchSessionStore;
+  readonly workbenchSessionStorePath?: string;
   readonly protectedPaths?: readonly string[];
   readonly businessOrigin?: string;
   readonly businessServiceToken?: string;
@@ -88,6 +97,12 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
   }
   const staticRoot = resolve(options.staticRoot ?? resolve(import.meta.dirname, "../../../dist"));
   const sessions = options.sessionStore ?? new ProductSessionStore(options.sessionStorePath);
+  const workbenchSessions = options.workbenchSessionStore ?? new WorkbenchSessionStore(
+    options.workbenchSessionStorePath
+      ?? (options.sessionStore?.path === undefined
+        ? options.sessionStorePath === undefined ? undefined : `${options.sessionStorePath}.v2.json`
+        : `${options.sessionStore.path}.v2.json`),
+  );
   const fetchImpl = options.fetchImpl ?? fetch;
   const now = options.now ?? (() => new Date().toISOString());
   if (options.businessOrigin !== undefined) {
@@ -154,6 +169,12 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     }
     if (pathname.startsWith("/_harness/")) {
       await handleHarnessRequest(request, response, pathname, requestUrl.searchParams);
+      return;
+    }
+    if (pathname === "/api/workbench/migrations/product-v1"
+      || pathname === "/api/workbench/sessions" || pathname.startsWith("/api/workbench/sessions/")
+      || pathname === "/api/workbench/runs" || pathname.startsWith("/api/workbench/runs/")) {
+      await handleWorkbenchRequest(request, response, pathname, requestUrl.searchParams);
       return;
     }
     if (shouldProxyProductRoute(pathname)) {
@@ -349,6 +370,419 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       return;
     }
     responseJson(response, 404, { code: "not_found" });
+  }
+
+  async function handleWorkbenchRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    pathname: string,
+    query: URLSearchParams,
+  ): Promise<void> {
+    if (pathname === "/api/workbench/migrations/product-v1" && request.method === "POST") {
+      const body = asRecord(await readJsonBody(request));
+      assertAllowedKeys(body, ["dry_run"]);
+      if (typeof body.dry_run !== "boolean") throw new ProductHttpError(400, "invalid_dry_run");
+      const scope = await resolveWorkbenchScope(request);
+      let plan;
+      try {
+        const source = await sessions.readSourceStrict();
+        plan = await planProductV1Migration(source, scope, async (projectId) => {
+          try {
+            return await resolveWorkbenchScope(request, projectId);
+          } catch (error) {
+            if (error instanceof ProductHttpError && error.statusCode === 404) return undefined;
+            throw error;
+          }
+        });
+      } catch (error) {
+        if (error instanceof ProductHttpError) throw error;
+        if (error instanceof Error && error.message.startsWith("migration_")) {
+          throw new ProductHttpError(409, "migration_conflict");
+        }
+        throw new ProductHttpError(422, "migration_source_invalid");
+      }
+      let sessionsAdded: number;
+      let runsAdded: number;
+      try {
+        if (body.dry_run) {
+          const preview = await workbenchSessions.previewMigration(plan);
+          sessionsAdded = preview.sessions_added;
+          runsAdded = preview.runs_added;
+        } else {
+          const applied = await workbenchSessions.applyMigration(plan);
+          sessionsAdded = applied.sessions_added;
+          runsAdded = applied.runs_added;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("migration_")) {
+          throw new ProductHttpError(409, "migration_conflict");
+        }
+        throw error;
+      }
+      responseJson(response, 200, {
+        schema_version: 2,
+        dry_run: body.dry_run,
+        scope_source_sha256: plan.scope_source_sha256,
+        scope_source_bytes: plan.scope_source_bytes,
+        matched_records: plan.matched_records,
+        sessions_added: sessionsAdded,
+        runs_added: runsAdded,
+        sessions: plan.sessions.map((session) => ({
+          session_id: session.session_id,
+          channel_id: session.channel_id,
+          surface: session.surface,
+          ...(session.project_id === undefined ? {} : { project_id: session.project_id }),
+          created_at: session.created_at,
+          updated_at: session.updated_at,
+        })),
+        runs: plan.runs.map((run) => ({
+          run_id: run.run_id,
+          session_id: run.session_id,
+          source_event_id: run.source_event_id,
+          ...(run.source_event_derived === undefined ? {} : { source_event_derived: run.source_event_derived }),
+          conversation_id: run.conversation_id,
+          created_at: run.created_at,
+          updated_at: run.updated_at,
+        })),
+      });
+      return;
+    }
+    if (pathname === "/api/workbench/sessions" && request.method === "POST") {
+      const body = asRecord(await readJsonBody(request));
+      assertAllowedKeys(body, ["project_id", "surface"]);
+      const surface = body.surface === undefined ? "chat" : requiredSurface(body.surface);
+      const projectId = optionalId(body.project_id, "project_id");
+      const scope = await resolveWorkbenchScope(request, projectId);
+      const timestamp = now();
+      const session: WorkbenchSessionRecord = {
+        schema_version: 2,
+        session_id: randomUUID(),
+        workspace_id: scope.workspace_id,
+        actor_user_id: scope.actor_user_id,
+        channel_id: scope.channel_id,
+        surface,
+        created_at: timestamp,
+        updated_at: timestamp,
+        ...(projectId === undefined ? {} : { project_id: projectId }),
+      };
+      await workbenchSessions.createSession(session);
+      responseJson(response, 201, await workbenchSessionProjection(session));
+      return;
+    }
+    if (pathname === "/api/workbench/sessions" && request.method === "GET") {
+      const projectId = optionalId(query.get("project_id"), "project_id");
+      const scope = await resolveWorkbenchScope(request, projectId);
+      const records = await workbenchSessions.listSessions({
+        workspace_id: scope.workspace_id,
+        actor_user_id: scope.actor_user_id,
+        ...(projectId === undefined ? {} : { project_id: projectId }),
+      });
+      const visibleRecords: WorkbenchSessionRecord[] = [];
+      for (const session of records) {
+        if (session.project_id === undefined) {
+          visibleRecords.push(session);
+          continue;
+        }
+        try {
+          const projectScope = await resolveWorkbenchScope(request, session.project_id);
+          if (projectScope.workspace_id === session.workspace_id
+            && projectScope.actor_user_id === session.actor_user_id
+            && projectScope.project_id === session.project_id) {
+            visibleRecords.push(session);
+          }
+        } catch (error) {
+          if (error instanceof ProductHttpError && error.statusCode === 404) continue;
+          throw error;
+        }
+      }
+      responseJson(response, 200, {
+        sessions: await Promise.all(visibleRecords.map((session) => workbenchSessionProjection(session))),
+      });
+      return;
+    }
+    const sessionMatch = pathname.match(/^\/api\/workbench\/sessions\/([^/]+)$/);
+    if (sessionMatch !== null && request.method === "GET") {
+      const scope = await resolveWorkbenchScope(request);
+      const session = await workbenchSessions.getSession(decodeSegment(sessionMatch[1]));
+      if (session === undefined) throw new ProductHttpError(404, "session_not_found");
+      await authorizeWorkbenchSession(request, session, scope);
+      responseJson(response, 200, await workbenchSessionProjection(session));
+      return;
+    }
+    const sessionRunsMatch = pathname.match(/^\/api\/workbench\/sessions\/([^/]+)\/runs$/);
+    if (sessionRunsMatch !== null && request.method === "POST") {
+      const scope = await resolveWorkbenchScope(request);
+      const session = await workbenchSessions.getSession(decodeSegment(sessionRunsMatch[1]));
+      if (session === undefined) throw new ProductHttpError(404, "session_not_found");
+      const authorizedScope = await authorizeWorkbenchSession(request, session, scope);
+      const body = asRecord(await readJsonBody(request));
+      assertAllowedKeys(body, [
+        "prompt", "source_event_id", "surface", "parent_run_id", "resource_refs", "requested_artifact",
+      ]);
+      const prompt = requiredSettingString(body.prompt, "prompt");
+      const sourceEventId = requiredSettingString(body.source_event_id, "source_event_id");
+      const surface = body.surface === undefined ? session.surface : requiredSurface(body.surface);
+      const parentRunId = optionalId(body.parent_run_id, "parent_run_id");
+      const resourceRefs = body.resource_refs === undefined ? [] : requiredResourceRefs(body.resource_refs);
+      if (resourceRefs.length > 0) throw new ProductHttpError(422, "resource_refs_not_supported");
+      const requestedArtifact = requestedArtifactKind(body.requested_artifact);
+      if (parentRunId !== undefined) {
+        const parent = await workbenchSessions.getRun(parentRunId);
+        if (parent === undefined || parent.session_id !== session.session_id) {
+          throw new ProductHttpError(404, "parent_run_not_found");
+        }
+      }
+      const timestamp = now();
+      const run: WorkbenchRunRecord = {
+        schema_version: 2,
+        run_id: randomUUID(),
+        session_id: session.session_id,
+        workspace_id: authorizedScope.workspace_id,
+        actor_user_id: authorizedScope.actor_user_id,
+        channel_id: session.channel_id,
+        surface,
+        prompt,
+        source_event_id: sourceEventId,
+        resource_refs: resourceRefs,
+        conversation_id: session.session_id,
+        created_at: timestamp,
+        updated_at: timestamp,
+        admission_status: "pending",
+        ...(session.project_id === undefined ? {} : { project_id: session.project_id }),
+        ...(parentRunId === undefined ? {} : { parent_run_id: parentRunId }),
+        ...(requestedArtifact === undefined ? {} : { requested_artifact: requestedArtifact }),
+      };
+      const lookup = await workbenchSessions.createOrGetRun(run);
+      if (lookup.kind === "conflict") throw new ProductHttpError(409, "run_conflict");
+      if (lookup.kind === "existing") {
+        const canonical = await readWorkbenchEvents(lookup.run, productTaskForWorkbenchRun(lookup.run));
+        if (canonical.canonical) {
+          responseJson(response, 202, {
+            schema_version: 2,
+            run_id: lookup.run.run_id,
+            session_id: session.session_id,
+            source_event_id: lookup.run.source_event_id,
+            status: statusFromEvents(canonical.events),
+          });
+          return;
+        }
+        if (lookup.run.admission_status === "failed") {
+          throw new ProductHttpError(409, lookup.run.admission_error ?? "run_admission_failed");
+        }
+        if (lookup.run.admission_status === "pending") {
+          const admission = workbenchSessions.waitForRunAdmission(lookup.run.run_id);
+          if (admission === undefined) {
+            throw new ProductHttpError(409, "run_admission_pending");
+          }
+          const outcome = await admission;
+          if (!outcome.ok) throw new ProductHttpError(outcome.statusCode, outcome.code);
+          responseJson(response, 202, {
+            schema_version: 2,
+            run_id: lookup.run.run_id,
+            session_id: session.session_id,
+            source_event_id: lookup.run.source_event_id,
+            status: "queued",
+          });
+          return;
+        }
+      }
+      if (lookup.kind === "created") {
+        workbenchSessions.beginRunAdmission(lookup.run.run_id);
+        try {
+          await startWorkbenchRun(lookup.run);
+          workbenchSessions.completeRunAdmission(lookup.run.run_id, { ok: true });
+        } catch (error) {
+          const failure = error instanceof ProductHttpError
+            ? { statusCode: error.statusCode, code: error.code }
+            : { statusCode: 503, code: "harness_unavailable" };
+          workbenchSessions.completeRunAdmission(lookup.run.run_id, {
+            ok: false,
+            ...failure,
+          });
+          throw error;
+        } finally {
+          workbenchSessions.endRunAdmission(lookup.run.run_id);
+        }
+      }
+      const status = lookup.kind === "created"
+        ? "queued"
+        : (await readWorkbenchRun(lookup.run))?.status ?? "queued";
+      responseJson(response, 202, {
+        schema_version: 2,
+        run_id: lookup.run.run_id,
+        session_id: session.session_id,
+        source_event_id: lookup.run.source_event_id,
+        status,
+      });
+      return;
+    }
+    const runMatch = pathname.match(/^\/api\/workbench\/runs\/([^/]+)(?:\/events)?$/);
+    if (runMatch !== null && request.method === "GET") {
+      await resolveWorkbenchScope(request);
+      const run = await workbenchSessions.getRun(decodeSegment(runMatch[1]));
+      if (run === undefined) throw new ProductHttpError(404, "run_not_found");
+      const session = await workbenchSessions.getSession(run.session_id);
+      if (session === undefined) throw new ProductHttpError(404, "run_not_found");
+      try {
+        await authorizeWorkbenchSession(request, session);
+      } catch (error) {
+        if (error instanceof ProductHttpError && error.statusCode === 401) throw error;
+        throw new ProductHttpError(404, "run_not_found");
+      }
+      const detail = await readWorkbenchRun(run);
+      if (detail === undefined) throw new ProductHttpError(404, "run_not_found");
+      if (pathname.endsWith("/events")) {
+        const afterSeq = parseCursor(query.get("after_seq"));
+        responseJson(response, 200, {
+          run_id: run.run_id,
+          events: detail.events.filter((event) => event.seq > afterSeq).map(publicWorkbenchEvent),
+          watermark: watermarkFor(detail.events, run.run_id),
+        });
+      } else {
+        responseJson(response, 200, publicWorkbenchRun(run, detail));
+      }
+      return;
+    }
+    responseJson(response, 404, { code: "not_found" });
+  }
+
+  async function resolveWorkbenchScope(
+    request: IncomingMessage,
+    projectId?: string,
+  ): Promise<{ workspace_id: string; actor_user_id: string; channel_id: string; project_id?: string }> {
+    if (options.businessOrigin === undefined) throw new ProductHttpError(503, "business_service_unavailable");
+    const authorization = request.headers.authorization;
+    try {
+      const upstream = await fetchImpl(`${options.businessOrigin}/_business/workbench/scope`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          ...(typeof authorization === "string" ? { authorization } : {}),
+          ...(options.businessServiceToken === undefined ? {} : { "x-anna-service-token": options.businessServiceToken }),
+        },
+        body: JSON.stringify(projectId === undefined ? {} : { project_id: projectId }),
+      });
+      if (!upstream.ok) {
+        if (upstream.status === 401) throw new ProductHttpError(401, "authentication_required");
+        if (upstream.status === 404 || upstream.status === 403) throw new ProductHttpError(404, "scope_not_found");
+        throw new ProductHttpError(503, "business_service_unavailable");
+      }
+      const body = await upstream.json() as Record<string, unknown>;
+      if (typeof body.workspace_id !== "string" || typeof body.actor_user_id !== "string" || typeof body.channel_id !== "string") {
+        throw new ProductHttpError(503, "business_scope_invalid");
+      }
+      return {
+        workspace_id: body.workspace_id,
+        actor_user_id: body.actor_user_id,
+        channel_id: body.channel_id,
+        ...(typeof body.project_id === "string" ? { project_id: body.project_id } : {}),
+      };
+    } catch (error) {
+      if (error instanceof ProductHttpError) throw error;
+      throw new ProductHttpError(503, "business_service_unavailable");
+    }
+  }
+
+  async function authorizeWorkbenchSession(
+    request: IncomingMessage,
+    session: WorkbenchSessionRecord,
+    resolvedScope?: { workspace_id: string; actor_user_id: string; channel_id: string; project_id?: string },
+  ): Promise<{ workspace_id: string; actor_user_id: string; channel_id: string; project_id?: string }> {
+    const scope = resolvedScope ?? await resolveWorkbenchScope(request);
+    if (scope.workspace_id !== session.workspace_id || scope.actor_user_id !== session.actor_user_id) {
+      throw new ProductHttpError(404, "session_not_found");
+    }
+    if (session.project_id === undefined) return scope;
+    try {
+      return await resolveWorkbenchScope(request, session.project_id);
+    } catch (error) {
+      if (error instanceof ProductHttpError && (error.statusCode === 403 || error.statusCode === 404)) {
+        throw new ProductHttpError(404, "session_not_found");
+      }
+      throw error;
+    }
+  }
+
+  async function startWorkbenchRun(run: WorkbenchRunRecord): Promise<void> {
+    const task = await workbenchTaskForRun(run);
+    try {
+      await sessions.save(task, run.created_at);
+      await options.runtime.start(run.surface as V2SurfaceId, {
+        workspace_id: run.workspace_id,
+        channel_id: run.channel_id,
+        command_id: `workbench:${run.run_id}`,
+        run_id: run.run_id,
+        source_event_id: run.source_event_id,
+        goal: run.prompt,
+      });
+      await workbenchSessions.markRunAdmission(run.run_id, "started");
+    } catch (error) {
+      const failureCode = error instanceof ProductHttpError
+        ? error.code
+        : error instanceof Error && error.message === "model_not_configured"
+          ? "model_not_configured"
+          : "run_admission_failed";
+      await workbenchSessions.markRunAdmission(run.run_id, "failed", failureCode);
+      if (error instanceof Error && error.message === "model_not_configured") {
+        throw new ProductHttpError(409, "model_not_configured");
+      }
+      throw new ProductHttpError(503, "harness_unavailable");
+    }
+  }
+
+  async function readWorkbenchRun(run: WorkbenchRunRecord): Promise<{
+    readonly status: string;
+    readonly events: CanonicalEvent[];
+    readonly result?: Record<string, unknown>;
+  } | undefined> {
+    const task = productTaskForWorkbenchRun(run);
+    const { events, canonical } = await readWorkbenchEvents(run, task);
+    const result = resultFromEvents(events, task);
+    return {
+      status: canonical ? statusFromEvents(events) : "not_started",
+      events,
+      ...(result === undefined ? {} : { result }),
+    };
+  }
+
+  async function workbenchTaskForRun(run: WorkbenchRunRecord): Promise<ProductTask> {
+    const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+    const priorRuns = (await workbenchSessions.listRuns(run.session_id))
+      .filter((item) => item.run_id !== run.run_id)
+      .filter((item) => item.created_at < run.created_at
+        || (item.created_at === run.created_at && item.run_id < run.run_id));
+    for (const prior of priorRuns) {
+      history.push({ role: "user", content: prior.prompt });
+      const priorTask = productTaskForWorkbenchRun(prior);
+      const { events } = await readWorkbenchEvents(prior, priorTask);
+      for (const event of events) {
+        if (event.type !== "omp.transcript.message") continue;
+        const message = recordValue(recordValue(event.payload).message);
+        if (message.role !== "assistant") continue;
+        const content = textFromMessage(message);
+        if (content !== undefined) history.push({ role: "assistant", content });
+      }
+    }
+    return {
+      ...productTaskForWorkbenchRun(run),
+      ...(history.length === 0 ? {} : { context: { conversation_history: history } }),
+    };
+  }
+
+  async function workbenchSessionProjection(session: WorkbenchSessionRecord): Promise<Record<string, unknown>> {
+    const runs = await workbenchSessions.listRuns(session.session_id);
+    const details = await Promise.all(runs.map(async (run) => ({ run, detail: await readWorkbenchRun(run) })));
+    const messages = details.flatMap((item) => messagesForWorkbenchRun(item.run, item.detail?.events ?? []));
+    return {
+      ...session,
+      runs: details.map((item) => publicWorkbenchRun(item.run, item.detail)),
+      messages,
+      watermark: {
+        session_id: session.session_id,
+        runs: details.map((item) => watermarkFor(item.detail?.events ?? [], item.run.run_id)),
+      },
+    };
   }
 
   async function startTask(task: ProductTask): Promise<string> {
@@ -571,6 +1005,15 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     return events;
   }
 
+  async function readWorkbenchEvents(
+    run: WorkbenchRunRecord,
+    task: ProductTask,
+  ): Promise<{ readonly events: CanonicalEvent[]; readonly canonical: boolean }> {
+    const command = await options.eventStore.scope(scopeFor(task)).getRunCommand(run.run_id as never);
+    if (command === undefined) return { events: [], canonical: false };
+    return { events: await readTaskEvents(task), canonical: true };
+  }
+
   async function streamCanonicalEvents(
     request: IncomingMessage,
     response: ServerResponse,
@@ -703,6 +1146,146 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
 }
 
 export const startProductHarnessService = startProductHost;
+
+function productTaskForWorkbenchRun(run: WorkbenchRunRecord): ProductTask {
+  return {
+    schema_version: 2,
+    run_id: run.run_id,
+    workspace_id: run.workspace_id,
+    actor_user_id: run.actor_user_id,
+    surface: run.surface as ProductTask["surface"],
+    prompt: run.prompt,
+    channel_id: run.channel_id,
+    conversation_id: run.conversation_id,
+    session_id: run.session_id,
+    ...(run.project_id === undefined ? {} : { project_id: run.project_id }),
+    ...(run.parent_run_id === undefined ? {} : { parent_run_id: run.parent_run_id }),
+    resource_refs: run.resource_refs,
+    ...(run.requested_artifact === undefined ? {} : { requested_artifact: run.requested_artifact }),
+    source_event_id: run.source_event_id,
+  };
+}
+
+function publicWorkbenchRun(
+  run: WorkbenchRunRecord,
+  detail: { readonly status: string; readonly events: readonly CanonicalEvent[]; readonly result?: Record<string, unknown> } | undefined,
+): Record<string, unknown> {
+  return {
+    schema_version: 2,
+    run_id: run.run_id,
+    session_id: run.session_id,
+    surface: run.surface,
+    prompt: run.prompt,
+    source_event_id: run.source_event_id,
+    ...(run.source_event_derived === undefined ? {} : { source_event_derived: run.source_event_derived }),
+    ...(run.conversation_source === undefined ? {} : { conversation_source: run.conversation_source }),
+    ...(run.project_id === undefined ? {} : { project_id: run.project_id }),
+    ...(run.parent_run_id === undefined ? {} : { parent_run_id: run.parent_run_id }),
+    status: detail?.status ?? "queued",
+    ...(run.admission_status === undefined ? {} : { admission_status: run.admission_status }),
+    ...(run.admission_error === undefined ? {} : { admission_error: run.admission_error }),
+    created_at: run.created_at,
+    updated_at: run.updated_at,
+    ...(detail?.result === undefined ? {} : { result: detail.result }),
+    watermark: watermarkFor(detail?.events ?? [], run.run_id),
+  };
+}
+
+function messagesForWorkbenchRun(
+  run: WorkbenchRunRecord,
+  events: readonly CanonicalEvent[],
+): Array<Record<string, unknown>> {
+  const messages: Array<Record<string, unknown>> = [{
+    run_id: run.run_id,
+    event_id: run.source_event_id,
+    seq: -1,
+    role: "user",
+    content: run.prompt,
+    source_event_id: run.source_event_id,
+  }];
+  for (const event of events) {
+    if (event.type !== "omp.transcript.message") continue;
+    const payload = recordValue(event.payload);
+    const message = recordValue(payload.message);
+    if (message.role !== "assistant") continue;
+    const content = textFromMessage(message);
+    if (content === undefined) continue;
+    messages.push({
+      run_id: run.run_id,
+      event_id: event.id,
+      seq: event.seq,
+      role: "assistant",
+      content,
+    });
+  }
+  return messages;
+}
+
+function publicWorkbenchEvent(event: CanonicalEvent): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    run_id: event.streamId,
+    event_id: event.id,
+    type: event.type,
+    seq: event.seq,
+    timestamp: event.timestamp,
+  };
+  if (event.type === "omp.transcript.message") {
+    const message = recordValue(recordValue(event.payload).message);
+    if (message.role === "assistant") {
+      const content = textFromMessage(message);
+      if (content !== undefined) body.message = { role: "assistant", content };
+    }
+  } else if (event.type.startsWith("run.")) {
+    body.status = event.type.slice("run.".length);
+  }
+  return body;
+}
+
+function watermarkFor(events: readonly CanonicalEvent[], runId: string): Record<string, unknown> {
+  const last = events.at(-1);
+  return {
+    run_id: runId,
+    ...(last === undefined ? {} : { event_id: last.id, seq: last.seq }),
+  };
+}
+
+function textFromMessage(message: Record<string, unknown>): string | undefined {
+  if (!Array.isArray(message.content)) return undefined;
+  const text = message.content
+    .filter((block): block is Record<string, unknown> => isRecord(block) && block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text as string)
+    .join("");
+  return text.trim() === "" ? undefined : text;
+}
+
+function requiredSurface(value: unknown): ProductTask["surface"] {
+  if (typeof value !== "string" || !(productSurfaces as readonly string[]).includes(value)) {
+    throw new ProductHttpError(400, "invalid_surface");
+  }
+  return value as ProductTask["surface"];
+}
+
+function optionalId(value: unknown, name: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || value.trim() === "") throw new ProductHttpError(400, `invalid_${name}`);
+  return value;
+}
+
+function requiredResourceRefs(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.trim() === "")) {
+    throw new ProductHttpError(400, "invalid_resource_refs");
+  }
+  return value as string[];
+}
+
+function requestedArtifactKind(value: unknown): string | undefined {
+  const artifact = optionalId(value, "requested_artifact");
+  if (artifact === undefined) return undefined;
+  if (!(new Set(["skill", "prompt", "python_tool"])).has(artifact)) {
+    throw new ProductHttpError(400, "invalid_requested_artifact");
+  }
+  return artifact;
+}
 
 export function statusFromEvents(events: readonly CanonicalEvent[]): string {
   const terminal = events.filter((event) => terminalEvents.has(event.type)).at(-1);

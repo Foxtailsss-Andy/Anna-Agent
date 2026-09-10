@@ -1,0 +1,7 @@
+{
+  "case": "admission-failure",
+  "failed_code": "model_not_configured",
+  "query_status": "not_started",
+  "concurrent_duplicate_calls": 2,
+  "model_transport_calls": 0
+}

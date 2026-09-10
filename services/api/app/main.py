@@ -285,6 +285,7 @@ def create_app(
                 memory=memory,
                 reimbursement=reimbursement,
                 service_token=mode_config.service_token,
+                local_session=_local_session,
             )
         )
 

@@ -1,0 +1,179 @@
+{
+  "case": "product-v1-migration",
+  "source_sha256": "9bdc9254398eb4ac1cffd3f573abeced7ba5d7f0ae856366b849bd61d8a7a40b",
+  "matched_records": 13,
+  "sessions": [
+    {
+      "session_id": "session:v2:e49b78bd40fd7a2aa7e19a6da43ee674fe6e3b15433af90dc05f97d3f6e753ca",
+      "run_ids": [
+        "legacy-run-chat",
+        "legacy-run-create",
+        "legacy-history-01",
+        "legacy-history-02",
+        "legacy-history-03",
+        "legacy-history-04",
+        "legacy-history-05",
+        "legacy-history-06",
+        "legacy-history-07"
+      ]
+    },
+    {
+      "session_id": "session:v2:6c7e5786d58739edcce084e7262849254b2dfa1933a8abb50363bb445e834462",
+      "run_ids": [
+        "legacy-conversation-collision"
+      ]
+    },
+    {
+      "session_id": "session:v2:57dc6689681957bd5e89932443fef1dff6cdc3ee22aafcf347b040cad22756e9",
+      "run_ids": [
+        "legacy-fallback-run"
+      ]
+    },
+    {
+      "session_id": "session:v2:a7828e73baa666092cc064c5813d05f96673c7cb7425efa6fb91e488ebe5c440",
+      "run_ids": [
+        "legacy-project-b"
+      ]
+    },
+    {
+      "session_id": "session:v2:65c380bd7fda117d1d621a0dd56b911c0e2c429d5e31198841c413b3107db60e",
+      "run_ids": [
+        "legacy-project-a"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "legacy-run-chat",
+      "source_event_id": "product:source:legacy-run-chat",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-run-chat",
+        "event_id": "c240ea2e-6de0-425f-9bcf-5e4265eb5aae",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-run-create",
+      "source_event_id": "product:source:legacy-run-create",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-run-create",
+        "event_id": "dcbce701-7d84-480d-95ed-dc6b435aa6d4",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-01",
+      "source_event_id": "product:source:legacy-history-01",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-01",
+        "event_id": "e7fa9237-0c88-4f1f-92b6-ddd1e28f6bc1",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-02",
+      "source_event_id": "product:source:legacy-history-02",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-02",
+        "event_id": "9898f379-7142-4c4f-9abf-5db0cf63c6df",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-03",
+      "source_event_id": "product:source:legacy-history-03",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-03",
+        "event_id": "81090be6-35b8-4ba9-9fea-3cf9963e73da",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-04",
+      "source_event_id": "product:source:legacy-history-04",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-04",
+        "event_id": "c3b987b6-45d7-4eec-b505-47e9ef0cfba2",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-05",
+      "source_event_id": "product:source:legacy-history-05",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-05",
+        "event_id": "42f6bac4-9222-428c-8fb1-f21ab7debaf1",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-06",
+      "source_event_id": "product:source:legacy-history-06",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-06",
+        "event_id": "65fd070c-73e8-4f01-8013-373019adcf49",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-history-07",
+      "source_event_id": "product:source:legacy-history-07",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-history-07",
+        "event_id": "3da1800a-55aa-4ce4-8660-b7a4377240c1",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-conversation-collision",
+      "source_event_id": "product:source:legacy-conversation-collision",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-conversation-collision",
+        "event_id": "85db51cd-ad19-41ac-b490-0a5229fa6883",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-fallback-run",
+      "source_event_id": "product:source:legacy-fallback-run",
+      "conversation_source": "run_id_fallback",
+      "watermark": {
+        "run_id": "legacy-fallback-run",
+        "event_id": "bcdb53e5-3f63-43bb-8e4d-5b77fde0c073",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-project-b",
+      "source_event_id": "product:source:legacy-project-b",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-project-b",
+        "event_id": "70ed0930-c3e5-4033-af17-4720ceaadf9f",
+        "seq": 11
+      }
+    },
+    {
+      "run_id": "legacy-project-a",
+      "source_event_id": "product:source:legacy-project-a",
+      "conversation_source": "conversation",
+      "watermark": {
+        "run_id": "legacy-project-a",
+        "event_id": "e7d227a3-2307-41f3-b86d-423ac650f6fe",
+        "seq": 11
+      }
+    }
+  ],
+  "model_transport_calls": 14,
+  "usage": "unavailable"
+}

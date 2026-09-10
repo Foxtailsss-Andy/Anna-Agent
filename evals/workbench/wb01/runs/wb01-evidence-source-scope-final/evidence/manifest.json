@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "caseId": "wb01-session-increment",
+  "generatedAt": "2026-09-10T04:13:19.414Z",
+  "evidenceMode": "D",
+  "provider": "blocked",
+  "gitHead": "cfe0731700268fd466b588a65641c1d162487443",
+  "files": [
+    {
+      "path": "increment-result.json",
+      "size": 10702,
+      "sha256": "3a601c6bec3b432ed6aab6ead4b358d5d33ab27e25b74f87ca57993bad62b0b5"
+    },
+    {
+      "path": "receipt-missing-workbench-session-migration.test.ts.json",
+      "size": 269,
+      "sha256": "99771fa75d8de1491325b2c274423c495c549a92e44d13d8e5d64948320dceef"
+    },
+    {
+      "path": "receipt-python-scope.json",
+      "size": 248,
+      "sha256": "186c01fb8f2a3082e90f94f3875b3259e8531a2fa2cbfac3fa30501bca60ae5e"
+    },
+    {
+      "path": "receipt-ts-session-contract.json",
+      "size": 828,
+      "sha256": "069f9f48e8f90b14dc800b279c2efd326abf3d750e16f517bf35fae4788ae21e"
+    }
+  ]
+}

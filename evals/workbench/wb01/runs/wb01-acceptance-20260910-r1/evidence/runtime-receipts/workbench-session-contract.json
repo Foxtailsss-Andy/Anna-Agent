@@ -1,0 +1,9 @@
+{
+  "case": "session-contract-restart",
+  "session_id": "f1b1da3f-f469-4046-9838-3105c6f1edc7",
+  "workspace_id": "ws_crew_demo",
+  "actor_user_id": "acc_boss",
+  "channel_id": "chat_channel:ws_crew_demo",
+  "restarted_session_id": "f1b1da3f-f469-4046-9838-3105c6f1edc7",
+  "usage": "unavailable"
+}

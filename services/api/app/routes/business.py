@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import json
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -11,6 +12,7 @@ from services.chat.app.orchestrator import ChatOrchestrator, ChatRunNotFoundErro
 from services.crew.app.service import CrewService
 from services.hiker.app.orchestrator import HikerOrchestrator
 from services.identity.app.service import IdentityService
+from services.identity.app.schemas import SessionIdentity
 from services.memory.app.store import BusinessMemoryStore
 from services.reimbursement.app.orchestrator import ReimbursementOrchestrator
 from services.reimbursement.app.capability import ReimbursementCapabilityHandler
@@ -51,6 +53,12 @@ class ChatToolCallRequest(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class WorkbenchScopeRequest(BaseModel):
+    workspace_id: str | None = None
+    actor_user_id: str | None = None
+    project_id: str | None = None
+
+
 def build_router(
     *,
     hiker: HikerOrchestrator,
@@ -60,6 +68,7 @@ def build_router(
     memory: BusinessMemoryStore,
     reimbursement: ReimbursementOrchestrator | None = None,
     service_token: str | None,
+    local_session: Callable[[], SessionIdentity] | None = None,
 ) -> APIRouter:
     """Internal business adapters used by the Node Harness Host.
 
@@ -78,6 +87,47 @@ def build_router(
     def require_scope(workspace_id: str, actor_user_id: str, run_id: str) -> None:
         if not workspace_id.strip() or not actor_user_id.strip() or not run_id.strip():
             raise HTTPException(status_code=400, detail="business scope is required")
+
+    def resolve_workbench_identity(authorization: str | None) -> SessionIdentity:
+        if authorization is not None:
+            if not authorization.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="authentication required")
+            token = authorization.removeprefix("Bearer ").strip()
+            resolved = identity.resolve(token) if token else None
+            if resolved is None:
+                raise HTTPException(status_code=401, detail="authentication required")
+            return resolved
+        if local_session is not None:
+            return local_session()
+        raise HTTPException(status_code=401, detail="authentication required")
+
+    @router.post("/_business/workbench/scope")
+    def workbench_scope(
+        request: WorkbenchScopeRequest,
+        authorization: str | None = Header(default=None),
+        x_anna_service_token: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        require_token(x_anna_service_token)
+        resolved = resolve_workbench_identity(authorization)
+        # Scope mismatches deliberately collapse to 404 so callers cannot use
+        # this service seam to probe another actor or workspace.
+        if request.workspace_id is not None and resolved.workspace_id != request.workspace_id:
+            raise HTTPException(status_code=404, detail="scope not found")
+        if request.actor_user_id is not None and resolved.user_id != request.actor_user_id:
+            raise HTTPException(status_code=404, detail="scope not found")
+        channel_id = f"chat_channel:{resolved.workspace_id}"
+        response = {
+            "workspace_id": resolved.workspace_id,
+            "actor_user_id": resolved.user_id,
+            "channel_id": channel_id,
+        }
+        if request.project_id is not None:
+            project = crew.get_project(request.project_id)
+            if project is None or project.workspace_id != resolved.workspace_id:
+                raise HTTPException(status_code=404, detail="scope not found")
+            response["project_id"] = project.id
+            response["channel_id"] = f"crew_channel:{project.id}"
+        return response
 
     @router.get("/_business/status")
     def status(x_anna_service_token: str | None = Header(default=None)) -> dict[str, Any]:
