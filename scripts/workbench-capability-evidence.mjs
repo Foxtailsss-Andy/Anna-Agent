@@ -23,17 +23,38 @@ const requiredTsTests = [
   "test/workbench-capability-skill-restore.test.ts",
   "test/workbench-capability-public.test.ts",
   "test/workbench-capability-public-network.test.ts",
+  "test/workbench-capability-files.test.ts",
+  "test/workbench-capability-files-legacy.test.ts",
   "test/web-search.test.ts",
 ];
 const requiredSourcePaths = [
   "apps/harness-service/src/workbench-public-web.ts",
+  "apps/harness-service/src/workbench-files.ts",
+  "apps/harness-service/src/production.ts",
   "apps/harness-service/package.json",
   "package-lock.json",
   "apps/harness-service/src/production-tools.ts",
+  "apps/harness-service/src/workbench-capabilities.ts",
+  "apps/harness-service/src/product-facade.ts",
+  "services/api/app/routes/workdirs.py",
+  "services/runtime/app/workdir_store.py",
+  "services/api/app/main.py",
+  "services/api/app/routes/business.py",
+  "apps/harness-service/test/workbench-capability-files-legacy.test.ts",
+  "services/api/app/security.py",
+  "services/api/app/routes/chat.py",
+  "services/api/app/routes/create.py",
+  "services/chat/app/orchestrator.py",
+  "apps/desktop/src/lib/api/client.ts",
+  "apps/desktop/src/lib/api/identity.ts",
+  "apps/desktop/src/lib/runtime.ts",
   "apps/harness-service/test/web-search.test.ts",
+  "apps/harness-service/test/workbench-capability-files.test.ts",
   "apps/harness-service/test/production-tools.test.ts",
 ];
 const requiredPythonTest = "tests/contracts/test_workbench_capabilities.py";
+const requiredPythonFilesTest = "tests/contracts/test_workbench_files.py";
+const requiredPythonTests = [requiredPythonTest, requiredPythonFilesTest];
 const ownedPaths = [
   "scripts/workbench-capability-evidence.mjs",
   "scripts/workbench-capability-evidence.test.mjs",
@@ -42,9 +63,15 @@ const ownedPaths = [
   "apps/harness-service/src/production.ts",
   "apps/harness-service/src/production-tools.ts",
   "apps/harness-service/src/workbench-public-web.ts",
+  "apps/harness-service/src/workbench-files.ts",
+  "apps/harness-service/src/workbench-capabilities.ts",
+  "apps/harness-service/src/product-facade.ts",
+  "services/api/app/routes/workdirs.py",
+  "services/runtime/app/workdir_store.py",
+  "services/api/app/main.py",
+  "services/api/app/routes/business.py",
   "apps/harness-service/package.json",
   "package-lock.json",
-  "apps/harness-service/src/workbench-capabilities.ts",
   "apps/harness-service/src/workbench-skills.ts",
   "packages/harness-v2/src/index.ts",
   "packages/harness-v2/src/run-profile.ts",
@@ -53,7 +80,10 @@ const ownedPaths = [
   "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
   "apps/harness-service/test/workbench-capability-public.test.ts",
   "apps/harness-service/test/workbench-capability-public-network.test.ts",
+  "apps/harness-service/test/workbench-capability-files.test.ts",
   "apps/harness-service/test/web-search.test.ts",
+  "tests/contracts/test_workbench_capabilities.py",
+  "tests/contracts/test_workbench_files.py",
   "apps/harness-service/test/production-tools.test.ts",
 ];
 
@@ -197,7 +227,7 @@ async function collectCapabilityTests() {
     /^apps\/harness-service\/test\/(?:workbench-capability-.*|web-search)\.test\.ts$/.test(path))).map((path) =>
     path.slice("apps/harness-service/".length));
   const pythonTests = (await filesBelow("tests/contracts", (path) =>
-    /(?:workbench[-_]capabilit|capabilit).*\.py$/.test(path)));
+    /(?:workbench[-_]capabilit|capabilit).*\.py$/.test(path) || path === requiredPythonFilesTest));
   return {
     tsTests: [...new Set(tsTests)].sort((left, right) => left.localeCompare(right)),
     pythonTests: [...new Set(pythonTests)].sort((left, right) => left.localeCompare(right)),
@@ -209,6 +239,7 @@ async function collectSourcePaths() {
     "apps/harness-service/src/production.ts",
     "apps/harness-service/src/production-tools.ts",
     "apps/harness-service/src/workbench-public-web.ts",
+    "apps/harness-service/src/workbench-files.ts",
     "apps/harness-service/src/product-session.ts",
     "apps/harness-service/src/product-facade.ts",
     "apps/harness-service/src/pi-kernel-build-identity.ts",
@@ -229,7 +260,8 @@ async function collectSourcePaths() {
     "packages/omp-loop-kernel/runtime/protocol.ts",
     "packages/omp-loop-kernel/runtime/worker.ts",
     "services/api/app/routes/business.py",
-    requiredPythonTest,
+    ...requiredSourcePaths,
+    ...requiredPythonTests,
     "package.json",
     "package-lock.json",
     "apps/harness-service/package.json",
@@ -323,7 +355,7 @@ async function runPythonTest(pythonTests) {
       exitCode: null,
       output: "",
       status: "not_run",
-      tests: [requiredPythonTest],
+      tests: requiredPythonTests,
       testFileCount: 0,
       blockingReason: "required_test_not_generated",
     };
@@ -352,7 +384,7 @@ const discoveredBefore = await collectCapabilityTests();
 const tsTests = discoveredBefore.tsTests;
 const missingTsTests = requiredTsTests.filter((path) => !tsTests.includes(path));
 const pythonTests = discoveredBefore.pythonTests;
-const missingPythonTests = pythonTests.includes(requiredPythonTest) ? [] : [requiredPythonTest];
+const missingPythonTests = requiredPythonTests.filter((path) => !pythonTests.includes(path));
 
 const tsResult = await runTsTests(tsTests);
 const pythonResult = await runPythonTest(pythonTests);
@@ -489,7 +521,13 @@ const result = {
       missing: missingTsTests,
       testFileCount: tsTests.length,
     },
-    python: { required: requiredPythonTest, discovered: pythonTests, missing: missingPythonTests, testFileCount: pythonTests.length },
+    python: {
+      required: requiredPythonTest,
+      requiredTests: requiredPythonTests,
+      discovered: pythonTests,
+      missing: missingPythonTests,
+      testFileCount: pythonTests.length,
+    },
   },
   testFileCounts: { ts: tsResult.testFileCount, python: pythonResult.testFileCount, receipts: receipts.length },
   commands: [

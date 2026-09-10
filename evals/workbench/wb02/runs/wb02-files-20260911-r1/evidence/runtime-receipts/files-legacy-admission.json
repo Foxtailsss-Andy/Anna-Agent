@@ -1,0 +1,6 @@
+{
+  "run_id": "legacy-admission-recheck",
+  "status": "rejected_before_runtime",
+  "error": "workdir_binding_changed",
+  "evidence_boundary": "actual Product Host admission with real Python identity/scope; no model transport needed"
+}

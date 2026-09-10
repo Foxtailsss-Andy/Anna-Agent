@@ -1,0 +1,35 @@
+{
+  "run_id": "400ab811-c735-4aa1-b914-abe499a9aa75",
+  "dispatches": [
+    {
+      "seq": 10,
+      "tool_name": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool_name": "capabilities.load"
+    },
+    {
+      "seq": 29,
+      "tool_name": "web_search"
+    }
+  ],
+  "tool_responses": [
+    {
+      "event_id": "9422ab12-e9f0-4451-97bf-e68be4735520",
+      "seq": 11,
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "e3dd3921-72ae-4562-9378-73fd8496390c",
+      "seq": 21,
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "0a16d416-aff9-4c4e-8987-fcf9c67abd5f",
+      "seq": 30,
+      "tool_status": "succeeded"
+    }
+  ],
+  "evidence_boundary": "actual public Workbench OMP/Gateway events; model and external HTTP transports are fixtures"
+}

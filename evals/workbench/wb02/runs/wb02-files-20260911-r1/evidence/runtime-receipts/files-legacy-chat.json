@@ -1,0 +1,19 @@
+{
+  "run_id": "chat_run_001",
+  "status": "ready",
+  "stream_frames": [
+    {
+      "type": "tool_start",
+      "name": "workdir.read_file"
+    },
+    {
+      "type": "tool_done",
+      "name": "workdir.read_file",
+      "ok": true
+    },
+    {
+      "type": "done"
+    }
+  ],
+  "evidence_boundary": "actual desktop Chat submit/subscribe through Python Product Host and OMP; real identity/scope and registered file; model transport is a fixture"
+}

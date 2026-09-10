@@ -1,0 +1,17 @@
+{
+  "run_id": "4caebd5c-17e0-405c-9098-17e3c759de06",
+  "dispatches": [
+    {
+      "seq": 10,
+      "tool_name": "capabilities.search"
+    }
+  ],
+  "tool_responses": [
+    {
+      "event_id": "a2ce2b33-b576-4952-8885-b4bbee429a38",
+      "seq": 11,
+      "tool_status": "succeeded"
+    }
+  ],
+  "evidence_boundary": "actual public Workbench OMP/Gateway events; model and external HTTP transports are fixtures"
+}

@@ -19,6 +19,7 @@ from services.reimbursement.app.capability import ReimbursementCapabilityHandler
 from services.runtime.app.engine.capability import CapabilityError, CapabilitySuspend
 from services.runtime.app.model_provider import ModelToolCall
 from services.runtime.app.skill_loader import SkillLoaderError
+from services.runtime.app.workdir_store import resolve_workdir
 
 
 class HikerToolCallRequest(BaseModel):
@@ -57,6 +58,7 @@ class WorkbenchScopeRequest(BaseModel):
     workspace_id: str | None = None
     actor_user_id: str | None = None
     project_id: str | None = None
+    workdir_id: str | None = None
 
 
 def build_router(
@@ -112,12 +114,14 @@ def build_router(
             resolved = resolve_workbench_identity(authorization)
             resolved_workspace_id = resolved.workspace_id
             resolved_actor_user_id = resolved.user_id
+            local_identity = False
         elif request.workspace_id is not None and request.actor_user_id is not None:
             if local_session is not None:
                 local = local_session()
                 if local.workspace_id == request.workspace_id and local.user_id == request.actor_user_id:
                     resolved_workspace_id = local.workspace_id
                     resolved_actor_user_id = local.user_id
+                    local_identity = True
                 else:
                     member = next(
                         (candidate for candidate in identity.list_members(request.workspace_id) if candidate.id == request.actor_user_id),
@@ -127,6 +131,7 @@ def build_router(
                         raise HTTPException(status_code=404, detail="scope not found")
                     resolved_workspace_id = member.workspace_id
                     resolved_actor_user_id = member.id
+                    local_identity = False
             else:
                 member = next(
                     (candidate for candidate in identity.list_members(request.workspace_id) if candidate.id == request.actor_user_id),
@@ -136,10 +141,12 @@ def build_router(
                     raise HTTPException(status_code=404, detail="scope not found")
                 resolved_workspace_id = member.workspace_id
                 resolved_actor_user_id = member.id
+                local_identity = False
         else:
             resolved = resolve_workbench_identity(None)
             resolved_workspace_id = resolved.workspace_id
             resolved_actor_user_id = resolved.user_id
+            local_identity = True
         # Scope mismatches deliberately collapse to 404 so callers cannot use
         # this service seam to probe another actor or workspace.
         if request.workspace_id is not None and resolved_workspace_id != request.workspace_id:
@@ -158,6 +165,17 @@ def build_router(
                 raise HTTPException(status_code=404, detail="scope not found")
             response["project_id"] = project.id
             response["channel_id"] = f"crew_channel:{project.id}"
+        if request.workdir_id is not None:
+            workdir = resolve_workdir(
+                request.workdir_id,
+                owner_workspace_id=resolved_workspace_id,
+                owner_actor_user_id=resolved_actor_user_id,
+                allow_legacy_local=local_identity,
+            )
+            if workdir is None:
+                raise HTTPException(status_code=404, detail="scope not found")
+            response["workdir_id"] = request.workdir_id
+            response["workdir_path"] = workdir["path"]
         return response
 
     @router.get("/_business/status")
@@ -225,7 +243,21 @@ def build_router(
         if run.workspace_id != request.workspace_id or run.actor_user_id != request.actor_user_id:
             raise HTTPException(status_code=403, detail="chat scope is not authorized")
         try:
-            handler = chat.build_host_capability(run)
+            local_identity = False
+            if local_session is not None:
+                local = local_session()
+                local_identity = (
+                    local.workspace_id == request.workspace_id
+                    and local.user_id == request.actor_user_id
+                )
+            handler = chat.build_host_capability(
+                run,
+                workdir_owner=(
+                    request.workspace_id,
+                    request.actor_user_id,
+                    local_identity,
+                ),
+            )
             observation = handler.dispatch_tool(
                 ModelToolCall(
                     id=f"host-{request.run_id}-{canonical_name}",

@@ -18,6 +18,8 @@ from services.business.harness_client import (
     native_todo_plan,
     result_payload,
 )
+from services.identity.app.schemas import SessionIdentity
+from services.identity.app.service import IdentityService
 from services.reimbursement.app.audit import AuditEvent
 from services.runtime.app.autocompact import clear_autocompact_tracker
 from services.runtime.app.concurrency import WorkspaceRunGate
@@ -34,7 +36,12 @@ from ..schemas import (
     InterjectChatRunRequest,
     SaveChatRunRequest,
 )
-from ..security import _assert_identity, _assert_run_access, _assert_workspace_access
+from ..security import (
+    _assert_identity,
+    _assert_run_access,
+    _assert_workspace_access,
+    _resolve_product_identity,
+)
 
 # L3a run_store surface key for chat frame journaling (one table per surface).
 _CHAT_SURFACE = "chat"
@@ -535,6 +542,8 @@ def build_router(
     *,
     harness_client: HarnessHostClient | None = None,
     product_mode: bool = False,
+    identity: IdentityService | None = None,
+    local_session: Callable[[], SessionIdentity] | None = None,
 ) -> APIRouter:
     router = APIRouter()
     manager = BackgroundRunManager(chat)
@@ -545,8 +554,28 @@ def build_router(
             raise HTTPException(status_code=503, detail="Harness Host is not configured")
         return harness_client
 
-    def _task_for_run(run: ChatRun) -> ProductTask:
-        resolved = chat.build_host_inputs(run)
+    def _request_identity(
+        authorization: str | None,
+        workspace_id: str,
+        user_id: str,
+    ) -> tuple[str, str, bool] | None:
+        if not product_mode:
+            return None
+        resolved, local_identity = _resolve_product_identity(
+            authorization,
+            workspace_id,
+            user_id,
+            identity=identity,
+            local_session=local_session,
+        )
+        return resolved.workspace_id, resolved.user_id, local_identity
+
+    def _task_for_run(
+        run: ChatRun,
+        *,
+        workdir_owner: tuple[str, str, bool] | None = None,
+    ) -> ProductTask:
+        resolved = chat.build_host_inputs(run, workdir_owner=workdir_owner)
         messages = resolved.request.messages
         system_prompt = next(
             (
@@ -616,7 +645,9 @@ def build_router(
     def get_chat_prompt_templates(
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_workspace_access(anna_workspace_id, anna_workspace_id, anna_user_id)
         return {"templates": [template.model_dump() for template in chat.prompt_templates()]}
 
@@ -624,8 +655,10 @@ def build_router(
     def get_chat_model_profiles(
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
         """Sanitized model profiles for the composer selector (no secrets)."""
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_workspace_access(anna_workspace_id, anna_workspace_id, anna_user_id)
         return {
             "profiles": chat.settings.list_model_profiles(),
@@ -637,7 +670,11 @@ def build_router(
         request: CreateChatRunRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        workdir_owner = _request_identity(
+            authorization, anna_workspace_id, anna_user_id
+        )
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -657,7 +694,9 @@ def build_router(
                 thread_id=request.thread_id,
             )
             try:
-                host_run = _require_host().submit_and_wait(_task_for_run(run))
+                host_run = _require_host().submit_and_wait(
+                    _task_for_run(run, workdir_owner=workdir_owner)
+                )
                 host_run_ids[run.id] = host_run.run_id
             except HarnessHostError as exc:
                 _apply_chat_host_failure(chat, run, exc.code or "harness_request_failed")
@@ -681,7 +720,9 @@ def build_router(
     def list_chat_runs(
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> list[dict]:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_workspace_access(anna_workspace_id, anna_workspace_id, anna_user_id)
         if product_mode:
             # Host history is the runtime fact source. The local registry still
@@ -703,7 +744,9 @@ def build_router(
         run_id: str,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -722,8 +765,10 @@ def build_router(
         run_id: str,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
         """执行过程 Trace(§4 TraceDoc)—— journal+audit 装配,纯读。"""
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -752,7 +797,11 @@ def build_router(
         request: CreateChatRunRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> StreamingResponse:
+        workdir_owner = _request_identity(
+            authorization, anna_workspace_id, anna_user_id
+        )
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -775,7 +824,9 @@ def build_router(
                         thread_id=request.thread_id,
                     )
                     host = _require_host()
-                    submitted = await asyncio.to_thread(host.submit, _task_for_run(run))
+                    submitted = await asyncio.to_thread(
+                        host.submit, _task_for_run(run, workdir_owner=workdir_owner)
+                    )
                     host_run_ids[run.id] = submitted.run_id
                     yield _json_sse({"type": "event", "event": _host_audit_event(run.id, "harness.task.submitted", {"surface": "chat"})})
                     after_seq = -1
@@ -841,7 +892,11 @@ def build_router(
         request: CreateChatRunRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        workdir_owner = _request_identity(
+            authorization, anna_workspace_id, anna_user_id
+        )
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -861,7 +916,10 @@ def build_router(
                 thread_id=request.thread_id,
             )
             try:
-                submitted = _require_host().submit(_task_for_run(run))
+                submitted = await asyncio.to_thread(
+                    _require_host().submit,
+                    _task_for_run(run, workdir_owner=workdir_owner),
+                )
                 host_run_ids[run.id] = submitted.run_id
             except HarnessHostError as exc:
                 _apply_chat_host_failure(chat, run, exc.code or "harness_request_failed")
@@ -886,7 +944,9 @@ def build_router(
         from_seq: int = Query(0, ge=0),
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> StreamingResponse:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -934,7 +994,9 @@ def build_router(
         run_id: str,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -949,7 +1011,9 @@ def build_router(
         run_id: str,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -975,6 +1039,7 @@ def build_router(
         request: InterjectChatRunRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
         """Speak to a run that is already running (J3 插话 / steering).
 
@@ -985,6 +1050,7 @@ def build_router(
         user turn. Interjecting into a terminal run is an idempotent no-op
         reporting ``accepted: false`` with the run's current status.
         """
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         text = request.text.strip()
         if not text:
             raise HTTPException(status_code=422, detail="interjection text is required")
@@ -1013,6 +1079,7 @@ def build_router(
         run_id: str,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
         """Resume a run parked at ``max_turns`` (L4a 续办).
 
@@ -1022,6 +1089,7 @@ def build_router(
         streams on the SAME ``run_id`` / journal seq space via
         ``GET /runs/{run_id}/stream?from_seq=``.
         """
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:
@@ -1045,7 +1113,9 @@ def build_router(
         request: SaveChatRunRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         try:
             run = chat.get_run(run_id)
         except ChatRunNotFoundError as exc:

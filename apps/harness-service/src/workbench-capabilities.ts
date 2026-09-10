@@ -72,6 +72,17 @@ const webReadSchema = {
   additionalProperties: false,
 } as const satisfies Record<string, JsonValue>;
 
+const workdirReadSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string" },
+    offset: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    limit: { type: "integer", minimum: 1, maximum: 16_384 },
+  },
+  required: ["path"],
+  additionalProperties: false,
+} as const satisfies Record<string, JsonValue>;
+
 const skillLoadSchema = {
   type: "object",
   properties: { skill_id: { type: "string" } },
@@ -135,6 +146,15 @@ const fixedCapabilities: readonly WorkbenchCapabilityDefinition[] = Object.freez
     inputSchema: webReadSchema,
   }),
   buildCapabilityDefinition({
+    id: "workdir.read_file",
+    version: "1.0.0",
+    description: "Read bounded UTF-8 text from the currently admitted Workbench workdir.",
+    source: "anna.workbench.workdir",
+    effect: "read",
+    replayPolicy: "safe",
+    inputSchema: workdirReadSchema,
+  }),
+  buildCapabilityDefinition({
     id: skillLoadTool,
     version: "1.0.0",
     description: "Read a frozen registered Skill method and report its declared dependencies.",
@@ -163,10 +183,13 @@ const fixedCapabilities: readonly WorkbenchCapabilityDefinition[] = Object.freez
   }),
 ]);
 
-export function createWorkbenchCapabilityPolicy(): CapabilityPolicySnapshot {
+export function createWorkbenchCapabilityPolicy(options: { readonly includeWorkdir?: boolean } = {}): CapabilityPolicySnapshot {
+  const capabilities = options.includeWorkdir === false
+    ? fixedCapabilities.filter((item) => item.id !== "workdir.read_file")
+    : fixedCapabilities;
   return {
     version: WORKBENCH_CAPABILITY_POLICY_VERSION,
-    catalog: buildCapabilityCatalog(fixedCapabilities, WORKBENCH_CAPABILITY_POLICY_VERSION),
+    catalog: buildCapabilityCatalog(capabilities, WORKBENCH_CAPABILITY_POLICY_VERSION),
   };
 }
 
@@ -190,7 +213,8 @@ export function createWorkbenchCapabilityController(
     && (options.projectId !== undefined
       || item.id === skillLoadTool
       || item.id === "web_search"
-      || item.id === "web_read"));
+      || item.id === "web_read"
+      || item.id === "workdir.read_file"));
   const byId = new Map(visible.map((item) => [item.id, item]));
   const loaded = new Set<string>();
   for (const id of options.loadedIds ?? []) {

@@ -33,6 +33,7 @@ import {
   type WorkbenchSessionRecord,
 } from "./workbench-session";
 import { planProductV1Migration } from "./workbench-migration";
+import { resolveWorkbenchWorkdir, workdirResourceId } from "./workbench-files";
 
 const maxJsonBodyBytes = 1_024 * 1_024;
 const terminalEvents = new Set([
@@ -114,6 +115,18 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
   const originHost = host === "::1" ? "[::1]" : host;
   let origin = "";
   let closed = false;
+
+  const workdirProtectedPaths = (): readonly string[] => [
+    options.runtimeConfigPath,
+    options.sessionStorePath,
+    sessions.taskSnapshotPath,
+    workbenchSessions.path,
+    ...parseProtectedPaths(process.env.ANNA_HARNESS_PROTECTED_PATHS),
+    ...parseProtectedPaths(process.env.ANNA_HARNESS_HOST_CONFIG_PATH),
+    ...parseProtectedPaths(process.env.ANNA_HARNESS_HOST_EVENT_STORE_PATH),
+    ...parseProtectedPaths(process.env.ANNA_HARNESS_SESSION_STORE_PATH),
+    ...(options.protectedPaths ?? []),
+  ].filter((value): value is string => typeof value === "string" && value.trim() !== "");
 
   const server = createServer((request, response) => {
     void handleRequest(request, response).catch((error: unknown) => {
@@ -524,7 +537,11 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       const surface = body.surface === undefined ? session.surface : requiredSurface(body.surface);
       const parentRunId = optionalId(body.parent_run_id, "parent_run_id");
       const resourceRefs = body.resource_refs === undefined ? [] : requiredResourceRefs(body.resource_refs);
-      if (resourceRefs.length > 0) throw new ProductHttpError(422, "resource_refs_not_supported");
+      try {
+        workdirResourceId(resourceRefs);
+      } catch {
+        throw new ProductHttpError(422, "resource_refs_not_supported");
+      }
       const requestedArtifact = requestedArtifactKind(body.requested_artifact);
       if (parentRunId !== undefined) {
         const parent = await workbenchSessions.getRun(parentRunId);
@@ -705,8 +722,8 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
   }
 
   async function startWorkbenchRun(run: WorkbenchRunRecord): Promise<void> {
-    const task = await workbenchTaskForRun(run);
     try {
+      const task = await workbenchTaskForRun(run);
       await sessions.save(task, run.created_at);
       await options.runtime.start(run.surface as V2SurfaceId, {
         workspace_id: run.workspace_id,
@@ -736,7 +753,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     readonly events: CanonicalEvent[];
     readonly result?: Record<string, unknown>;
   } | undefined> {
-    const task = productTaskForWorkbenchRun(run);
+    const task = (await sessions.get(run.run_id))?.task ?? productTaskForWorkbenchRun(run);
     const { events, canonical } = await readWorkbenchEvents(run, task);
     const result = resultFromEvents(events, task);
     return {
@@ -764,10 +781,31 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         if (content !== undefined) history.push({ role: "assistant", content });
       }
     }
-    return {
+    const task: ProductTask = {
       ...productTaskForWorkbenchRun(run),
       ...(history.length === 0 ? {} : { context: { conversation_history: history } }),
     };
+    if (options.businessOrigin === undefined) return task;
+    try {
+      const workdirPath = await resolveWorkbenchWorkdir({
+        origin: options.businessOrigin,
+        serviceToken: options.businessServiceToken,
+        workspaceId: run.workspace_id,
+        actorUserId: run.actor_user_id,
+        resourceRefs: run.resource_refs,
+        fetchImpl,
+        protectedPaths: workdirProtectedPaths(),
+      });
+      return workdirPath === undefined ? task : { ...task, workdir_path: workdirPath };
+    } catch (error) {
+      if (error instanceof Error && error.message === "workdir_not_found") {
+        throw new ProductHttpError(400, "workdir_not_found");
+      }
+      if (error instanceof Error && error.message === "workdir_protected_path") {
+        throw new ProductHttpError(400, "workdir_protected_path");
+      }
+      throw new ProductHttpError(503, "business_workdir_unavailable");
+    }
   }
 
   async function workbenchSessionProjection(session: WorkbenchSessionRecord): Promise<Record<string, unknown>> {
@@ -820,33 +858,38 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     const workdirId = typeof task.context?.workdir_id === "string"
       ? task.context.workdir_id.trim()
       : "";
-    if (workdirPath === undefined && workdirId !== "" && options.businessOrigin !== undefined) {
+    if (workdirPath !== undefined) {
+      workdirPath = await admitWorkdirPath(workdirPath);
+    }
+    if (workdirId !== "" && options.businessOrigin !== undefined) {
       try {
-        const business = await fetchImpl(`${options.businessOrigin}/api/workdirs`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "x-anna-workspace-id": task.workspace_id,
-            "x-anna-user-id": task.actor_user_id,
-            ...(options.businessServiceToken === undefined ? {} : { "x-anna-service-token": options.businessServiceToken }),
-          },
+        workdirPath = await resolveWorkbenchWorkdir({
+          origin: options.businessOrigin,
+          serviceToken: options.businessServiceToken,
+          workspaceId: task.workspace_id,
+          actorUserId: task.actor_user_id,
+          resourceRefs: [`workdir:${workdirId}`],
+          ...(workdirPath === undefined ? {} : { boundRoot: workdirPath }),
+          fetchImpl,
+          protectedPaths: workdirProtectedPaths(),
         });
-        if (!business.ok) throw new Error("workdir lookup failed");
-        const payload = await business.json() as Record<string, unknown>;
-        const workdirs = Array.isArray(payload.workdirs) ? payload.workdirs : [];
-        const match = workdirs.find((item) => isRecord(item) && item.id === workdirId);
-        if (!isRecord(match) || typeof match.path !== "string" || match.path.trim() === "") {
+        if (workdirPath === undefined) {
           throw new ProductHttpError(400, "workdir_not_found");
         }
-        workdirPath = match.path;
       } catch (error) {
         if (error instanceof ProductHttpError) throw error;
+        if (error instanceof Error && (
+          error.message === "workdir_not_found"
+          || error.message === "workdir_protected_path"
+          || error.message === "workdir_binding_changed"
+        )) {
+          throw new ProductHttpError(400, error.message);
+        }
         throw new ProductHttpError(503, "business_workdir_unavailable");
       }
     }
     if (workdirPath === undefined) return task;
-    const admitted = await admitWorkdirPath(workdirPath);
-    return { ...task, workdir_path: admitted };
+    return { ...task, workdir_path: workdirPath };
   }
 
   async function admitWorkdirPath(input: string): Promise<string> {
@@ -859,16 +902,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     } catch {
       throw new ProductHttpError(400, "workdir_unavailable");
     }
-    const protectedPaths = [
-      options.runtimeConfigPath,
-      options.sessionStorePath,
-      ...parseProtectedPaths(process.env.ANNA_HARNESS_PROTECTED_PATHS),
-      ...parseProtectedPaths(process.env.ANNA_HARNESS_HOST_CONFIG_PATH),
-      ...parseProtectedPaths(process.env.ANNA_HARNESS_HOST_EVENT_STORE_PATH),
-      ...parseProtectedPaths(process.env.ANNA_HARNESS_SESSION_STORE_PATH),
-      ...(options.protectedPaths ?? []),
-    ].filter((value): value is string => typeof value === "string" && value.trim() !== "");
-    for (const protectedPath of protectedPaths) {
+    for (const protectedPath of workdirProtectedPaths()) {
       const protectedCanonical = await canonicalPath(protectedPath);
       if (containsPath(canonical, protectedCanonical) || containsPath(protectedCanonical, canonical)) {
         throw new ProductHttpError(400, "workdir_protected_path");

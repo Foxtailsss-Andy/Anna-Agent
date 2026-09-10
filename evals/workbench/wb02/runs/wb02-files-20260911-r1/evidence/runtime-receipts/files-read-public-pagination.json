@@ -1,0 +1,44 @@
+{
+  "run_id": "dba83de2-fe17-40a5-a2df-3518172357be",
+  "dispatches": [
+    {
+      "seq": 10,
+      "tool_name": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool_name": "capabilities.load"
+    },
+    {
+      "seq": 29,
+      "tool_name": "workdir.read_file"
+    },
+    {
+      "seq": 38,
+      "tool_name": "workdir.read_file"
+    }
+  ],
+  "tool_responses": [
+    {
+      "event_id": "adde3718-b1ae-4722-8344-7cbb2cf0d854",
+      "seq": 11,
+      "status": "succeeded"
+    },
+    {
+      "event_id": "1d2afd0d-3446-406c-bd99-490f2b100b8f",
+      "seq": 21,
+      "status": "succeeded"
+    },
+    {
+      "event_id": "616aa1a4-b8b7-43cf-9598-74544f34d6d6",
+      "seq": 30,
+      "status": "succeeded"
+    },
+    {
+      "event_id": "71bd3c61-025f-466f-a3ec-ab2263581613",
+      "seq": 39,
+      "status": "succeeded"
+    }
+  ],
+  "evidence_boundary": "actual Workbench OMP/Gateway with real Python identity/scope and registered files; model transport is a fixture"
+}

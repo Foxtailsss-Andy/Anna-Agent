@@ -1,0 +1,15 @@
+{
+  "run_id": "legacy-revoke-read",
+  "status": "completed",
+  "tool_responses": [
+    {
+      "tool_call_id": "legacy-read-before-revoke",
+      "status": "succeeded"
+    },
+    {
+      "tool_call_id": "legacy-read-after-revoke",
+      "status": "failed"
+    }
+  ],
+  "evidence_boundary": "actual Product Host/OMP with real Python identity, registered file, real DELETE revoke; model transport is a fixture"
+}

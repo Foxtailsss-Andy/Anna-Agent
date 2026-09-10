@@ -1,0 +1,26 @@
+{
+  "run_id": "098cdf94-f2ef-41e1-8cd6-4b0910f2364a",
+  "dispatches": [
+    {
+      "seq": 10,
+      "tool_name": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool_name": "capabilities.load"
+    }
+  ],
+  "tool_responses": [
+    {
+      "event_id": "f97623d2-f23e-4e8c-b282-d2f6e06603c5",
+      "seq": 11,
+      "status": "succeeded"
+    },
+    {
+      "event_id": "61d48bdf-476c-46e1-bccd-1d5d032bf97a",
+      "seq": 20,
+      "status": "failed"
+    }
+  ],
+  "evidence_boundary": "actual Workbench OMP/Gateway with real Python identity/scope and registered files; model transport is a fixture"
+}

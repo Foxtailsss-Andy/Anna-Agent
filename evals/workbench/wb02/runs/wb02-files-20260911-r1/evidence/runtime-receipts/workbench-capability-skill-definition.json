@@ -1,0 +1,238 @@
+{
+  "run_id": "6cd6dadc-8b3b-47e9-8584-838fb1431385",
+  "model_requests": [
+    {
+      "tool_definitions": [
+        {
+          "name": "capabilities.search",
+          "description": "Search capabilities admitted to this Workbench scope.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "capabilities.load",
+          "description": "Load a selected admitted capability for the next model request.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    {
+      "tool_definitions": [
+        {
+          "name": "capabilities.search",
+          "description": "Search capabilities admitted to this Workbench scope.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "capabilities.load",
+          "description": "Load a selected admitted capability for the next model request.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    {
+      "tool_definitions": [
+        {
+          "name": "capabilities.search",
+          "description": "Search capabilities admitted to this Workbench scope.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "capabilities.load",
+          "description": "Load a selected admitted capability for the next model request.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "skills.load",
+          "description": "Read a frozen registered Skill method and report its declared dependencies.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "skill_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "skill_id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    {
+      "tool_definitions": [
+        {
+          "name": "capabilities.search",
+          "description": "Search capabilities admitted to this Workbench scope.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "capabilities.load",
+          "description": "Load a selected admitted capability for the next model request.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "skills.load",
+          "description": "Read a frozen registered Skill method and report its declared dependencies.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "skill_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "skill_id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  ],
+  "persisted_definition": {
+    "id": "skills.load",
+    "version": "1.0.0",
+    "description": "Read a frozen registered Skill method and report its declared dependencies.",
+    "schema_hash": "sha256:36fbc68a354f9481145a158228b82a58e6aa4cb8e0b95af9a94a0571d4e947e4",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "skill_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "skill": {
+    "skill_id": "skill:harness-v2/general-assistant",
+    "version": "0.1.0",
+    "source": "anna-repository",
+    "uri": "anna-repository://skills/harness-v2/general-assistant/SKILL.md",
+    "document_hash": "sha256:11b712192836ae7bac37f3d34bc659a15d3ac0bc178a7d8fecc6a5491636bbf6",
+    "body_hash": "sha256:4a5d5b8af1e4575b4bdbb430cf45c46c8acc99a50ac9715c2a0dbc358f4c88fc"
+  },
+  "actual_tool_calls": [
+    {
+      "seq": 10,
+      "tool": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool": "capabilities.load"
+    },
+    {
+      "seq": 29,
+      "tool": "skills.load"
+    }
+  ],
+  "evidence_boundary": "actual public Workbench OMP/Gateway events; model transport fixture only"
+}

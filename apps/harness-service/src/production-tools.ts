@@ -213,6 +213,13 @@ export function createProductionToolGateway(
     },
     sandbox: {
       async execute(request, signal): Promise<ToolResult> {
+        if (
+          request.name === "workdir.read_file"
+          && options.command.runProfileSnapshot.capabilityPolicy !== undefined
+          && options.dynamicToolCall !== undefined
+        ) {
+          return options.dynamicToolCall(request, signal);
+        }
         if (request.name !== "read_only" && request.name !== "workdir.read_file") {
           if (request.name === "create_artifact") {
             if (signal.aborted) {

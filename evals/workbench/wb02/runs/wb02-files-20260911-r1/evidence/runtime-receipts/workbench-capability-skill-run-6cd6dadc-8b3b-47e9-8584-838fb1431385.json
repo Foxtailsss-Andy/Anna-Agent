@@ -1,0 +1,56 @@
+{
+  "run_id": "6cd6dadc-8b3b-47e9-8584-838fb1431385",
+  "actual_tool_calls": [
+    {
+      "seq": 10,
+      "tool": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool": "capabilities.load"
+    },
+    {
+      "seq": 29,
+      "tool": "skills.load"
+    }
+  ],
+  "event_types": [
+    "run.queued",
+    "run.started",
+    "omp.context.seed",
+    "run.context.ready",
+    "omp.transcript.message",
+    "run.progress",
+    "run.model.requested",
+    "omp.model.response",
+    "omp.tool.dispatch",
+    "omp.tool.response",
+    "capability.loaded",
+    "run.eval.contract",
+    "run.completed"
+  ],
+  "tool_responses": [
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "5c7d6026-6531-43dd-8479-cd5cd76a8a64",
+      "seq": 11,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "b3541273-ce2d-494f-93b8-24400089c8e2",
+      "seq": 21,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "6ff2362a-cfa0-4b8c-8850-75eb0df860fe",
+      "seq": 30,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    }
+  ],
+  "evidence_boundary": "actual public Workbench OMP/Gateway events; model transport fixture only"
+}

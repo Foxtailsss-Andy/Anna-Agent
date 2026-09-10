@@ -1,0 +1,24 @@
+{
+  "id": "ts-workbench-capabilities",
+  "command": "npm run test --workspace=@anna/harness-service -- --run test/web-search.test.ts test/workbench-capability-files-legacy.test.ts test/workbench-capability-files.test.ts test/workbench-capability-loading.test.ts test/workbench-capability-public-network.test.ts test/workbench-capability-public.test.ts test/workbench-capability-restore.test.ts test/workbench-capability-review.test.ts test/workbench-capability-scope.test.ts test/workbench-capability-skill-restore.test.ts test/workbench-capability-skills.test.ts",
+  "exitCode": 0,
+  "status": "pass",
+  "testSummary": "Test Files  11 passed (11) | Tests  61 passed (61) | Duration  196.18s (transform 857ms, setup 0ms, import 3.89s, tests 377.34s, environment 1ms)",
+  "tests": [
+    "test/web-search.test.ts",
+    "test/workbench-capability-files-legacy.test.ts",
+    "test/workbench-capability-files.test.ts",
+    "test/workbench-capability-loading.test.ts",
+    "test/workbench-capability-public-network.test.ts",
+    "test/workbench-capability-public.test.ts",
+    "test/workbench-capability-restore.test.ts",
+    "test/workbench-capability-review.test.ts",
+    "test/workbench-capability-scope.test.ts",
+    "test/workbench-capability-skill-restore.test.ts",
+    "test/workbench-capability-skills.test.ts"
+  ],
+  "testFileCount": 11,
+  "evidenceModes": [
+    "D"
+  ]
+}

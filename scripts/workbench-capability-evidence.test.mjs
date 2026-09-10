@@ -14,8 +14,81 @@ const requiredCapabilityTests = [
   "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
   "apps/harness-service/test/workbench-capability-public.test.ts",
   "apps/harness-service/test/workbench-capability-public-network.test.ts",
+  "apps/harness-service/test/workbench-capability-files.test.ts",
+  "apps/harness-service/test/workbench-capability-files-legacy.test.ts",
   "apps/harness-service/test/web-search.test.ts",
 ];
+const requiredFileSourcePaths = [
+  "apps/harness-service/src/workbench-files.ts",
+  "services/api/app/routes/workdirs.py",
+  "services/runtime/app/workdir_store.py",
+  "services/api/app/main.py",
+  "apps/harness-service/src/product-facade.ts",
+  "services/api/app/routes/business.py",
+  "apps/harness-service/src/production.ts",
+  "apps/harness-service/src/production-tools.ts",
+  "apps/harness-service/src/workbench-capabilities.ts",
+  "apps/harness-service/test/workbench-capability-files-legacy.test.ts",
+  "services/api/app/security.py",
+  "services/api/app/routes/chat.py",
+  "services/api/app/routes/create.py",
+  "services/chat/app/orchestrator.py",
+  "apps/desktop/src/lib/api/client.ts",
+  "apps/desktop/src/lib/api/identity.ts",
+  "apps/desktop/src/lib/runtime.ts",
+];
+
+test("WB-02 file capability checks are discovered, executed, and hashed independently", async () => {
+  const fixture = await createSyntheticFixture({
+    pythonFiles: [
+      "tests/contracts/test_workbench_capabilities.py",
+      "tests/contracts/test_workbench_files.py",
+    ],
+    tsFiles: requiredCapabilityTests,
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "pass");
+    assert.deepEqual(evidence.testDiscovery.python.discovered, [
+      "tests/contracts/test_workbench_capabilities.py",
+      "tests/contracts/test_workbench_files.py",
+    ]);
+    assert.deepEqual(evidence.testDiscovery.python.missing, []);
+    assert.ok(evidence.testDiscovery.ts.required.includes("test/workbench-capability-files.test.ts"));
+    assert.ok(evidence.testDiscovery.ts.required.includes("test/workbench-capability-files-legacy.test.ts"));
+    assert.ok(evidence.testDiscovery.ts.discovered.includes("test/workbench-capability-files.test.ts"));
+    assert.ok(evidence.testDiscovery.ts.discovered.includes("test/workbench-capability-files-legacy.test.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/src/workbench-files.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-capability-files-legacy.test.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/routes/workdirs.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/runtime/app/workdir_store.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/main.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/src/product-facade.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/routes/business.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/security.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/routes/chat.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/api/app/routes/create.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("services/chat/app/orchestrator.py"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/desktop/src/lib/api/client.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/desktop/src/lib/api/identity.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/desktop/src/lib/runtime.ts"));
+    assert.ok(evidence.sourceHashesBefore.some((entry) => entry.path === "apps/harness-service/src/workbench-files.ts"));
+    assert.ok(evidence.sourceHashesAfter.some((entry) => entry.path === "tests/contracts/test_workbench_files.py"));
+    assert.equal(evidence.commands[0].testFileCount, requiredCapabilityTests.length);
+    assert.equal(evidence.commands[1].testFileCount, 2);
+    const privateRoot = join(fixture.root, ".tmp-tests/wb02/evidence", fixture.id);
+    const tsCommand = JSON.parse(await readFile(join(privateRoot, "issue-ts-workbench-capabilities/command.json"), "utf8"));
+    const pythonCommand = JSON.parse(await readFile(join(privateRoot, "issue-python-workbench-capabilities/command.json"), "utf8"));
+    assert.ok(tsCommand.argv.includes("test/workbench-capability-files.test.ts"));
+    assert.ok(pythonCommand.argv.includes("tests/contracts/test_workbench_files.py"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "ts-workbench-capabilities" && receipt.status === "pass"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "python-workbench-capabilities" && receipt.status === "pass"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
 
 test("WB-02 runner refuses an existing round without overwriting it", async () => {
   const id = `cli-test-${process.pid}-${Date.now()}`;
@@ -103,9 +176,30 @@ test("WB-02 required Python guard fails when another capability test is present"
     const evidence = await readEvidence(fixture.roundRoot);
     assert.equal(evidence.sourceChanged, false);
     assert.deepEqual(evidence.testDiscovery.python.discovered, ["tests/contracts/test_other_capability.py"]);
-    assert.deepEqual(evidence.testDiscovery.python.missing, ["tests/contracts/test_workbench_capabilities.py"]);
+    assert.deepEqual(evidence.testDiscovery.python.missing, [
+      "tests/contracts/test_workbench_capabilities.py",
+      "tests/contracts/test_workbench_files.py",
+    ]);
     assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-test_workbench_capabilities.py" && receipt.status === "not_run"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-test_workbench_files.py" && receipt.status === "not_run"));
     assert.equal(evidence.status, "fail");
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 file Python test is independently required", async () => {
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.deepEqual(evidence.testDiscovery.python.missing, ["tests/contracts/test_workbench_files.py"]);
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-test_workbench_files.py" && receipt.status === "not_run"));
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }
@@ -113,7 +207,10 @@ test("WB-02 required Python guard fails when another capability test is present"
 
 test("WB-02 Skill tests are independently required", async () => {
   const missingRestore = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: [
+      "tests/contracts/test_workbench_capabilities.py",
+      "tests/contracts/test_workbench_files.py",
+    ],
     tsFiles: [
       "apps/harness-service/test/workbench-capability-loading.test.ts",
       "apps/harness-service/test/workbench-capability-skills.test.ts",
@@ -131,7 +228,7 @@ test("WB-02 Skill tests are independently required", async () => {
   }
 
   const missingSkill = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: [
       "apps/harness-service/test/workbench-capability-loading.test.ts",
       "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
@@ -157,7 +254,7 @@ test("WB-02 public capability tests are independently required", async () => {
     "apps/harness-service/test/workbench-capability-public-network.test.ts",
   ]) {
     const fixture = await createSyntheticFixture({
-      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
       tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
     });
     try {
@@ -174,10 +271,48 @@ test("WB-02 public capability tests are independently required", async () => {
   }
 });
 
+test("WB-02 file capability test is independently required", async () => {
+  const missing = "apps/harness-service/test/workbench-capability-files.test.ts";
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+    tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
+    missingSourcePath: missing,
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.ok(evidence.testDiscovery.ts.missing.includes("test/workbench-capability-files.test.ts"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-files.test.ts" && receipt.status === "not_run"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 legacy file capability test is independently required", async () => {
+  const missing = "apps/harness-service/test/workbench-capability-files-legacy.test.ts";
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+    tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
+    missingSourcePath: missing,
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.ok(evidence.testDiscovery.ts.missing.includes("test/workbench-capability-files-legacy.test.ts"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-files-legacy.test.ts" && receipt.status === "not_run"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("WB-02 web-search test is independently required", async () => {
   const missing = "apps/harness-service/test/web-search.test.ts";
   const fixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
     missingSourcePath: missing,
   });
@@ -195,7 +330,7 @@ test("WB-02 web-search test is independently required", async () => {
 
 test("WB-02 missing public web module cannot pass with successful synthetic commands", async () => {
   const fixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     missingSourcePath: "apps/harness-service/src/workbench-public-web.ts",
   });
@@ -211,6 +346,26 @@ test("WB-02 missing public web module cannot pass with successful synthetic comm
     await rm(fixture.root, { recursive: true, force: true });
   }
 });
+
+for (const missingSourcePath of requiredFileSourcePaths) {
+  test(`WB-02 required source guard rejects missing ${missingSourcePath}`, async () => {
+    const fixture = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+      tsFiles: requiredCapabilityTests,
+      missingSourcePath,
+    });
+    try {
+      const result = await runNode(fixture.runner, fixture.env);
+      assert.notEqual(result.code, 0, `missing source unexpectedly passed: ${missingSourcePath}`);
+      const evidence = await readEvidence(fixture.roundRoot);
+      assert.equal(evidence.status, "fail");
+      assert.equal(evidence.blockingReason, "required_source_missing");
+      assert.ok(evidence.requiredSourcePathsMissing.includes(missingSourcePath));
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+}
 
 test("WB-02 public guards are independently killed by isolated guard mutations", async () => {
   const variants = [
@@ -244,12 +399,12 @@ test("WB-02 public guards are independently killed by isolated guard mutations",
 
   for (const variant of variants) {
     const current = await createSyntheticFixture({
-      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
       tsFiles: variant.tsFiles,
       missingSourcePath: variant.missingSourcePath ?? null,
     });
     const mutant = await createSyntheticFixture({
-      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
       tsFiles: variant.tsFiles,
       missingSourcePath: variant.missingSourcePath ?? null,
     });
@@ -269,9 +424,92 @@ test("WB-02 public guards are independently killed by isolated guard mutations",
   }
 });
 
+test("WB-02 file guards are independently killed by isolated guard mutations", async () => {
+  const variants = [
+    {
+      name: "file-ts-test-guard",
+      testName: "WB-02 file capability test is independently required",
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+      tsFiles: requiredCapabilityTests.filter((path) => path !== "apps/harness-service/test/workbench-capability-files.test.ts"),
+      missingSourcePath: "apps/harness-service/test/workbench-capability-files.test.ts",
+      mutation: (source) => removeRequiredEntry(source, "test/workbench-capability-files.test.ts"),
+    },
+    {
+      name: "file-legacy-ts-test-guard",
+      testName: "WB-02 legacy file capability test is independently required",
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+      tsFiles: requiredCapabilityTests.filter((path) => path !== "apps/harness-service/test/workbench-capability-files-legacy.test.ts"),
+      missingSourcePath: "apps/harness-service/test/workbench-capability-files-legacy.test.ts",
+      mutation: (source) => removeRequiredEntry(source, "test/workbench-capability-files-legacy.test.ts"),
+    },
+    {
+      name: "file-python-test-guard",
+      testName: "WB-02 file Python test is independently required",
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      tsFiles: requiredCapabilityTests,
+      mutation: removeRequiredPythonFilesTest,
+    },
+  ];
+
+  for (const variant of variants) {
+    const current = await createSyntheticFixture({
+      pythonFiles: variant.pythonFiles,
+      tsFiles: variant.tsFiles,
+      missingSourcePath: variant.missingSourcePath ?? null,
+    });
+    const mutant = await createSyntheticFixture({
+      pythonFiles: variant.pythonFiles,
+      tsFiles: variant.tsFiles,
+      missingSourcePath: variant.missingSourcePath ?? null,
+    });
+    try {
+      const mutantRunner = await readFile(mutant.runner, "utf8");
+      await writeFile(mutant.runner, variant.mutation(mutantRunner), { flag: "w" });
+      const testNamePattern = `--test-name-pattern=${variant.testName}`;
+      const currentResult = await runNodeTest(join(current.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, current.env);
+      assert.equal(currentResult.code, 0, `${variant.name} current guard failed\n${currentResult.stdout}\n${currentResult.stderr}`);
+      const mutantResult = await runNodeTest(join(mutant.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, mutant.env);
+      process.stdout.write(`WB-02 isolated mutation ${variant.name}: current_exit=${currentResult.code} mutant_exit=${mutantResult.code}\n`);
+      assert.equal(mutantResult.code, 1, `${variant.name} mutation was not detected\n${mutantResult.stdout}\n${mutantResult.stderr}`);
+    } finally {
+      await rm(current.root, { recursive: true, force: true });
+      await rm(mutant.root, { recursive: true, force: true });
+    }
+  }
+});
+
+for (const missingSourcePath of requiredFileSourcePaths) {
+  const guardTestName = `WB-02 required source guard rejects missing ${missingSourcePath}`;
+  test(`WB-02 source guard mutation is detected for ${missingSourcePath}`, async () => {
+    const current = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+      tsFiles: requiredCapabilityTests,
+      missingSourcePath,
+    });
+    const mutant = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+      tsFiles: requiredCapabilityTests,
+      missingSourcePath,
+    });
+    try {
+      const mutantRunner = await readFile(mutant.runner, "utf8");
+      await writeFile(mutant.runner, removeRequiredSourceEntry(mutantRunner, missingSourcePath), { flag: "w" });
+      const testNamePattern = `--test-name-pattern=^${escapeRegExp(guardTestName)}$`;
+      const currentResult = await runNodeTest(join(current.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, current.env);
+      assert.equal(currentResult.code, 0, `source guard current failed for ${missingSourcePath}\n${currentResult.stdout}\n${currentResult.stderr}`);
+      const mutantResult = await runNodeTest(join(mutant.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, mutant.env);
+      process.stdout.write(`WB-02 isolated mutation file-source-guard-${missingSourcePath}: current_exit=${currentResult.code} mutant_exit=${mutantResult.code}\n`);
+      assert.equal(mutantResult.code, 1, `source guard mutation was not detected for ${missingSourcePath}\n${mutantResult.stdout}\n${mutantResult.stderr}`);
+    } finally {
+      await rm(current.root, { recursive: true, force: true });
+      await rm(mutant.root, { recursive: true, force: true });
+    }
+  });
+}
+
 test("WB-02 test commands retain direct stdout and stderr in exclusive private evidence", async () => {
   const fixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     npmExit: 7,
     npmStdout: "synthetic-ts-stdout-secret",
@@ -295,6 +533,9 @@ test("WB-02 test commands retain direct stdout and stderr in exclusive private e
     assert.deepEqual(tsCommand.argv.slice(0, 2), ["npm", "run"]);
     assert.deepEqual(pythonCommand.argv.slice(0, 2), ["uv", "run"]);
     assert.ok(tsCommand.argv.includes("test/web-search.test.ts"));
+    assert.ok(tsCommand.argv.includes("test/workbench-capability-files.test.ts"));
+    assert.ok(pythonCommand.argv.includes("tests/contracts/test_workbench_capabilities.py"));
+    assert.ok(pythonCommand.argv.includes("tests/contracts/test_workbench_files.py"));
     assert.equal(tsCommand.cwd, resolve(tsCommand.cwd));
     assert.equal(tsExit.exitCode, 7);
     assert.equal(pythonExit.exitCode, 9);
@@ -314,7 +555,7 @@ test("WB-02 test commands retain direct stdout and stderr in exclusive private e
 test("WB-02 test command streams are durable before a running child exits", async () => {
   const marker = "synthetic-ts-running-marker";
   const fixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     npmExit: 7,
     npmStdout: marker,
@@ -372,7 +613,7 @@ test("WB-02 private round root refuses reuse even when public round is new", asy
 
 test("WB-02 source snapshot catches a changed capability core module while unchanged synthetic run passes", async () => {
   const passingFixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
   });
   try {
@@ -390,7 +631,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   }
 
   const changedFixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     mutatePath: "packages/harness-v2/src/capability-catalog.ts",
   });
@@ -409,7 +650,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   }
 
   const changedSkillFixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     mutatePath: "packages/harness-v2/src/skill-catalog.ts",
   });
@@ -426,7 +667,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   }
 
   const changedSkillDocumentFixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     mutatePath: "skills/harness-v2/general-assistant/SKILL.md",
   });
@@ -443,7 +684,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   }
 
   const changedPublicWebFixture = await createSyntheticFixture({
-    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
     tsFiles: requiredCapabilityTests,
     mutatePath: "apps/harness-service/src/workbench-public-web.ts",
   });
@@ -457,6 +698,24 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
     assert.notEqual(evidence.modulesHashBefore, evidence.modulesHashAfter);
   } finally {
     await rm(changedPublicWebFixture.root, { recursive: true, force: true });
+  }
+
+  const changedFilesFixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py", "tests/contracts/test_workbench_files.py"],
+    tsFiles: requiredCapabilityTests,
+    mutatePath: "apps/harness-service/src/workbench-files.ts",
+  });
+  try {
+    const result = await runNode(changedFilesFixture.runner, changedFilesFixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(changedFilesFixture.roundRoot);
+    assert.equal(evidence.sourceChanged, true);
+    assert.equal(evidence.blockingReason, "source_changed_during_run");
+    const before = evidence.sourceHashesBefore.find((entry) => entry.path === "apps/harness-service/src/workbench-files.ts");
+    const after = evidence.sourceHashesAfter.find((entry) => entry.path === "apps/harness-service/src/workbench-files.ts");
+    assert.notEqual(before?.sha256, after?.sha256);
+  } finally {
+    await rm(changedFilesFixture.root, { recursive: true, force: true });
   }
 });
 
@@ -487,7 +746,23 @@ async function createSyntheticFixture({
   await writeFile(join(baselineEvidence, "baseline-result.json"), JSON.stringify({ datasetVersion: "wb00-dataset-v1.1" }));
   const requiredSourceFixtures = [
     "apps/harness-service/src/workbench-public-web.ts",
+    "apps/harness-service/src/workbench-files.ts",
+    "apps/harness-service/src/production.ts",
     "apps/harness-service/src/production-tools.ts",
+    "apps/harness-service/src/workbench-capabilities.ts",
+    "apps/harness-service/src/product-facade.ts",
+    "services/api/app/routes/workdirs.py",
+    "services/runtime/app/workdir_store.py",
+    "services/api/app/main.py",
+    "services/api/app/routes/business.py",
+    "services/api/app/security.py",
+    "services/api/app/routes/chat.py",
+    "services/api/app/routes/create.py",
+    "services/chat/app/orchestrator.py",
+    "apps/desktop/src/lib/api/client.ts",
+    "apps/desktop/src/lib/api/identity.ts",
+    "apps/desktop/src/lib/runtime.ts",
+    "apps/harness-service/test/workbench-capability-files-legacy.test.ts",
     "apps/harness-service/test/web-search.test.ts",
     "apps/harness-service/test/production-tools.test.ts",
     "apps/harness-service/package.json",
@@ -566,15 +841,35 @@ function runNodeWithArgs(script, args, env) {
 }
 
 function removeRequiredEntry(source, entry) {
+  const start = source.indexOf("const requiredTsTests = [");
+  const end = source.indexOf("];", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const block = source.slice(start, end);
   const line = `  "${entry}",\n`;
-  assert.equal(source.split(line).length - 1, 1, `expected one required test guard entry for ${entry}`);
-  return source.replace(line, "");
+  assert.equal(block.split(line).length - 1, 1, `expected one required test guard entry for ${entry}`);
+  return source.slice(0, start) + block.replace(line, "") + source.slice(end);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function removeRequiredSourceEntry(source, entry) {
-  const block = `const requiredSourcePaths = [\n  "${entry}",\n`;
-  assert.equal(source.split(block).length - 1, 1, `expected one required source guard entry for ${entry}`);
-  return source.replace(block, "const requiredSourcePaths = [\n");
+  const start = source.indexOf("const requiredSourcePaths = [");
+  const end = source.indexOf("];", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const block = source.slice(start, end);
+  const line = `  "${entry}",\n`;
+  assert.equal(block.split(line).length - 1, 1, `expected one required source guard entry for ${entry}`);
+  return source.slice(0, start) + block.replace(line, "") + source.slice(end);
+}
+
+function removeRequiredPythonFilesTest(source) {
+  const block = "const requiredPythonTests = [requiredPythonTest, requiredPythonFilesTest];";
+  assert.equal(source.split(block).length - 1, 1, "expected one required Python files test guard");
+  return source.replace(block, "const requiredPythonTests = [requiredPythonTest];");
 }
 
 function spawnNodeLive(script, env) {

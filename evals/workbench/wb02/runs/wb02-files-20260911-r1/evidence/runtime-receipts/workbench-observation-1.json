@@ -1,0 +1,117 @@
+{
+  "session_id": "098e25b4-f36e-4d38-9ff2-38118c8dab54",
+  "run_id": "7cfea412-ca0e-45ff-9119-d1c3c464fe53",
+  "project_id": "proj_1",
+  "model_requests": [
+    {
+      "event_id": "d3ee7f4b-33fb-4cbd-92f1-c5432d5070ad",
+      "seq": 6,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "9745af6f-82c7-4e11-ae33-897620896202",
+      "seq": 15,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "5212fee7-61de-43cf-9c30-a5ef468243bc",
+      "seq": 25,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    },
+    {
+      "event_id": "2fb4c814-d94d-40ed-977f-033ffaabaa09",
+      "seq": 34,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    }
+  ],
+  "capability_loads": [
+    {
+      "event_id": "10ed2604-65c0-403b-bcbf-9d52d73ccef0",
+      "seq": 20,
+      "catalog_hash": "sha256:251eec85c7fafaa748eecbd074020a87aeb89e066b9ec4400aada405584693e5",
+      "capability_ids": [
+        "crew.project.read"
+      ],
+      "capability_hashes": [
+        "sha256:3d6544e5e792c7eefd6b25dba1b6bddc4d5dfb9977e55888f0134275e8651b67"
+      ],
+      "load_tool_call_id": "load-project-2",
+      "load_dispatch_event_id": "472ae20a-9711-4d98-b4d5-c080f21c5c4b"
+    }
+  ],
+  "tool_observations": [
+    {
+      "event_id": "376357c0-7be3-46d4-9170-edcf1e6279c0",
+      "seq": 10,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.search",
+      "input_digest": "2c0124e1dfb90a5f104591e9b3e0528ec0be8972fc807c9ad1f4e60f7461995d"
+    },
+    {
+      "event_id": "0ba35f31-bb8f-46cd-a6cb-e6e790154f78",
+      "seq": 11,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "472ae20a-9711-4d98-b4d5-c080f21c5c4b",
+      "seq": 19,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.load",
+      "input_digest": "d0301219ab38075200cecd8a8941d81d4ff37206d0e83c905c511ac1d75cfe74"
+    },
+    {
+      "event_id": "fefdc86f-de54-48e0-9f0d-6b5a113bccd0",
+      "seq": 21,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "922835fd-2aab-448d-b312-e09ff3f8179a",
+      "seq": 29,
+      "type": "omp.tool.dispatch",
+      "tool_name": "crew.project.read",
+      "input_digest": "cfae2af4ef24b018adebf061a480c72d1eeb4a03cba049e41b579926ea2cb800"
+    },
+    {
+      "event_id": "f43e0b98-782b-4689-a420-a1350b329669",
+      "seq": 30,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    }
+  ],
+  "observation_branch": "finish",
+  "usage": "unavailable"
+}

@@ -48,25 +48,71 @@ def save_workdirs(items: list[dict]) -> None:
     )
 
 
-def resolve_workdir(workdir_id: str) -> dict | None:
-    """按 id 查注册表;命中返回 ``{id, name, path}``,miss 返回 ``None``。"""
+def resolve_workdir(
+    workdir_id: str,
+    *,
+    owner_workspace_id: str | None = None,
+    owner_actor_user_id: str | None = None,
+    allow_legacy_local: bool = False,
+) -> dict | None:
+    """按 id 查注册表，可按服务端 owner 选择重复 ID 的记录。
+
+    不带 owner 参数时保持历史 first-match 语义；带 owner 参数时只返回
+    精确归属，或由可信 local identity 显式读取旧的无归属记录。
+    """
     for it in load_workdirs():
-        if it.get("id") == workdir_id:
-            return {
-                "id": str(it.get("id") or ""),
-                "name": str(it.get("name") or ""),
-                "path": str(it.get("path") or ""),
-            }
+        if it.get("id") != workdir_id:
+            continue
+        owner_selected = owner_workspace_id is not None or owner_actor_user_id is not None
+        if owner_selected:
+            if owner_workspace_id is None or owner_actor_user_id is None:
+                return None
+            exact_owner = (
+                it.get("owner_workspace_id") == owner_workspace_id
+                and it.get("owner_actor_user_id") == owner_actor_user_id
+            )
+            legacy_local = (
+                allow_legacy_local
+                and it.get("owner_workspace_id") is None
+                and it.get("owner_actor_user_id") is None
+            )
+            if not exact_owner and not legacy_local:
+                continue
+        return {
+            "id": str(it.get("id") or ""),
+            "name": str(it.get("name") or ""),
+            "path": str(it.get("path") or ""),
+            **(
+                {"owner_workspace_id": str(it["owner_workspace_id"])}
+                if it.get("owner_workspace_id") is not None else {}
+            ),
+            **(
+                {"owner_actor_user_id": str(it["owner_actor_user_id"])}
+                if it.get("owner_actor_user_id") is not None else {}
+            ),
+        }
     return None
 
 
-def resolve_valid_workdir(workdir_id: str) -> dict | None:
+def resolve_valid_workdir(
+    workdir_id: str,
+    *,
+    owner_workspace_id: str | None = None,
+    owner_actor_user_id: str | None = None,
+    allow_legacy_local: bool = False,
+) -> dict | None:
     """``resolve_workdir`` + 路径仍真实存在的门。
 
     注册表命中但文件夹已删/路径失踪 → ``None``(调用方审计 ``workdir.missing``
-    并诚实降级,run 照常进行)。
+    并诚实降级,run 照常进行)。可选 owner 参数沿用 ``resolve_workdir`` 的
+    归属筛选，product 入口因此不会把同路径的其他 owner 当成当前目录。
     """
-    workdir = resolve_workdir(workdir_id)
+    workdir = resolve_workdir(
+        workdir_id,
+        owner_workspace_id=owner_workspace_id,
+        owner_actor_user_id=owner_actor_user_id,
+        allow_legacy_local=allow_legacy_local,
+    )
     if workdir is None:
         return None
     path = workdir["path"]

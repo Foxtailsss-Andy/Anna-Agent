@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from services.create.app.orchestrator import CreateOrchestrator, CreateRunNotFoundError
 from services.business.harness_client import HarnessHostClient, HarnessHostError, HarnessRun, ProductTask, result_payload
+from services.identity.app.schemas import SessionIdentity
+from services.identity.app.service import IdentityService
 
 from ..schemas import (
     CreateDraftRequest,
     CreateSkillDraftRequest,
     SaveCreateSkillDraftRequest,
 )
-from ..security import _assert_identity
+from ..security import _assert_identity, _resolve_product_identity
 
 
 def build_router(
@@ -22,8 +25,25 @@ def build_router(
     *,
     harness_client: HarnessHostClient | None = None,
     product_mode: bool = False,
+    identity: IdentityService | None = None,
+    local_session: Callable[[], SessionIdentity] | None = None,
 ) -> APIRouter:
     router = APIRouter()
+
+    def _request_identity(
+        authorization: str | None,
+        workspace_id: str,
+        user_id: str,
+    ) -> None:
+        if not product_mode:
+            return
+        _resolve_product_identity(
+            authorization,
+            workspace_id,
+            user_id,
+            identity=identity,
+            local_session=local_session,
+        )
 
     def require_host() -> HarnessHostClient:
         if not product_mode or harness_client is None:
@@ -35,7 +55,9 @@ def build_router(
         request: CreateSkillDraftRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -69,7 +91,9 @@ def build_router(
         request: CreateDraftRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -110,8 +134,10 @@ def build_router(
         request: CreateDraftRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> StreamingResponse:
         """B1 — Create 流式管线(chat 同形帧词表:step/event/done/error)。"""
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         _assert_identity(
             request.workspace_id,
             request.actor_user_id,
@@ -182,7 +208,9 @@ def build_router(
     def list_create_drafts(
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> list[dict]:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         runs = create.list_runs(anna_workspace_id, anna_user_id)
         return [run.model_dump(mode="json") for run in runs]
 
@@ -192,7 +220,9 @@ def build_router(
         request: SaveCreateSkillDraftRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         if request.confirmed_by != anna_user_id:
             raise HTTPException(
                 status_code=403,
@@ -217,7 +247,9 @@ def build_router(
         request: SaveCreateSkillDraftRequest,
         anna_workspace_id: str = Header(alias="X-Anna-Workspace-ID"),
         anna_user_id: str = Header(alias="X-Anna-User-ID"),
+        authorization: str | None = Header(default=None),
     ) -> dict:
+        _request_identity(authorization, anna_workspace_id, anna_user_id)
         if request.confirmed_by != anna_user_id:
             raise HTTPException(
                 status_code=403,

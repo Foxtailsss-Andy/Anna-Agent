@@ -154,6 +154,10 @@ class ChatHostInputs:
     workdir_root: str | None
 
 
+# (workspace_id, actor_user_id, trusted local fallback)
+WorkdirOwner = tuple[str, str, bool]
+
+
 class ChatOrchestrator(BaseOrchestrator):
     _fail_event_type = "chat.run.failed"
     _fail_payload_includes_message = False
@@ -876,14 +880,19 @@ class ChatOrchestrator(BaseOrchestrator):
         engine = self._engine_for(run.model_profile_id, resolved_settings)
         return handler, config, engine
 
-    def build_host_inputs(self, run: ChatRun) -> ChatHostInputs:
+    def build_host_inputs(
+        self,
+        run: ChatRun,
+        *,
+        workdir_owner: WorkdirOwner | None = None,
+    ) -> ChatHostInputs:
         """Resolve Chat context/tools for a model-free Product Host task.
 
         This reuses the normal Chat capability constructor but deliberately
         stops before model preflight or the Python engine loop. The Node Host
         remains the sole model/tool-loop authority in product mode.
         """
-        handler = self.build_host_capability(run)
+        handler = self.build_host_capability(run, workdir_owner=workdir_owner)
         return ChatHostInputs(
             request=handler.build_initial_request(),
             skill=handler.skill,
@@ -892,14 +901,21 @@ class ChatOrchestrator(BaseOrchestrator):
             workdir_root=handler.workdir_root,
         )
 
-    def build_host_capability(self, run: ChatRun) -> ChatCapabilityHandler:
+    def build_host_capability(
+        self,
+        run: ChatRun,
+        *,
+        workdir_owner: WorkdirOwner | None = None,
+    ) -> ChatCapabilityHandler:
         """Build the resolved Chat capability without starting the Python loop."""
         skill_id = run.skill_id or self.settings.chat_skill_id
         skill = self.skill_loader.load(skill_id)
         if not any(event.type == "skill.loaded" for event in run.audit_events):
             self._record_skill_loaded(run, skill)
         template = self._template(run.template_id)
-        workdir_context_text, workdir_root = self._workdir_injection(run)
+        workdir_context_text, workdir_root = self._workdir_injection(
+            run, workdir_owner=workdir_owner
+        )
         directive = self.settings.agent_directive(run.agent_id or "chat")
         handler = ChatCapabilityHandler(
             skill=skill,
@@ -917,7 +933,12 @@ class ChatOrchestrator(BaseOrchestrator):
         )
         return handler
 
-    def _workdir_injection(self, run: ChatRun) -> tuple[str | None, str | None]:
+    def _workdir_injection(
+        self,
+        run: ChatRun,
+        *,
+        workdir_owner: WorkdirOwner | None = None,
+    ) -> tuple[str | None, str | None]:
         """B2:解析 run.workdir_id → ``(system 上下文文本, 根目录)``。
 
         注册表 miss 或路径失踪 → ``(None, None)`` 并审计 ``workdir.missing``
@@ -925,7 +946,16 @@ class ChatOrchestrator(BaseOrchestrator):
         """
         if not run.workdir_id:
             return None, None
-        workdir = resolve_valid_workdir(run.workdir_id)
+        if workdir_owner is None:
+            workdir = resolve_valid_workdir(run.workdir_id)
+        else:
+            workspace_id, actor_user_id, local_identity = workdir_owner
+            workdir = resolve_valid_workdir(
+                run.workdir_id,
+                owner_workspace_id=workspace_id,
+                owner_actor_user_id=actor_user_id,
+                allow_legacy_local=local_identity,
+            )
         if workdir is None:
             self.audit.append(
                 run.audit_events,

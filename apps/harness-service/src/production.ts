@@ -72,6 +72,7 @@ import {
   createWorkbenchCapabilityController,
 } from "./workbench-capabilities";
 import { loadWorkbenchSkillCatalog } from "./workbench-skills";
+import { readRegisteredWorkdirFile, resolveWorkbenchWorkdir } from "./workbench-files";
 
 export interface LiveHarnessV2RuntimeOptions {
   readonly runtimeConfigPath?: string;
@@ -96,6 +97,7 @@ export interface LiveHarnessV2RuntimeOptions {
   readonly businessOrigin?: string;
   readonly businessServiceToken?: string;
   readonly businessFetchImpl?: typeof fetch;
+  readonly protectedPaths?: readonly string[];
   /** External DNS/HTTP seams may be fixed in D/O tests; production defaults stay native. */
   readonly publicWebDnsLookup?: PublicWebDnsLookup;
   readonly publicWebTransport?: PublicWebTransport;
@@ -512,8 +514,26 @@ export async function createLiveHarnessV2Runtime(
     loadedCapabilityIdsByRun.set(runId, loadedIds);
     const callLocalOrBusiness = (request: Parameters<ToolGateway["execute"]>[0], signal: AbortSignal): Promise<ToolResult> => {
       const canonical = canonicalToolName(request.name);
-      if (canonical.startsWith("create.emit_") || canonical === "workdir.read_file") {
+      if (canonical.startsWith("create.emit_")) {
         return callLocalProductTool(request);
+      }
+      if (canonical === "workdir.read_file") {
+        const legacyWorkdirId = task?.schema_version === 2
+          ? undefined
+          : typeof task?.context?.workdir_id === "string" && task.context.workdir_id.trim() !== ""
+            ? task.context.workdir_id.trim()
+            : undefined;
+        return readRegisteredWorkdirFile(request.input, {
+          origin: options.businessOrigin ?? "",
+          serviceToken: options.businessServiceToken,
+          workspaceId: String(command.workspaceId),
+          actorUserId: task?.actor_user_id ?? "",
+          resourceRefs: task?.resource_refs
+            ?? (legacyWorkdirId === undefined ? [] : [`workdir:${legacyWorkdirId}`]),
+          ...(task?.workdir_path === undefined ? {} : { boundRoot: task.workdir_path }),
+          fetchImpl: options.businessFetchImpl,
+          protectedPaths: options.protectedPaths,
+        }, signal);
       }
       if (options.businessOrigin === undefined) return callLocalProductTool(request);
       return callBusinessTool({
@@ -572,6 +592,7 @@ export async function createLiveHarnessV2Runtime(
         productTaskFor: options.productTaskFor,
         productTaskPeek: options.productTaskPeek,
         fetchImpl: options.businessFetchImpl,
+        protectedPaths: options.protectedPaths,
       }),
       ...(webSearch === undefined ? {} : { webSearch }),
       webRead,
@@ -1143,6 +1164,7 @@ function workbenchV2Profile(
 ): ResolvedRunProfile {
   const model = selectedProductModel(profile, task, modelProfiles);
   const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool, skillLoadTool, "web_search", "web_read"];
+  if (hasWorkbenchWorkdir(task)) capabilityNames.push("workdir.read_file");
   if (task.project_id !== undefined) capabilityNames.push("crew.project.read", "crew.channel.read");
   const skills = explicitSkillEntries;
   const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
@@ -1158,7 +1180,7 @@ function workbenchV2Profile(
     ? "Complete the requested Workbench goal with the admitted capabilities. Do not require an artifact unless the request asks for one."
     : "Complete the requested Workbench goal with the admitted capabilities.";
   const skillIds = skills.map((skill) => skill.id);
-  const capabilityPolicy = createWorkbenchCapabilityPolicy();
+  const capabilityPolicy = createWorkbenchCapabilityPolicy({ includeWorkdir: hasWorkbenchWorkdir(task) });
   return resolveRunProfile({
     catalog: skills as SkillCatalogEntry[],
     channelPolicy: {
@@ -1198,6 +1220,12 @@ function workbenchV2Profile(
       ...(profile.kernel === undefined ? {} : { kernel: profile.kernel }),
     },
   });
+}
+
+function hasWorkbenchWorkdir(task?: ProductTask): boolean {
+  if (task?.schema_version !== 2 || task.resource_refs?.length !== 1) return false;
+  const ref = task.resource_refs[0];
+  return typeof ref === "string" && /^workdir:[^/\\]+$/.test(ref);
 }
 
 function selectedProductModel(
@@ -1677,7 +1705,7 @@ async function initialMessagesFor(
     ...(task.context ?? {}),
     ...(task.channel_id === undefined ? {} : { channel_id: task.channel_id }),
     ...(task.conversation_id === undefined ? {} : { conversation_id: task.conversation_id }),
-    ...(task.workdir_path === undefined ? {} : { workdir_path: task.workdir_path }),
+    ...(task.schema_version === 2 || task.workdir_path === undefined ? {} : { workdir_path: task.workdir_path }),
     ...(task.permission_mode === undefined ? {} : { permission_mode: task.permission_mode }),
     ...(task.model_profile_id === undefined ? {} : { model_profile_id: task.model_profile_id }),
     ...(task.source_event_id === undefined ? {} : { source_event_id: task.source_event_id }),
@@ -1794,9 +1822,35 @@ async function authorizeWorkbenchTool(options: {
   productTaskFor?: (runId: string) => ProductTask | undefined | Promise<ProductTask | undefined>;
   productTaskPeek?: (runId: string) => ProductTask | undefined;
   fetchImpl?: typeof fetch;
+  protectedPaths?: readonly string[];
 }): Promise<"allow" | "deny"> {
   const task = options.productTaskPeek?.(String(options.command.runId))
     ?? await options.productTaskFor?.(String(options.command.runId));
+  const legacyWorkdirId = task?.schema_version !== 2
+    && typeof task?.context?.workdir_id === "string"
+    && task.context.workdir_id.trim() !== ""
+    ? task.context.workdir_id.trim()
+    : undefined;
+  if (legacyWorkdirId !== undefined && (options.request.name === "read_only" || options.request.name === "workdir.read_file")) {
+    if (options.origin === undefined || options.serviceToken === undefined || options.serviceToken.trim() === "") {
+      return "deny";
+    }
+    try {
+      const canonical = await resolveWorkbenchWorkdir({
+        origin: options.origin,
+        serviceToken: options.serviceToken,
+        workspaceId: String(options.command.workspaceId),
+        actorUserId: task!.actor_user_id,
+        resourceRefs: [`workdir:${legacyWorkdirId}`],
+        ...(task?.workdir_path === undefined ? {} : { boundRoot: task.workdir_path }),
+        fetchImpl: options.fetchImpl,
+        protectedPaths: options.protectedPaths,
+      });
+      return canonical !== undefined ? "allow" : "deny";
+    } catch {
+      return "deny";
+    }
+  }
   if (task?.schema_version !== 2) {
     return options.command.runProfileSnapshot.capabilityPolicy === undefined ? "allow" : "deny";
   }

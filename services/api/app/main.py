@@ -234,8 +234,22 @@ def create_app(
             product_mode=harness_backed,
         )
     )
-    app.include_router(chat_routes.build_router(chat, harness_client=host, product_mode=harness_backed))
-    app.include_router(workdirs_routes.build_router())
+    app.include_router(
+        chat_routes.build_router(
+            chat,
+            harness_client=host,
+            product_mode=harness_backed,
+            identity=identity,
+            local_session=_local_session,
+        )
+    )
+    app.include_router(
+        workdirs_routes.build_router(
+            identity=identity,
+            product_mode=harness_backed,
+            local_session=lambda: local_session_identity(reimbursement),
+        )
+    )
     app.include_router(
         hiker_routes.build_router(
             hiker,
@@ -250,7 +264,15 @@ def create_app(
     app.state.harness_v2_bridge = v2_bridge
     app.include_router(harness_v2_routes.build_router(v2_bridge))
     app.include_router(associate_routes.build_router(associate))
-    app.include_router(create_routes.build_router(create, harness_client=host, product_mode=harness_backed))
+    app.include_router(
+        create_routes.build_router(
+            create,
+            harness_client=host,
+            product_mode=harness_backed,
+            identity=identity,
+            local_session=_local_session,
+        )
+    )
     app.include_router(reimbursement_routes.build_router(reimbursement, harness_client=host, product_mode=harness_backed))
     app.include_router(
         admin_runtime_routes.build_router(

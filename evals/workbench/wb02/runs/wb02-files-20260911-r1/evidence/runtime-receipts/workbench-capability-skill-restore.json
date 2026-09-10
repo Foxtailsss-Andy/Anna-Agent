@@ -1,0 +1,42 @@
+{
+  "run_id": "67d1d7a6-3540-4c3f-9e93-20298cd5eacc",
+  "resumed_run_id": "67d1d7a6-3540-4c3f-9e93-20298cd5eacc",
+  "new_run_id": "b17464ed-eecd-468e-bd37-7bcdddc74240",
+  "checkpoint_last_seq": 34,
+  "resumed_dispatch": {
+    "seq": 41,
+    "tool": "skills.load",
+    "toolCallId": "skill-restore-resumed-load-1"
+  },
+  "resumed_skill": {
+    "skill_id": "skill:harness-v2/general-assistant",
+    "version": "0.1.0",
+    "source": "anna-repository",
+    "document_hash": "sha256:11b712192836ae7bac37f3d34bc659a15d3ac0bc178a7d8fecc6a5491636bbf6",
+    "body_hash": "sha256:4a5d5b8af1e4575b4bdbb430cf45c46c8acc99a50ac9715c2a0dbc358f4c88fc"
+  },
+  "new_run_skill": {
+    "skill_id": "skill:harness-v2/general-assistant",
+    "version": "9.9.9",
+    "source": "anna-repository",
+    "document_hash": "sha256:24e1064a2e4e72d7a8da160af870129f41995c7469de068b867306a7e7f4ec46",
+    "body_hash": "sha256:19e953d4006ccbce1803b2d5e0104252ac473c6e66e65dc7bd9c71c0e4440272"
+  },
+  "new_run_dispatches": [
+    {
+      "seq": 10,
+      "tool": "capabilities.search",
+      "toolCallId": "skill-restore-new-search-1"
+    },
+    {
+      "seq": 19,
+      "tool": "capabilities.load",
+      "toolCallId": "skill-restore-new-capability-load-1"
+    },
+    {
+      "seq": 29,
+      "tool": "skills.load",
+      "toolCallId": "skill-restore-new-load-1"
+    }
+  ]
+}

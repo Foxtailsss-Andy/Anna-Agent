@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "caseId": "wb02-capability-increment",
+  "generatedAt": "2026-09-10T19:09:20.925Z",
+  "evidenceMode": "D",
+  "provider": "blocked",
+  "gitHead": "63d3ef27a6cfb9e6e8c046ed38bc1fa02435e869",
+  "files": [
+    {
+      "path": "increment-result.json",
+      "size": 49882,
+      "sha256": "9337d16ba15c9462676c0ca022a288b02b13780d56ebd1852f4a1a5507fd29fc"
+    },
+    {
+      "path": "receipt-python-workbench-capabilities.json",
+      "size": 425,
+      "sha256": "a52cf93acb3463f71803322e08df4980f604d981d4e2a1b2b810561b30439e07"
+    },
+    {
+      "path": "receipt-ts-workbench-capabilities.json",
+      "size": 1376,
+      "sha256": "f4855eb654fc7f48f52bc1ee66f29c64e554a2bf9cdde606e5df3be67c8dd561"
+    },
+    {
+      "path": "runtime-receipts/chat-no-project.json",
+      "size": 786,
+      "sha256": "8ef31d58646e8e84d22cb77b38bfe2b2b89e4cef590cfcabcb88b61de754b0ee"
+    },
+    {
+      "path": "runtime-receipts/chat-project.json",
+      "size": 786,
+      "sha256": "321fcfab699b2f7d0b8a82442620a152b55a5741fbf4daff10280d6d83dbd970"
+    },
+    {
+      "path": "runtime-receipts/create-no-project.json",
+      "size": 786,
+      "sha256": "fef8623efb7ec8e274aae5996358e9d7264894fbb358e5a64ee79fdb43c3713c"
+    },
+    {
+      "path": "runtime-receipts/create-project.json",
+      "size": 786,
+      "sha256": "7242786036fbda90bac05d50a0a237ff908ade7cf7be6f73e597fca29a1bc22a"
+    },
+    {
+      "path": "runtime-receipts/crew-no-project.json",
+      "size": 786,
+      "sha256": "e0a0ad33f450b67dd955a8e53ad49b648e8f9c02b775ba5bd6fdfa7c0553a620"
+    },
+    {
+      "path": "runtime-receipts/crew-project.json",
+      "size": 786,
+      "sha256": "aa286e5887d3a3815f2486e33c89adb5e7cbe45c96b03e5108c6370e0cf57db1"
+    },
+    {
+      "path": "runtime-receipts/files-legacy-admission.json",
+      "size": 235,
+      "sha256": "4c284bbeb363aee1d97708a70963f6d39f5dc2c0bbe18c168319be27f28d528c"
+    },
+    {
+      "path": "runtime-receipts/files-legacy-chat.json",
+      "size": 448,
+      "sha256": "8f22237a8e385f341c398e603f47619f3d1d922994496c51d356b4c4e4d83479"
+    },
+    {
+      "path": "runtime-receipts/files-legacy-revoke.json",
+      "size": 411,
+      "sha256": "b8be9992ed2e8f2e109419fed1a69ff6aa7422219937982080d2d2f211078a34"
+    },
+    {
+      "path": "runtime-receipts/files-read-public-pagination.json",
+      "size": 983,
+      "sha256": "d6341405df5436175600619aa06462a662566c702fbda28ddcb537cbbab944cb"
+    },
+    {
+      "path": "runtime-receipts/files-read-public-root-binding.json",
+      "size": 980,
+      "sha256": "61769fb1efe7679727ec0ec2b67b6e4653705e614efe5c40d5f3afbfa6760266"
+    },
+    {
+      "path": "runtime-receipts/files-read-public-unbound.json",
+      "size": 610,
+      "sha256": "a2c5ec94b96fec265ba1465dbdab3b9739e61b18841fcc83b108c3be2abd8dc6"
+    },
+    {
+      "path": "runtime-receipts/public-chat.json",
+      "size": 1332,
+      "sha256": "0339da654bcf9de27198c35937195c2dcf2c671028346c346677500d16ff549d"
+    },
+    {
+      "path": "runtime-receipts/public-crew-configured.json",
+      "size": 413,
+      "sha256": "1fe1f8bc760276987a0f7351946f1d531c592353b1e89eab5b9cf36e9e55ff18"
+    },
+    {
+      "path": "runtime-receipts/public-failure-feedback.json",
+      "size": 1332,
+      "sha256": "2eadfbead6660c9ebc5d80538ad7757a73feda3cb986f94c789bd6f3bc5ee6c9"
+    },
+    {
+      "path": "runtime-receipts/public-insufficient.json",
+      "size": 1338,
+      "sha256": "71bd34605422bdc2dc26cf5fc547286f1c9ec624bce87e122c31fddda58824db"
+    },
+    {
+      "path": "runtime-receipts/public-skill-read.json",
+      "size": 1152,
+      "sha256": "70ee9d28fc03a836442af2aefce131fe3ae17980926ec4889529502e5a2fe4ab"
+    },
+    {
+      "path": "runtime-receipts/public-sufficient.json",
+      "size": 786,
+      "sha256": "77cade3787da2bfaf17d9619ca387d7dc0779cd260b07638ed7f18a0f44cb8b5"
+    },
+    {
+      "path": "runtime-receipts/v1-project-task-actual.json",
+      "size": 1152,
+      "sha256": "388579217dccb08a51c8226afa9b87a64832452f782685ee571344fb90a5fdde"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-loading.json",
+      "size": 3753,
+      "sha256": "64752a43565ef6d597661ac4157c0b12945534f7f9225d26a61c949fc7e22d41"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-restore.json",
+      "size": 1884,
+      "sha256": "8bc9381b03caeaa9a667e39a5723fbaf157edf388d4341e95e98c2082b887052"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-definition.json",
+      "size": 6322,
+      "sha256": "c2b98372c2bb3d0c0e52960132e313ce2060b5b3bf3333bc0499e9c6ed7a678f"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-restore.json",
+      "size": 1343,
+      "sha256": "80eb35991db6dcbac883bdbee9550c7ddbdaa61a1f1b7cbb0fae392687dd380f"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-291fdbc0-e9f4-4155-98e3-5ad1cffdc149.json",
+      "size": 1408,
+      "sha256": "61d431a338c7b9ce2a3667dd6b10d09a7f0b8d2029573171dee3b112a5be4746"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-3b8d6e78-9c73-489f-bfa2-c5aed7fbf4fa.json",
+      "size": 1408,
+      "sha256": "640cbcf767fa7c2a27ca05c1eaf10da9af6c1c8a3904479b0147e24886f411fc"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-5ad213d7-cfa3-4032-81a1-c408e11f1f3d.json",
+      "size": 1689,
+      "sha256": "468c02132a4bfce43e6097ce2105c061f519279c317591aeac78f47348fcf375"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-5eca764d-e3c6-461a-b855-5742370ea1c4.json",
+      "size": 1695,
+      "sha256": "e30357f4dc3e31a601288b7a654ceb0851bb039f37169d2e49a0c496b522d0ba"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-6706b1ac-9e10-41ab-9198-d8689e0f5e2d.json",
+      "size": 1408,
+      "sha256": "f5a158afd3a698e279cc2e584139359d1d366190f8cc30892f81afb8cb21294b"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-6cd6dadc-8b3b-47e9-8584-838fb1431385.json",
+      "size": 1408,
+      "sha256": "bd04889cfa0a4be1660928a44a88f0dc19efbb7a907a7d3ce59b4dd77424cd8c"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-88e2bac9-b646-4bc0-9a70-ffb2d44f3e1a.json",
+      "size": 1124,
+      "sha256": "aed9315ffded9fcdb22309d8611423ccb0c43ea6e2de4fb3304f8562d9cf3bca"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-9020849f-ee2e-483b-b13b-37c4beada273.json",
+      "size": 1408,
+      "sha256": "e1a25d9fe7515792a035140f002662c6547b0d196fa8a8c8795f3e40dab55c79"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-b324d1db-eac3-40a1-8962-84b45666e7f8.json",
+      "size": 2275,
+      "sha256": "561e469af3409b11f76469a5454ddb628a0b0a78338f35283cf23a8f0dd1bdc7"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-c0ca08e7-7589-4883-bb85-7f58b1a8b355.json",
+      "size": 1405,
+      "sha256": "4fcef678cee5ffa78b7fc2fdb049c0685257eaf87af4399ceab20715801e9252"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-d430d014-915d-4a58-be9b-983613183d71.json",
+      "size": 1408,
+      "sha256": "07c21f952913ad99bcc26aac7d0ed532b18431e93c8735191dce8c91281eb489"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-eaf0a474-327e-4a06-918e-1d9eedb30303.json",
+      "size": 1408,
+      "sha256": "af560803e75caf9a9684c42733b98f3e41b10fc009ef92f79c07113f36ae2419"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-1.json",
+      "size": 3727,
+      "sha256": "fe8c6c8368f25b7cfd46c64da80c7cb9c481a4d3e450c61ce52e7d3b057108ae"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-2.json",
+      "size": 6287,
+      "sha256": "3c323038b069d0b26eae68206c766c1485496b27ff056b8c558ae098cf966599"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-1.json",
+      "size": 1638,
+      "sha256": "0ee43a8c175e668ce69c23c55fb95e5e44f8753a93cf0aac1301f39d5b5794af"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-2.json",
+      "size": 1636,
+      "sha256": "5a8b8bb0f12a2ea550c05c092122e242374ba5e7667be4f0e465b4a92a5d65a6"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-chat.json",
+      "size": 2509,
+      "sha256": "6dfc7ac3ec5f8aa4383f0aedbaff1928c03c79422d5ba7a60d07b08f5da626c8"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-create.json",
+      "size": 2513,
+      "sha256": "9a822a03e9988eee7678d61d00ec796209c29b0395985029c435064a94b00eb0"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-crew.json",
+      "size": 2509,
+      "sha256": "abc469c424604096780cd3f5ea9cdb0dd36b2e3b6ef68d7732a757d802fa5c32"
+    },
+    {
+      "path": "runtime-receipts/workbench-v1-restore.json",
+      "size": 1527,
+      "sha256": "17c887d8b940641cd2a34c23a231b9ac04b5efd0b66c57cc2170de7d9246175e"
+    },
+    {
+      "path": "source-snapshot.json",
+      "size": 33030,
+      "sha256": "13d6195dc682848facaea1e6f697f7c84e9f5cd70416a5832e8baeb60730758d"
+    }
+  ]
+}
