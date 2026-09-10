@@ -51,6 +51,7 @@ export {
   type ProductionToolGatewayOptions,
 } from "./production-tools";
 import { createProductionToolGateway } from "./production-tools";
+import { createPublicWebReader, type PublicWebDnsLookup, type PublicWebTransport } from "./workbench-public-web";
 import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 import {
   currentOmpImplementation,
@@ -95,6 +96,9 @@ export interface LiveHarnessV2RuntimeOptions {
   readonly businessOrigin?: string;
   readonly businessServiceToken?: string;
   readonly businessFetchImpl?: typeof fetch;
+  /** External DNS/HTTP seams may be fixed in D/O tests; production defaults stay native. */
+  readonly publicWebDnsLookup?: PublicWebDnsLookup;
+  readonly publicWebTransport?: PublicWebTransport;
   readonly modelProfiles?: Readonly<Record<string, {
     readonly model_name: string;
     readonly endpoint?: string;
@@ -221,6 +225,52 @@ export type WebSearchProvider = (
   signal: AbortSignal,
 ) => Promise<ToolResult>;
 
+const WEB_SEARCH_RESPONSE_MAX_BYTES = 1024 * 1024;
+
+type BoundedWebSearchPayload =
+  | { readonly status: "ok"; readonly payload: unknown }
+  | { readonly status: "invalid" }
+  | { readonly status: "too_large" }
+  | { readonly status: "aborted" };
+
+async function readBoundedWebSearchPayload(
+  response: Response,
+  signal: AbortSignal,
+): Promise<BoundedWebSearchPayload> {
+  if (response.body === null) return { status: "invalid" };
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      const chunk = next.value;
+      bytes += chunk.byteLength;
+      if (bytes > WEB_SEARCH_RESPONSE_MAX_BYTES) {
+        await reader.cancel();
+        return { status: "too_large" };
+      }
+      chunks.push(chunk);
+    }
+    if (signal.aborted) return { status: "aborted" };
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+    return { status: "ok", payload: JSON.parse(text) as unknown };
+  } catch {
+    return { status: signal.aborted ? "aborted" : "invalid" };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function cancelWebSearchResponse(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The response is already closed; do not expose transport details.
+  }
+}
+
 export function createWebSearchProvider(
   options: WebSearchProviderOptions,
 ): WebSearchProvider {
@@ -233,6 +283,7 @@ export function createWebSearchProvider(
     try {
       const response = await fetchImpl(options.endpoint, {
         method: "POST",
+        redirect: "manual",
         headers: {
           accept: "application/json",
           "content-type": "application/json",
@@ -243,17 +294,36 @@ export function createWebSearchProvider(
         body: JSON.stringify({ query: normalizedQuery, max_results: 5 }),
         signal,
       });
+      if (response.status >= 300 && response.status < 400) {
+        await cancelWebSearchResponse(response);
+        return { status: "failed", output: { reason: "web_search_redirect_rejected" } };
+      }
       if (!response.ok) {
+        await cancelWebSearchResponse(response);
         return { status: "failed", output: { reason: "web_search_provider_failed" } };
       }
-      const payload: unknown = await response.json();
-      const results = normalizeWebSearchResults(payload);
-      if (results === undefined) {
+      const payload = await readBoundedWebSearchPayload(response, signal);
+      if (payload.status === "too_large") {
+        return { status: "failed", output: { reason: "web_search_response_too_large" } };
+      }
+      if (payload.status === "aborted") {
+        return { status: "failed", output: { reason: "web_search_provider_unavailable" } };
+      }
+      if (payload.status === "invalid") {
         return { status: "failed", output: { reason: "invalid_web_search_response" } };
       }
+      const normalized = normalizeWebSearchResults(payload.payload);
+      if (normalized === undefined) {
+        return { status: "failed", output: { reason: "invalid_web_search_response" } };
+      }
+      const fetchedAt = new Date().toISOString();
       return {
         status: "succeeded",
-        output: { query: normalizedQuery, results },
+        output: {
+          query: normalizedQuery,
+          truncated: normalized.truncated,
+          results: normalized.results.map((result) => ({ ...result, fetched_at: fetchedAt })),
+        },
       };
     } catch {
       return { status: "failed", output: { reason: "web_search_provider_unavailable" } };
@@ -339,6 +409,10 @@ export async function createLiveHarnessV2Runtime(
         ...(config.web_search_api_key === undefined
           ? {}
           : { apiKey: config.web_search_api_key }),
+  });
+  const webRead = createPublicWebReader({
+    ...(options.publicWebDnsLookup === undefined ? {} : { dnsLookup: options.publicWebDnsLookup }),
+    ...(options.publicWebTransport === undefined ? {} : { transport: options.publicWebTransport }),
   });
   const selectedKernelDescriptor = config.harness_v2_kernel === "omp"
     ? ompDescriptor ?? kernelDescriptor
@@ -462,6 +536,9 @@ export async function createLiveHarnessV2Runtime(
           capabilityPolicy,
           skillCatalog: command.runProfileSnapshot.skillCatalog,
           allowedTools: command.runProfileSnapshot.allowedTools,
+          unconfiguredCapabilityIds: new Set(
+            webSearch === undefined ? ["web_search"] : [],
+          ),
           dynamicToolCall: callLocalOrBusiness,
         });
     const dynamicTools = dynamicGatewayTools(command, task);
@@ -497,6 +574,7 @@ export async function createLiveHarnessV2Runtime(
         fetchImpl: options.businessFetchImpl,
       }),
       ...(webSearch === undefined ? {} : { webSearch }),
+      webRead,
     });
   };
   const taskForOmp = async (command: StartRun): Promise<ProductTask | undefined> => {
@@ -1064,7 +1142,7 @@ function workbenchV2Profile(
   workbenchSkillCatalog?: SkillCatalogSnapshot,
 ): ResolvedRunProfile {
   const model = selectedProductModel(profile, task, modelProfiles);
-  const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool, skillLoadTool];
+  const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool, skillLoadTool, "web_search", "web_read"];
   if (task.project_id !== undefined) capabilityNames.push("crew.project.read", "crew.channel.read");
   const skills = explicitSkillEntries;
   const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
@@ -1214,8 +1292,6 @@ async function ompToolDefinitions(
   const capabilityPolicy = command.runProfileSnapshot.capabilityPolicy;
   return command.runProfileSnapshot.allowedTools.map((name): OmpToolDefinition => {
     const canonical = canonicalToolName(name);
-    const builtin = builtinOmpToolDefinition(name, canonical);
-    if (builtin !== undefined) return builtin;
     const capabilityDescription = capabilityToolDescription(canonical, capabilityPolicy);
     const capabilityParameters = capabilityToolParameters(canonical, capabilityPolicy);
     if (capabilityDescription !== undefined && capabilityParameters !== undefined) {
@@ -1225,6 +1301,8 @@ async function ompToolDefinitions(
         parameters: capabilityParameters as OmpToolDefinition["parameters"],
       };
     }
+    const builtin = builtinOmpToolDefinition(name, canonical);
+    if (builtin !== undefined) return builtin;
     const entry = canonical.startsWith("create.emit_")
       ? createToolCatalogEntry(canonical)
       : catalog.get(canonical) ?? catalog.get(name);
@@ -1255,9 +1333,13 @@ function dynamicGatewayTools(
   command: StartRun,
   task?: ProductTask,
 ): readonly HarnessToolDefinition[] {
-  const builtIn = new Set(["read_only", "create_artifact", "web_search"]);
-  const catalog = productToolCatalog(task);
   const capabilityPolicy = command.runProfileSnapshot.capabilityPolicy;
+  const builtIn = new Set(["read_only", "create_artifact"]);
+  if (capabilityPolicy === undefined) {
+    builtIn.add("web_search");
+    builtIn.add("web_read");
+  }
+  const catalog = productToolCatalog(task);
   return command.runProfileSnapshot.allowedTools
     .filter((name) => !builtIn.has(canonicalToolName(name)) && canonicalToolName(name) !== "todo")
     .map((name) => {
@@ -1544,6 +1626,12 @@ function validateJsonSchemaValue(schema: Record<string, unknown>, value: unknown
     if (typeof value !== "number" || !Number.isFinite(value) || (type === "integer" && !Number.isInteger(value))) {
       throw new Error(`${path} must be a ${type}`);
     }
+    if (typeof schema.minimum === "number" && (value as number) < schema.minimum) {
+      throw new Error(`${path} is below the minimum`);
+    }
+    if (typeof schema.maximum === "number" && (value as number) > schema.maximum) {
+      throw new Error(`${path} is above the maximum`);
+    }
   } else if (type === "boolean" && typeof value !== "boolean") {
     throw new Error(`${path} must be a boolean`);
   }
@@ -1791,7 +1879,10 @@ async function callBusinessTool(options: {
 
 function normalizeWebSearchResults(
   input: unknown,
-): Array<{ title: string; url: string; snippet: string }> | undefined {
+): {
+  readonly results: Array<{ title: string; url: string; snippet: string; published_at?: string }>;
+  readonly truncated: boolean;
+} | undefined {
   if (!isRecord(input) || !Array.isArray(input.results)) {
     return undefined;
   }
@@ -1803,9 +1894,32 @@ function normalizeWebSearchResults(
       || typeof item.snippet !== "string") {
       return undefined;
     }
-    results.push({ title: item.title, url: item.url, snippet: item.snippet });
+    if (item.title.trim() === "" || item.url.trim() === "") return undefined;
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(item.url);
+    } catch {
+      return undefined;
+    }
+    if ((parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:")
+      || parsedUrl.username !== ""
+      || parsedUrl.password !== "") {
+      return undefined;
+    }
+    if (Object.prototype.hasOwnProperty.call(item, "published_at")
+      && (typeof item.published_at !== "string" || item.published_at.trim() === "")) {
+      return undefined;
+    }
+    results.push({
+      title: item.title,
+      url: item.url,
+      snippet: item.snippet,
+      ...(typeof item.published_at === "string"
+        ? { published_at: item.published_at }
+        : {}),
+    });
   }
-  return results;
+  return { results, truncated: input.results.length > results.length };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

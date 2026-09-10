@@ -14,6 +14,7 @@
     "@anna/harness-v2": "0.0.0",
     "@anna/omp-loop-kernel": "0.0.0",
     "@anna/pi-loop-kernel": "0.0.0",
-    "@anna/trace": "0.0.0"
+    "@anna/trace": "0.0.0",
+    "parse5": "8.0.1"
   }
 }

@@ -8,6 +8,14 @@ import test from "node:test";
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const runner = join(repositoryRoot, "scripts/workbench-capability-evidence.mjs");
 const roundRoot = (id) => join(repositoryRoot, "evals/workbench/wb02/runs", id);
+const requiredCapabilityTests = [
+  "apps/harness-service/test/workbench-capability-loading.test.ts",
+  "apps/harness-service/test/workbench-capability-skills.test.ts",
+  "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+  "apps/harness-service/test/workbench-capability-public.test.ts",
+  "apps/harness-service/test/workbench-capability-public-network.test.ts",
+  "apps/harness-service/test/web-search.test.ts",
+];
 
 test("WB-02 runner refuses an existing round without overwriting it", async () => {
   const id = `cli-test-${process.pid}-${Date.now()}`;
@@ -116,7 +124,7 @@ test("WB-02 Skill tests are independently required", async () => {
     assert.notEqual(result.code, 0);
     const evidence = await readEvidence(missingRestore.roundRoot);
     assert.equal(evidence.status, "fail");
-    assert.deepEqual(evidence.testDiscovery.ts.missing, ["test/workbench-capability-skill-restore.test.ts"]);
+    assert.ok(evidence.testDiscovery.ts.missing.includes("test/workbench-capability-skill-restore.test.ts"));
     assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-skill-restore.test.ts" && receipt.status === "not_run"));
   } finally {
     await rm(missingRestore.root, { recursive: true, force: true });
@@ -127,6 +135,8 @@ test("WB-02 Skill tests are independently required", async () => {
     tsFiles: [
       "apps/harness-service/test/workbench-capability-loading.test.ts",
       "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+      "apps/harness-service/test/workbench-capability-public.test.ts",
+      "apps/harness-service/test/workbench-capability-public-network.test.ts",
     ],
   });
   try {
@@ -134,21 +144,236 @@ test("WB-02 Skill tests are independently required", async () => {
     assert.notEqual(result.code, 0);
     const evidence = await readEvidence(missingSkill.roundRoot);
     assert.equal(evidence.status, "fail");
-    assert.deepEqual(evidence.testDiscovery.ts.missing, ["test/workbench-capability-skills.test.ts"]);
+    assert.ok(evidence.testDiscovery.ts.missing.includes("test/workbench-capability-skills.test.ts"));
     assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-skills.test.ts" && receipt.status === "not_run"));
   } finally {
     await rm(missingSkill.root, { recursive: true, force: true });
   }
 });
 
+test("WB-02 public capability tests are independently required", async () => {
+  for (const missing of [
+    "apps/harness-service/test/workbench-capability-public.test.ts",
+    "apps/harness-service/test/workbench-capability-public-network.test.ts",
+  ]) {
+    const fixture = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
+    });
+    try {
+      const result = await runNode(fixture.runner, fixture.env);
+      assert.notEqual(result.code, 0);
+      const evidence = await readEvidence(fixture.roundRoot);
+      const requiredPath = missing.slice("apps/harness-service/".length);
+      assert.ok(evidence.testDiscovery.ts.missing.includes(requiredPath));
+      assert.ok(evidence.receipts.some((receipt) => receipt.id === `missing-${missing.split("/").at(-1)}` && receipt.status === "not_run"));
+      assert.equal(evidence.status, "fail");
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("WB-02 web-search test is independently required", async () => {
+  const missing = "apps/harness-service/test/web-search.test.ts";
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests.filter((path) => path !== missing),
+    missingSourcePath: missing,
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.ok(evidence.testDiscovery.ts.missing.includes("test/web-search.test.ts"));
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-web-search.test.ts" && receipt.status === "not_run"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 missing public web module cannot pass with successful synthetic commands", async () => {
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+    missingSourcePath: "apps/harness-service/src/workbench-public-web.ts",
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.equal(evidence.sourceChanged, false);
+    assert.equal(evidence.blockingReason, "required_source_missing");
+    assert.ok(evidence.requiredSourcePathsMissing.includes("apps/harness-service/src/workbench-public-web.ts"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 public guards are independently killed by isolated guard mutations", async () => {
+  const variants = [
+    {
+      name: "public-test-guard",
+      testName: "WB-02 public capability tests are independently required",
+      tsFiles: requiredCapabilityTests.filter((path) => path !== "apps/harness-service/test/workbench-capability-public.test.ts"),
+      mutation: (source) => removeRequiredEntry(source, "test/workbench-capability-public.test.ts"),
+    },
+    {
+      name: "public-network-test-guard",
+      testName: "WB-02 public capability tests are independently required",
+      tsFiles: requiredCapabilityTests.filter((path) => path !== "apps/harness-service/test/workbench-capability-public-network.test.ts"),
+      mutation: (source) => removeRequiredEntry(source, "test/workbench-capability-public-network.test.ts"),
+    },
+    {
+      name: "public-web-source-guard",
+      testName: "WB-02 missing public web module cannot pass with successful synthetic commands",
+      tsFiles: requiredCapabilityTests,
+      missingSourcePath: "apps/harness-service/src/workbench-public-web.ts",
+      mutation: (source) => removeRequiredSourceEntry(source, "apps/harness-service/src/workbench-public-web.ts"),
+    },
+    {
+      name: "web-search-test-guard",
+      testName: "WB-02 web-search test is independently required",
+      tsFiles: requiredCapabilityTests.filter((path) => path !== "apps/harness-service/test/web-search.test.ts"),
+      missingSourcePath: "apps/harness-service/test/web-search.test.ts",
+      mutation: (source) => removeRequiredEntry(source, "test/web-search.test.ts"),
+    },
+  ];
+
+  for (const variant of variants) {
+    const current = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      tsFiles: variant.tsFiles,
+      missingSourcePath: variant.missingSourcePath ?? null,
+    });
+    const mutant = await createSyntheticFixture({
+      pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+      tsFiles: variant.tsFiles,
+      missingSourcePath: variant.missingSourcePath ?? null,
+    });
+    try {
+      const mutantRunner = await readFile(mutant.runner, "utf8");
+      await writeFile(mutant.runner, variant.mutation(mutantRunner), { flag: "w" });
+      const testNamePattern = `--test-name-pattern=${variant.testName}`;
+      const currentResult = await runNodeTest(join(current.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, current.env);
+      assert.equal(currentResult.code, 0, `${variant.name} current guard failed\n${currentResult.stdout}\n${currentResult.stderr}`);
+      const mutantResult = await runNodeTest(join(mutant.root, "scripts/workbench-capability-evidence.test.mjs"), testNamePattern, mutant.env);
+      process.stdout.write(`WB-02 isolated mutation ${variant.name}: current_exit=${currentResult.code} mutant_exit=${mutantResult.code}\n`);
+      assert.equal(mutantResult.code, 1, `${variant.name} mutation was not detected\n${mutantResult.stdout}\n${mutantResult.stderr}`);
+    } finally {
+      await rm(current.root, { recursive: true, force: true });
+      await rm(mutant.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("WB-02 test commands retain direct stdout and stderr in exclusive private evidence", async () => {
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+    npmExit: 7,
+    npmStdout: "synthetic-ts-stdout-secret",
+    npmStderr: "synthetic-ts-stderr-secret",
+    uvExit: 9,
+    uvStdout: "synthetic-python-stdout-secret",
+    uvStderr: "synthetic-python-stderr-secret",
+  });
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(fixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    const privateRoot = join(fixture.root, ".tmp-tests/wb02/evidence", fixture.id);
+    const tsDir = join(privateRoot, "issue-ts-workbench-capabilities");
+    const pythonDir = join(privateRoot, "issue-python-workbench-capabilities");
+    const tsCommand = JSON.parse(await readFile(join(tsDir, "command.json"), "utf8"));
+    const pythonCommand = JSON.parse(await readFile(join(pythonDir, "command.json"), "utf8"));
+    const tsExit = JSON.parse(await readFile(join(tsDir, "exit.json"), "utf8"));
+    const pythonExit = JSON.parse(await readFile(join(pythonDir, "exit.json"), "utf8"));
+    assert.deepEqual(tsCommand.argv.slice(0, 2), ["npm", "run"]);
+    assert.deepEqual(pythonCommand.argv.slice(0, 2), ["uv", "run"]);
+    assert.ok(tsCommand.argv.includes("test/web-search.test.ts"));
+    assert.equal(tsCommand.cwd, resolve(tsCommand.cwd));
+    assert.equal(tsExit.exitCode, 7);
+    assert.equal(pythonExit.exitCode, 9);
+    assert.equal(tsCommand.sourceHashesBefore.length, tsExit.sourceHashesAfter.length);
+    assert.ok(tsCommand.sourceHashesBefore.some((entry) => entry.path === "apps/harness-service/src/workbench-public-web.ts"));
+    assert.match(await readFile(join(tsDir, "stdout.log"), "utf8"), /synthetic-ts-stdout-secret/);
+    assert.match(await readFile(join(tsDir, "stderr.log"), "utf8"), /synthetic-ts-stderr-secret/);
+    assert.match(await readFile(join(pythonDir, "stdout.log"), "utf8"), /synthetic-python-stdout-secret/);
+    assert.match(await readFile(join(pythonDir, "stderr.log"), "utf8"), /synthetic-python-stderr-secret/);
+    const publicText = `${await readFile(join(fixture.roundRoot, "evidence/increment-result.json"), "utf8")}\n${await readFile(join(fixture.roundRoot, "evidence/manifest.json"), "utf8")}`;
+    assert.doesNotMatch(publicText, /synthetic-(?:ts|python)-(?:stdout|stderr)-secret/);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 test command streams are durable before a running child exits", async () => {
+  const marker = "synthetic-ts-running-marker";
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+    npmExit: 7,
+    npmStdout: marker,
+    npmStderr: `${marker}-stderr`,
+    npmStartupDelaySeconds: "2.5",
+  });
+  const barrier = join(fixture.root, "release-npm.barrier");
+  const live = spawnNodeLive(fixture.runner, {
+    ...fixture.env,
+    WB02_NPM_BARRIER: barrier,
+  });
+  const privateRoot = join(fixture.root, ".tmp-tests/wb02/evidence", fixture.id);
+  const tsDir = join(privateRoot, "issue-ts-workbench-capabilities");
+  try {
+    await waitForText(join(tsDir, "stdout.log"), marker, live.child);
+    await waitForText(join(tsDir, "stderr.log"), `${marker}-stderr`, live.child);
+    const command = JSON.parse(await readFile(join(tsDir, "command.json"), "utf8"));
+    assert.equal(command.argv[0], "npm");
+    assert.ok(command.sourceHashesBefore.some((entry) => entry.path === "apps/harness-service/src/workbench-public-web.ts"));
+    assert.equal(live.child.exitCode, null, "fixture runner must remain alive before barrier release");
+    await assert.rejects(readFile(join(tsDir, "exit.json"), "utf8"), { code: "ENOENT" });
+
+    await writeFile(barrier, "release\n", { flag: "wx" });
+    const result = await live.result;
+    assert.notEqual(result.code, 0);
+    const exit = JSON.parse(await readFile(join(tsDir, "exit.json"), "utf8"));
+    assert.equal(exit.exitCode, 7);
+    assert.equal(command.sourceHashesBefore.length, exit.sourceHashesAfter.length);
+    assert.match(await readFile(join(tsDir, "stdout.log"), "utf8"), new RegExp(marker));
+    assert.match(await readFile(join(tsDir, "stderr.log"), "utf8"), new RegExp(`${marker}-stderr`));
+  } finally {
+    if (live.child.exitCode === null) await terminateProcessGroup(live.child);
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WB-02 private round root refuses reuse even when public round is new", async () => {
+  const fixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+  });
+  const privateRoundRoot = join(fixture.root, ".tmp-tests/wb02/evidence", fixture.id);
+  await mkdir(privateRoundRoot, { recursive: true });
+  const marker = join(privateRoundRoot, "preserve-me.txt");
+  await writeFile(marker, "private-preserve\n");
+  try {
+    const result = await runNode(fixture.runner, fixture.env);
+    assert.notEqual(result.code, 0);
+    assert.match(`${result.stdout}\n${result.stderr}`, /EEXIST|already exists/i);
+    assert.equal(await readFile(marker, "utf8"), "private-preserve\n");
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("WB-02 source snapshot catches a changed capability core module while unchanged synthetic run passes", async () => {
   const passingFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: [
-      "apps/harness-service/test/workbench-capability-loading.test.ts",
-      "apps/harness-service/test/workbench-capability-skills.test.ts",
-      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
-    ],
+    tsFiles: requiredCapabilityTests,
   });
   try {
     const result = await runNode(passingFixture.runner, passingFixture.env);
@@ -166,11 +391,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
 
   const changedFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: [
-      "apps/harness-service/test/workbench-capability-loading.test.ts",
-      "apps/harness-service/test/workbench-capability-skills.test.ts",
-      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
-    ],
+    tsFiles: requiredCapabilityTests,
     mutatePath: "packages/harness-v2/src/capability-catalog.ts",
   });
   try {
@@ -189,11 +410,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
 
   const changedSkillFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: [
-      "apps/harness-service/test/workbench-capability-loading.test.ts",
-      "apps/harness-service/test/workbench-capability-skills.test.ts",
-      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
-    ],
+    tsFiles: requiredCapabilityTests,
     mutatePath: "packages/harness-v2/src/skill-catalog.ts",
   });
   try {
@@ -210,11 +427,7 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
 
   const changedSkillDocumentFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: [
-      "apps/harness-service/test/workbench-capability-loading.test.ts",
-      "apps/harness-service/test/workbench-capability-skills.test.ts",
-      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
-    ],
+    tsFiles: requiredCapabilityTests,
     mutatePath: "skills/harness-v2/general-assistant/SKILL.md",
   });
   try {
@@ -228,9 +441,38 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   } finally {
     await rm(changedSkillDocumentFixture.root, { recursive: true, force: true });
   }
+
+  const changedPublicWebFixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: requiredCapabilityTests,
+    mutatePath: "apps/harness-service/src/workbench-public-web.ts",
+  });
+  try {
+    const result = await runNode(changedPublicWebFixture.runner, changedPublicWebFixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(changedPublicWebFixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.equal(evidence.sourceChanged, true);
+    assert.equal(evidence.blockingReason, "source_changed_during_run");
+    assert.notEqual(evidence.modulesHashBefore, evidence.modulesHashAfter);
+  } finally {
+    await rm(changedPublicWebFixture.root, { recursive: true, force: true });
+  }
 });
 
-async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null }) {
+async function createSyntheticFixture({
+  pythonFiles,
+  tsFiles,
+  mutatePath = null,
+  missingSourcePath = null,
+  npmExit = 0,
+  npmStdout = "synthetic npm",
+  npmStderr = "",
+  npmStartupDelaySeconds = "0",
+  uvExit = 0,
+  uvStdout = "synthetic uv",
+  uvStderr = "",
+}) {
   const root = await mkdtemp(join(tmpdir(), "anna-wb02-synthetic-"));
   const scripts = join(root, "scripts");
   const bin = join(root, "bin");
@@ -239,17 +481,28 @@ async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null 
   await mkdir(bin, { recursive: true });
   await mkdir(baselineEvidence, { recursive: true });
   await cp(runner, join(scripts, "workbench-capability-evidence.mjs"));
+  await cp(join(repositoryRoot, "scripts/workbench-capability-evidence.test.mjs"), join(scripts, "workbench-capability-evidence.test.mjs"));
   await cp(join(repositoryRoot, "scripts/build-evidence-manifest.mjs"), join(scripts, "build-evidence-manifest.mjs"));
   await cp(join(repositoryRoot, "scripts/verify-evidence-manifest.mjs"), join(scripts, "verify-evidence-manifest.mjs"));
   await writeFile(join(baselineEvidence, "baseline-result.json"), JSON.stringify({ datasetVersion: "wb00-dataset-v1.1" }));
+  const requiredSourceFixtures = [
+    "apps/harness-service/src/workbench-public-web.ts",
+    "apps/harness-service/src/production-tools.ts",
+    "apps/harness-service/test/web-search.test.ts",
+    "apps/harness-service/test/production-tools.test.ts",
+    "apps/harness-service/package.json",
+    "package-lock.json",
+  ];
   for (const path of [
     ...pythonFiles,
     ...tsFiles,
+    ...requiredSourceFixtures,
     "packages/harness-v2/src/capability-catalog.ts",
     "packages/harness-v2/src/index.ts",
     "packages/harness-v2/src/skill-catalog.ts",
     "skills/harness-v2/general-assistant/SKILL.md",
   ]) {
+    if (path === missingSourcePath) continue;
     const target = join(root, path);
     await mkdir(resolve(target, ".."), { recursive: true });
     await writeFile(target, `synthetic fixture: ${path}\n`);
@@ -259,8 +512,8 @@ async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null 
   const npmStub = stubScript("npm");
   const uvStub = stubScript("uv");
   await writeFile(gitStub, "#!/bin/sh\ncase \"$1\" in\n  rev-parse) printf 'synthetic-head\\n' ;;\n  *) : ;;\nesac\n");
-  await writeFile(npmStub, "#!/bin/sh\nif [ -n \"${WB02_MUTATE_TARGET:-}\" ]; then printf 'mutated-by-synthetic-stub\\n' >> \"$WB02_MUTATE_TARGET\"; fi\nprintf 'synthetic npm\\n'\n");
-  await writeFile(uvStub, "#!/bin/sh\nprintf 'synthetic uv\\n'\n");
+  await writeFile(npmStub, "#!/bin/sh\nif [ -n \"${WB02_MUTATE_TARGET:-}\" ]; then printf 'mutated-by-synthetic-stub\\n' >> \"$WB02_MUTATE_TARGET\"; fi\nif [ \"${WB02_NPM_STARTUP_DELAY_SECONDS:-0}\" != \"0\" ]; then sleep \"$WB02_NPM_STARTUP_DELAY_SECONDS\"; fi\nprintf '%s\\n' \"${WB02_NPM_STDOUT:-synthetic npm}\"\nif [ -n \"${WB02_NPM_STDERR:-}\" ]; then printf '%s\\n' \"$WB02_NPM_STDERR\" >&2; fi\nif [ -n \"${WB02_NPM_BARRIER:-}\" ]; then while [ ! -e \"$WB02_NPM_BARRIER\" ]; do sleep 0.01; done; fi\nexit \"${WB02_NPM_EXIT:-0}\"\n");
+  await writeFile(uvStub, "#!/bin/sh\nprintf '%s\\n' \"${WB02_UV_STDOUT:-synthetic uv}\"\nif [ -n \"${WB02_UV_STDERR:-}\" ]; then printf '%s\\n' \"$WB02_UV_STDERR\" >&2; fi\nexit \"${WB02_UV_EXIT:-0}\"\n");
   await Promise.all([chmod(gitStub, 0o755), chmod(npmStub, 0o755), chmod(uvStub, 0o755)]);
   const id = `synthetic-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return {
@@ -270,8 +523,16 @@ async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null 
     env: {
       ANNA_WB02_EVAL_ROUND_ID: id,
       PATH: `${bin}:${process.env.PATH}`,
+      WB02_NPM_EXIT: `${npmExit}`,
+      WB02_NPM_STDOUT: npmStdout,
+      WB02_NPM_STDERR: npmStderr,
+      WB02_NPM_STARTUP_DELAY_SECONDS: `${npmStartupDelaySeconds}`,
+      WB02_UV_EXIT: `${uvExit}`,
+      WB02_UV_STDOUT: uvStdout,
+      WB02_UV_STDERR: uvStderr,
       ...(mutatePath === null ? {} : { WB02_MUTATE_TARGET: join(root, mutatePath) }),
     },
+    id,
   };
 }
 
@@ -280,10 +541,20 @@ async function readEvidence(roundRoot) {
 }
 
 function runNode(script, env) {
+  return runNodeWithArgs(script, [], env);
+}
+
+function runNodeTest(script, testNamePattern, env) {
+  return runNodeWithArgs(script, ["--test", testNamePattern], env);
+}
+
+function runNodeWithArgs(script, args, env) {
   return new Promise((resolveResult) => {
-    const child = spawn(process.execPath, [script], {
+    const childEnv = { ...process.env, ...env };
+    delete childEnv.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, [...args, script], {
       cwd: repositoryRoot,
-      env: { ...process.env, ...env },
+      env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -292,4 +563,59 @@ function runNode(script, env) {
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("close", (code) => resolveResult({ code, stdout, stderr }));
   });
+}
+
+function removeRequiredEntry(source, entry) {
+  const line = `  "${entry}",\n`;
+  assert.equal(source.split(line).length - 1, 1, `expected one required test guard entry for ${entry}`);
+  return source.replace(line, "");
+}
+
+function removeRequiredSourceEntry(source, entry) {
+  const block = `const requiredSourcePaths = [\n  "${entry}",\n`;
+  assert.equal(source.split(block).length - 1, 1, `expected one required source guard entry for ${entry}`);
+  return source.replace(block, "const requiredSourcePaths = [\n");
+}
+
+function spawnNodeLive(script, env) {
+  const child = spawn(process.execPath, [script], {
+    cwd: repositoryRoot,
+    detached: true,
+    env: { ...process.env, ...env },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const result = new Promise((resolveResult) => {
+    child.on("close", (code, signal) => resolveResult({ code, signal, stdout, stderr }));
+  });
+  return { child, result };
+}
+
+async function terminateProcessGroup(child) {
+  if (child.exitCode !== null) return;
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
+  if (child.exitCode !== null) return;
+  await new Promise((resolveResult) => child.once("close", resolveResult));
+}
+
+async function waitForText(path, marker, child) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`fixture child exited before ${marker} appeared in ${path}`);
+    try {
+      if ((await readFile(path, "utf8")).includes(marker)) return;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    const remaining = deadline - Date.now();
+    if (remaining > 0) await new Promise((resolveResult) => setTimeout(resolveResult, Math.min(10, remaining)));
+  }
+  throw new Error(`timed out waiting for ${marker} in ${path}`);
 }

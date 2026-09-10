@@ -13,6 +13,8 @@ import {
   WORKBENCH_CAPABILITY_POLICY_VERSION,
 } from "@anna/harness-v2";
 
+import { PUBLIC_WEB_READ_MAX_TEXT_CHARS } from "./workbench-public-web";
+
 export const capabilitySearchTool = "capabilities.search" as const;
 export const capabilityLoadTool = "capabilities.load" as const;
 export const skillLoadTool = "skills.load" as const;
@@ -49,6 +51,24 @@ const capabilityLoadSchema = {
   type: "object",
   properties: { ids: { type: "array", items: { type: "string" }, minItems: 1 } },
   required: ["ids"],
+  additionalProperties: false,
+} as const satisfies Record<string, JsonValue>;
+
+const webSearchSchema = {
+  type: "object",
+  properties: { query: { type: "string" } },
+  required: ["query"],
+  additionalProperties: false,
+} as const satisfies Record<string, JsonValue>;
+
+const webReadSchema = {
+  type: "object",
+  properties: {
+    url: { type: "string" },
+    offset: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    limit: { type: "integer", minimum: 1, maximum: PUBLIC_WEB_READ_MAX_TEXT_CHARS },
+  },
+  required: ["url"],
   additionalProperties: false,
 } as const satisfies Record<string, JsonValue>;
 
@@ -97,6 +117,24 @@ export function capabilityToolDescription(
 
 const fixedCapabilities: readonly WorkbenchCapabilityDefinition[] = Object.freeze([
   buildCapabilityDefinition({
+    id: "web_search",
+    version: "1.0.0",
+    description: "Search the configured public information source and return source metadata.",
+    source: "anna.workbench.public",
+    effect: "read",
+    replayPolicy: "safe",
+    inputSchema: webSearchSchema,
+  }),
+  buildCapabilityDefinition({
+    id: "web_read",
+    version: "1.0.0",
+    description: "Read bounded public HTML or text and return source metadata.",
+    source: "anna.workbench.public",
+    effect: "read",
+    replayPolicy: "safe",
+    inputSchema: webReadSchema,
+  }),
+  buildCapabilityDefinition({
     id: skillLoadTool,
     version: "1.0.0",
     description: "Read a frozen registered Skill method and report its declared dependencies.",
@@ -139,6 +177,7 @@ export function createWorkbenchCapabilityController(
     readonly capabilityPolicy?: CapabilityPolicySnapshot;
     readonly skillCatalog?: SkillCatalogSnapshot;
     readonly allowedTools?: readonly string[];
+    readonly unconfiguredCapabilityIds?: ReadonlySet<string>;
     readonly dynamicToolCall?: (request: ToolRequest, signal: AbortSignal) => Promise<ToolResult>;
   },
 ): WorkbenchCapabilityController {
@@ -147,7 +186,11 @@ export function createWorkbenchCapabilityController(
     ? new Set(catalog.map((item) => item.id))
     : new Set(options.allowedTools);
   const visible = catalog.filter((item) =>
-    allowed.has(item.id) && (options.projectId !== undefined || item.id === skillLoadTool));
+    allowed.has(item.id)
+    && (options.projectId !== undefined
+      || item.id === skillLoadTool
+      || item.id === "web_search"
+      || item.id === "web_read"));
   const byId = new Map(visible.map((item) => [item.id, item]));
   const loaded = new Set<string>();
   for (const id of options.loadedIds ?? []) {
@@ -175,7 +218,11 @@ export function createWorkbenchCapabilityController(
             replay_policy: item.replayPolicy,
             schema_hash: item.hash,
             input_schema: item.inputSchema,
-            status: loaded.has(item.id) ? "loaded" : "available",
+            status: loaded.has(item.id)
+              ? "loaded"
+              : options.unconfiguredCapabilityIds?.has(item.id) === true
+                ? "not_configured"
+                : "available",
           }));
         const skills = allowed.has(skillLoadTool)
           ? (options.skillCatalog?.skills ?? [])
@@ -231,7 +278,8 @@ export function createWorkbenchCapabilityController(
       }
       if (byId.has(request.name) && loaded.has(request.name)) {
         const input = request.input as { project_id?: unknown };
-        if (input.project_id !== options.projectId) {
+        if ((request.name === "crew.project.read" || request.name === "crew.channel.read")
+          && input.project_id !== options.projectId) {
           return { status: "failed", output: { reason: "capability_scope_not_authorized" } };
         }
         if (options.dynamicToolCall === undefined) {

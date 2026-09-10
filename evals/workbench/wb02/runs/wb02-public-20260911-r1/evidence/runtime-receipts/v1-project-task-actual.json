@@ -1,0 +1,43 @@
+{
+  "first_model_tools": [],
+  "terminal_events": [
+    {
+      "id": "310471ac-d4ad-4df8-b5d4-67cbd4b207dc",
+      "workspaceId": "ws_crew_demo",
+      "channelId": "crew_channel:proj_1",
+      "streamId": "run-wb02-v1-project-task",
+      "seq": 20,
+      "type": "run.completed",
+      "timestamp": "2026-09-10T16:48:05.115Z",
+      "schemaVersion": 1,
+      "payload": {
+        "outcome": "completed"
+      }
+    }
+  ],
+  "tool_responses": [
+    {
+      "id": "0f604ffd-4d4c-4c38-a7c4-1587e74b46b8",
+      "workspaceId": "ws_crew_demo",
+      "channelId": "crew_channel:proj_1",
+      "streamId": "run-wb02-v1-project-task",
+      "seq": 11,
+      "type": "omp.tool.response",
+      "timestamp": "2026-09-10T16:48:05.069Z",
+      "schemaVersion": 1,
+      "payload": {
+        "schemaVersion": 1,
+        "toolCallId": "v1-project-read-1",
+        "dispatchEventId": "77bbfe92-c16b-4c6d-88d1-fef6b92ea46e",
+        "transcriptIndex": 2,
+        "result": {
+          "status": "succeeded",
+          "output": {
+            "path": "v1-project-source.txt",
+            "content": "WB02_V1_PROJECT_MARKER"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "run_id": "33d9a7a8-afae-4754-b903-a4df8e456bec",
+  "actual_tool_calls": [
+    {
+      "seq": 10,
+      "tool": "capabilities.search"
+    },
+    {
+      "seq": 19,
+      "tool": "capabilities.load"
+    },
+    {
+      "seq": 29,
+      "tool": "skills.load"
+    },
+    {
+      "seq": 38,
+      "tool": "capabilities.load"
+    },
+    {
+      "seq": 47,
+      "tool": "capabilities.load"
+    },
+    {
+      "seq": 57,
+      "tool": "crew.project.read"
+    }
+  ],
+  "event_types": [
+    "run.queued",
+    "run.started",
+    "omp.context.seed",
+    "run.context.ready",
+    "omp.transcript.message",
+    "run.progress",
+    "run.model.requested",
+    "omp.model.response",
+    "omp.tool.dispatch",
+    "omp.tool.response",
+    "capability.loaded",
+    "run.eval.contract",
+    "run.completed"
+  ],
+  "tool_responses": [
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "7eefc84b-15bd-4f02-8fc5-101bf2e46c4a",
+      "seq": 11,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "e51226e7-5377-40ce-b7a6-c2b030c812e5",
+      "seq": 21,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "89481563-b634-456c-b2fc-e601ec411871",
+      "seq": 30,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "2574dabd-5652-4ee6-b19a-7ec56a0773f5",
+      "seq": 39,
+      "tool_status": "failed",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "d66df900-0c8b-4f11-a272-e5f765bd1a43",
+      "seq": 49,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    },
+    {
+      "event_type": "omp.tool.response",
+      "event_id": "806c10f5-e84b-4340-a7d5-47cbccab83af",
+      "seq": 58,
+      "tool_status": "succeeded",
+      "response_boundary": "public Workbench event projection"
+    }
+  ],
+  "evidence_boundary": "actual public Workbench OMP/Gateway events; model transport fixture only"
+}

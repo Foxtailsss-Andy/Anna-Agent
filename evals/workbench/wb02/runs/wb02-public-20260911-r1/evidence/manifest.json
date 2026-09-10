@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "caseId": "wb02-capability-increment",
+  "generatedAt": "2026-09-10T16:47:16.461Z",
+  "evidenceMode": "D",
+  "provider": "blocked",
+  "gitHead": "e3e95621abbb15b66767e7b4bd9a6b2b3db7a9d4",
+  "files": [
+    {
+      "path": "increment-result.json",
+      "size": 38883,
+      "sha256": "b5a3aa68fc62b7b78de0801e1daee8d585f28a8c96c1b7062b4b61f46753dd62"
+    },
+    {
+      "path": "receipt-python-workbench-capabilities.json",
+      "size": 337,
+      "sha256": "e14426871cedc1e8ac3cbb74355d983c13da556a53180fd776e2edad5c85cabe"
+    },
+    {
+      "path": "receipt-ts-workbench-capabilities.json",
+      "size": 1185,
+      "sha256": "0edc27e78c4360caf113e1912e8125bda492089efd37634b0d57dcfde753f678"
+    },
+    {
+      "path": "runtime-receipts/chat-no-project.json",
+      "size": 786,
+      "sha256": "e0d6e2551bc661ca8258dd0cb7d9823708a8274d2542689c75b9b63cb69dd57d"
+    },
+    {
+      "path": "runtime-receipts/chat-project.json",
+      "size": 786,
+      "sha256": "195705241cf34266e2bdefdf4f36f475459542240be6253a881992ada28e2b71"
+    },
+    {
+      "path": "runtime-receipts/create-no-project.json",
+      "size": 786,
+      "sha256": "dded788e66771959d99760cb6ea7b4a0c2a84d9e55524d8367dd5f915ecad8a5"
+    },
+    {
+      "path": "runtime-receipts/create-project.json",
+      "size": 786,
+      "sha256": "2e658ae80b8be790cdd87018630ce3103a72afb03ac9946178b716f23936d149"
+    },
+    {
+      "path": "runtime-receipts/crew-no-project.json",
+      "size": 786,
+      "sha256": "9e6b50a21eae6c9b3049d7443e7628157b6ba7223462033670d696c3af206cb4"
+    },
+    {
+      "path": "runtime-receipts/crew-project.json",
+      "size": 786,
+      "sha256": "4ac8e644a7934f2585d3e0c8304526a1f750b8b32c951530cffab27f8e7b808a"
+    },
+    {
+      "path": "runtime-receipts/public-chat.json",
+      "size": 1332,
+      "sha256": "501688fa988668fa85b5a7d479a89a3ea8b7f5c32a3e5bfed547f70f5f6d1d75"
+    },
+    {
+      "path": "runtime-receipts/public-crew-configured.json",
+      "size": 413,
+      "sha256": "450c83775b3c6a223741938b0174211be58a9633dfaa7deb7fd3978e7d8e91d6"
+    },
+    {
+      "path": "runtime-receipts/public-failure-feedback.json",
+      "size": 1332,
+      "sha256": "9493cb606af4b5413bc3a09ce9ce5e3608ff263b208d4cbc0075064b9664fe25"
+    },
+    {
+      "path": "runtime-receipts/public-insufficient.json",
+      "size": 1338,
+      "sha256": "436c8622bad2d3897be0145be9c0f4352aecf062aaf2d821fb46b3db2018bd88"
+    },
+    {
+      "path": "runtime-receipts/public-skill-read.json",
+      "size": 1152,
+      "sha256": "5cdad0dc17f02cd1a8c8d40e3ced262b7013fbfac5ce0f890e4e563f32679105"
+    },
+    {
+      "path": "runtime-receipts/public-sufficient.json",
+      "size": 786,
+      "sha256": "78016c05108814666c5e57c1fafa5f6de17028f34fa8761783e1bff3ea8a2942"
+    },
+    {
+      "path": "runtime-receipts/v1-project-task-actual.json",
+      "size": 1152,
+      "sha256": "9ff9b87bec935060c21f4c3249b2b6164e2e63e19236a34da304dc97fd382917"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-loading.json",
+      "size": 3753,
+      "sha256": "108bc556d12a6ec56299427f2730edcb115d4bad85d752bef1029bc824f54e66"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-restore.json",
+      "size": 1884,
+      "sha256": "206db00badb25f5de5dd77cbc155eaa38af6834e36ccf30c0c28f5e7aea2eb1f"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-definition.json",
+      "size": 6322,
+      "sha256": "3261470cb7b4531dd597113f8e31493284e6e715b8df08a22e8a0d11108c2995"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-restore.json",
+      "size": 1343,
+      "sha256": "05db198ab551461619358dfdb7bd0cf0be5dda89e59ff4330ef658efc2ad28b1"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-245f9af4-3d8e-4b07-9cdc-caacdad23c97.json",
+      "size": 1124,
+      "sha256": "381ed268c7c40dc531be6e77d02f611915bb068f805ae39bd39ad474f025aee1"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-33d9a7a8-afae-4754-b903-a4df8e456bec.json",
+      "size": 2275,
+      "sha256": "56d8e2d90c0522978c48fa08f87c748303c936b840e95955bb124424cb82640d"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-739f76e3-8b9a-4efc-be40-0db95d859898.json",
+      "size": 1689,
+      "sha256": "c6b9aa969c30ebef5088002b15577f6f299d09c499b1daa73f832af75d2f2d98"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-9670ab7a-6a54-4e06-8d2c-6cac35755677.json",
+      "size": 1408,
+      "sha256": "93fbbf760fe52fe55daaadb7ceb8e81e91e7be776eceb288de20bf8f7e09498d"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-9d19b370-4976-4986-9197-fb3a40b86d01.json",
+      "size": 1405,
+      "sha256": "0d5bec03a0a2b2284389759f0080fd0bf278729123486a8585f6e6a4a41dc0af"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-bf7bf2e4-13f4-44e3-a449-32e9fbefba85.json",
+      "size": 1408,
+      "sha256": "84149cf492545fc702c571935cc95cc1423b77bc075c0ac7accea8f2110734f4"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-cc7cb83a-7a2d-4956-9fde-87568b274ba6.json",
+      "size": 1408,
+      "sha256": "ed3460fd475a9318489bf6397e4f397645fcd0e1b122180de2f3e5210879ef1c"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-e06e1cef-5d29-40e5-9ea9-82d60a692e09.json",
+      "size": 1408,
+      "sha256": "96106e5181bf105bb1c697fac7748464a1ef87d0156f58141b367bc9a0beb738"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-e628e684-391e-4d1d-bd78-111051840649.json",
+      "size": 1695,
+      "sha256": "2992a4b4aeb94f4d7a2a8b55c07e0b9eb8d935b76d3a83abcf16416fd9e195f0"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-e62bbede-6ddf-4962-b754-d7fb58c71c50.json",
+      "size": 1408,
+      "sha256": "6af68087796e8e3f120720552bc4d79743093f8a28f81948b35050ab1581a4ae"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-e892d76a-0694-472a-b039-bf5e495a131e.json",
+      "size": 1408,
+      "sha256": "c60423acb56ef3c3bda108f46c44a4863b13534c2ca738daed00590f56b1634b"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-fed8fe96-4593-4a87-a882-b81ce4271cb0.json",
+      "size": 1408,
+      "sha256": "798963eb5f6d0718df9745045dac060c22d2d6ada0d0983e981d3770a46f73a1"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-1.json",
+      "size": 3727,
+      "sha256": "79d4eb075a365edf885f4705a2b4a96b5d838740958dc05b33798b3bf933df7d"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-2.json",
+      "size": 6287,
+      "sha256": "0e485248f9e0e1ac188db8c64489f675f1c6d934660db01d6bf8b92d16ecff19"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-1.json",
+      "size": 1638,
+      "sha256": "5792f5a8b64a069bdf919280dd0d065582769b7d687c6ba47de61a983f9c6d60"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-2.json",
+      "size": 1636,
+      "sha256": "9bc8e26a1b286f73be06db6f3e47c86dcbb25c72e87981254cfaf38064943108"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-chat.json",
+      "size": 2509,
+      "sha256": "f5f017958b684cc9fc2e9458faf8b4e00525105b7a07bfabbe5f9e7ac218609a"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-create.json",
+      "size": 2513,
+      "sha256": "c8bd32331c08ea56872541dd06170214eda6023bc98641ac103b0931d9fea888"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-crew.json",
+      "size": 2509,
+      "sha256": "67ba940480164d23f77ff8aec83274079ed80ef05c45252872215bb956238a74"
+    },
+    {
+      "path": "runtime-receipts/workbench-v1-restore.json",
+      "size": 1527,
+      "sha256": "17c887d8b940641cd2a34c23a231b9ac04b5efd0b66c57cc2170de7d9246175e"
+    },
+    {
+      "path": "source-snapshot.json",
+      "size": 26053,
+      "sha256": "32d96819d86064f50b89bad0941b7e5fa2b51b7135e272e248a8d13d4dab4831"
+    }
+  ]
+}

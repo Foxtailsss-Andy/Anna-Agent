@@ -12,6 +12,7 @@ import {
 } from "@anna/harness-v2";
 
 import { createSkillArtifact } from "./create-artifact";
+import { PUBLIC_WEB_READ_MAX_TEXT_CHARS } from "./workbench-public-web";
 
 const readOnlyInputSchema: Schema<unknown> = Object.freeze({
   parse(input: unknown) {
@@ -71,6 +72,27 @@ const webSearchInputSchema: Schema<unknown> = Object.freeze({
   },
 });
 
+const webReadInputSchema: Schema<unknown> = Object.freeze({
+  parse(input: unknown) {
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      throw new Error("web_read input requires an object");
+    }
+    const value = input as Record<string, unknown>;
+    if (
+      typeof value.url !== "string"
+      || value.url.trim() === ""
+      || (value.offset !== undefined && (typeof value.offset !== "number" || !Number.isSafeInteger(value.offset) || value.offset < 0))
+      || (value.limit !== undefined && (typeof value.limit !== "number" || !Number.isSafeInteger(value.limit) || value.limit <= 0 || value.limit > PUBLIC_WEB_READ_MAX_TEXT_CHARS))
+      || Object.keys(value).some((key) => !["url", "offset", "limit"].includes(key))
+    ) throw new Error("web_read input has invalid fields");
+    return {
+      url: value.url,
+      ...(value.offset === undefined ? {} : { offset: value.offset }),
+      ...(value.limit === undefined ? {} : { limit: value.limit }),
+    };
+  },
+});
+
 const chatEmitPageInputSchema: Schema<unknown> = strictObjectSchema(
   ["title", "html"],
   ["title", "html"],
@@ -111,10 +133,20 @@ const productionToolCatalog: readonly ToolDefinition[] = Object.freeze([
     replayPolicy: "safe" as const,
     inputSchema: webSearchInputSchema,
   }),
+  Object.freeze({
+    name: "web_read",
+    replayPolicy: "safe" as const,
+    inputSchema: webReadInputSchema,
+  }),
 ]);
 
 export type ProductionWebSearchProvider = (
   query: string,
+  signal: AbortSignal,
+) => Promise<ToolResult>;
+
+export type ProductionWebReadProvider = (
+  input: unknown,
   signal: AbortSignal,
 ) => Promise<ToolResult>;
 
@@ -124,6 +156,7 @@ export interface ProductionToolGatewayOptions {
   readonly workspaceRoot: string;
   readonly workspaceRootFor?: (command: StartRun) => string | undefined;
   readonly webSearch?: ProductionWebSearchProvider;
+  readonly webRead?: ProductionWebReadProvider;
   /** Product adapters may add a typed, allowlisted business tool surface. */
   readonly dynamicTools?: readonly ToolDefinition[];
   readonly dynamicToolCall?: (request: Parameters<ToolGateway["execute"]>[0], signal: AbortSignal) => Promise<ToolResult>;
@@ -150,9 +183,14 @@ export function createProductionToolGateway(
     channelId: options.command.channelId,
   };
   const allowedTools = new Set(options.command.runProfileSnapshot.allowedTools);
+  const persistedCapabilityIds = new Set(
+    options.command.runProfileSnapshot.capabilityPolicy?.catalog.capabilities.map((item) => item.id) ?? [],
+  );
+  const dynamicTools = options.dynamicTools ?? [];
   const catalog = [
-    ...productionToolCatalog,
-    ...(options.dynamicTools ?? []),
+    ...dynamicTools.filter((definition) => persistedCapabilityIds.has(definition.name)),
+    ...productionToolCatalog.filter((definition) => !persistedCapabilityIds.has(definition.name)),
+    ...dynamicTools.filter((definition) => !persistedCapabilityIds.has(definition.name)),
   ].filter((definition, index, definitions) =>
     allowedTools.has(definition.name)
     && definitions.findIndex((candidate) => candidate.name === definition.name) === index,
@@ -203,6 +241,15 @@ export function createProductionToolGateway(
             }
             const input = request.input as { query: string };
             return options.webSearch(input.query, signal);
+          }
+          if (request.name === "web_read") {
+            if (options.webRead === undefined) {
+              return {
+                status: "failed",
+                output: { reason: "web_read_provider_not_configured" },
+              };
+            }
+            return options.webRead(request.input, signal);
           }
           const dynamic = options.dynamicTools?.some((definition) => definition.name === request.name);
           if (dynamic && options.dynamicToolCall !== undefined) {

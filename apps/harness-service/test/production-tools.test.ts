@@ -977,10 +977,12 @@ test("production WebSearch uses the configured provider through the durable Gate
       status: "succeeded",
       output: {
         query: "durable runs",
+        truncated: false,
         results: [{
           title: "Durable Runs",
           url: "https://example.com/durable-runs",
           snippet: "A bounded result.",
+          fetched_at: expect.any(String),
         }],
       },
     });

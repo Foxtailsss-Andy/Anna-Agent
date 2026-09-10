@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { mkdir, open, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -17,10 +17,21 @@ const roundRoot = join(repositoryRoot, "evals/workbench/wb02/runs", roundId);
 const evidenceRoot = join(roundRoot, "evidence");
 const runtimeReceiptRoot = join(evidenceRoot, "runtime-receipts");
 const privateRoot = join(repositoryRoot, ".tmp-tests/wb02/evidence", roundId);
-const requiredTsTest = "test/workbench-capability-loading.test.ts";
-const requiredSkillTests = [
+const requiredTsTests = [
+  "test/workbench-capability-loading.test.ts",
   "test/workbench-capability-skills.test.ts",
   "test/workbench-capability-skill-restore.test.ts",
+  "test/workbench-capability-public.test.ts",
+  "test/workbench-capability-public-network.test.ts",
+  "test/web-search.test.ts",
+];
+const requiredSourcePaths = [
+  "apps/harness-service/src/workbench-public-web.ts",
+  "apps/harness-service/package.json",
+  "package-lock.json",
+  "apps/harness-service/src/production-tools.ts",
+  "apps/harness-service/test/web-search.test.ts",
+  "apps/harness-service/test/production-tools.test.ts",
 ];
 const requiredPythonTest = "tests/contracts/test_workbench_capabilities.py";
 const ownedPaths = [
@@ -29,6 +40,10 @@ const ownedPaths = [
   ".github/workflows/ci.yml",
   "package.json",
   "apps/harness-service/src/production.ts",
+  "apps/harness-service/src/production-tools.ts",
+  "apps/harness-service/src/workbench-public-web.ts",
+  "apps/harness-service/package.json",
+  "package-lock.json",
   "apps/harness-service/src/workbench-capabilities.ts",
   "apps/harness-service/src/workbench-skills.ts",
   "packages/harness-v2/src/index.ts",
@@ -36,15 +51,20 @@ const ownedPaths = [
   "packages/harness-v2/src/skill-catalog.ts",
   "apps/harness-service/test/workbench-capability-skills.test.ts",
   "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+  "apps/harness-service/test/workbench-capability-public.test.ts",
+  "apps/harness-service/test/workbench-capability-public-network.test.ts",
+  "apps/harness-service/test/web-search.test.ts",
+  "apps/harness-service/test/production-tools.test.ts",
 ];
 
 // Round creation is intentionally exclusive. Do this before any evidence work
 // so a reused ID cannot overwrite an earlier failed or partial round.
 await mkdir(dirname(roundRoot), { recursive: true });
 await mkdir(roundRoot);
+await mkdir(dirname(privateRoot), { recursive: true });
+await mkdir(privateRoot, { mode: 0o700 });
 await mkdir(evidenceRoot);
 await mkdir(runtimeReceiptRoot, { mode: 0o700 });
-await mkdir(privateRoot, { recursive: true });
 
 const generatedAt = new Date().toISOString();
 
@@ -64,6 +84,60 @@ async function run(program, args, env = process.env) {
       output: `${error.stdout ?? ""}${error.stderr ?? error.message ?? ""}`,
     };
   }
+}
+
+async function runTestCommand(id, program, args, env, sourcePaths) {
+  const commandRoot = join(privateRoot, id);
+  await mkdir(commandRoot);
+  const stdoutPath = join(commandRoot, "stdout.log");
+  const stderrPath = join(commandRoot, "stderr.log");
+  const [stdoutFile, stderrFile] = await Promise.all([
+    open(stdoutPath, "wx"),
+    open(stderrPath, "wx"),
+  ]);
+  const argv = [program, ...args];
+  const cwd = repositoryRoot;
+  const startedAt = new Date().toISOString();
+  const sourceHashesBefore = await hashFiles(sourcePaths);
+  await writeFile(join(commandRoot, "command.json"), `${JSON.stringify({
+    argv,
+    cwd,
+    startedAt,
+    sourceHashesBefore,
+  }, null, 2)}\n`, { flag: "wx" });
+  const child = spawn(program, args, {
+    cwd,
+    env,
+    stdio: ["ignore", stdoutFile.fd, stderrFile.fd],
+  });
+  const childResult = await new Promise((resolveResult) => {
+    child.once("error", (error) => resolveResult({ exitCode: 1, signal: null, error: error.message }));
+    child.once("close", (exitCode, signal) => resolveResult({ exitCode, signal, error: null }));
+  });
+  await Promise.all([stdoutFile.close(), stderrFile.close()]);
+  const sourceHashesAfter = await hashFiles(sourcePaths);
+  const endedAt = new Date().toISOString();
+  await writeFile(join(commandRoot, "exit.json"), `${JSON.stringify({
+    endedAt,
+    exitCode: childResult.exitCode,
+    signal: childResult.signal,
+    error: childResult.error,
+    sourceHashesAfter,
+  }, null, 2)}\n`, { flag: "wx" });
+  const [stdout, stderr] = await Promise.all([
+    readFile(stdoutPath, "utf8"),
+    readFile(stderrPath, "utf8"),
+  ]);
+  return {
+    command: argv.join(" "),
+    argv,
+    cwd,
+    exitCode: childResult.exitCode,
+    signal: childResult.signal,
+    output: `${stdout}${stderr}`,
+    stdout,
+    stderr,
+  };
 }
 
 function redact(output) {
@@ -120,7 +194,7 @@ async function filesBelow(relativeRoot, predicate = () => true) {
 
 async function collectCapabilityTests() {
   const tsTests = (await filesBelow("apps/harness-service/test", (path) =>
-    /^apps\/harness-service\/test\/workbench-capability-.*\.test\.ts$/.test(path))).map((path) =>
+    /^apps\/harness-service\/test\/(?:workbench-capability-.*|web-search)\.test\.ts$/.test(path))).map((path) =>
     path.slice("apps/harness-service/".length));
   const pythonTests = (await filesBelow("tests/contracts", (path) =>
     /(?:workbench[-_]capabilit|capabilit).*\.py$/.test(path)));
@@ -134,6 +208,7 @@ async function collectSourcePaths() {
   const fixed = [
     "apps/harness-service/src/production.ts",
     "apps/harness-service/src/production-tools.ts",
+    "apps/harness-service/src/workbench-public-web.ts",
     "apps/harness-service/src/product-session.ts",
     "apps/harness-service/src/product-facade.ts",
     "apps/harness-service/src/pi-kernel-build-identity.ts",
@@ -141,6 +216,8 @@ async function collectSourcePaths() {
     "packages/harness-v2/src/index.ts",
     "packages/harness-v2/src/run-profile.ts",
     "apps/harness-service/test/workbench-session-fixture.ts",
+    "apps/harness-service/test/web-search.test.ts",
+    "apps/harness-service/test/production-tools.test.ts",
     "packages/omp-loop-kernel/src/index.ts",
     "packages/omp-loop-kernel/src/kernel-identity.ts",
     "packages/omp-loop-kernel/src/kernel-source.ts",
@@ -222,10 +299,12 @@ async function runTsTests(tsTests) {
       blockingReason: "required_test_not_generated",
     };
   }
-  const result = await run(
+  const result = await runTestCommand(
+    "issue-ts-workbench-capabilities",
     "npm",
     ["run", "test", "--workspace=@anna/harness-service", "--", "--run", ...tsTests],
     { ...process.env, ANNA_WB02_RECEIPT_DIR: runtimeReceiptRoot },
+    sourcePathsBefore,
   );
   return {
     command: result.command,
@@ -249,10 +328,10 @@ async function runPythonTest(pythonTests) {
       blockingReason: "required_test_not_generated",
     };
   }
-  const result = await run("uv", ["run", "pytest", "-q", ...pythonTests], {
+  const result = await runTestCommand("issue-python-workbench-capabilities", "uv", ["run", "pytest", "-q", ...pythonTests], {
     ...process.env,
     ANNA_WB02_RECEIPT_DIR: runtimeReceiptRoot,
-  });
+  }, sourcePathsBefore);
   return {
     command: result.command,
     exitCode: result.exitCode,
@@ -265,23 +344,23 @@ async function runPythonTest(pythonTests) {
 
 const sourcePathsBefore = await collectSourcePaths();
 const sourceHashesBefore = await hashFiles(sourcePathsBefore);
+const requiredSourcePathsMissing = requiredSourcePaths.filter((path) =>
+  !sourceHashesBefore.some((entry) => entry.path === path && entry.present));
 const sourceHeadBefore = await gitHead();
 const ownedHashesBefore = await hashFiles(ownedPaths);
 const discoveredBefore = await collectCapabilityTests();
 const tsTests = discoveredBefore.tsTests;
-const missingTsTests = [requiredTsTest, ...requiredSkillTests].filter((path) => !tsTests.includes(path));
+const missingTsTests = requiredTsTests.filter((path) => !tsTests.includes(path));
 const pythonTests = discoveredBefore.pythonTests;
 const missingPythonTests = pythonTests.includes(requiredPythonTest) ? [] : [requiredPythonTest];
 
 const tsResult = await runTsTests(tsTests);
 const pythonResult = await runPythonTest(pythonTests);
-await writeFile(join(privateRoot, "ts.log"), tsResult.output, "utf8");
-await writeFile(join(privateRoot, "ts.exit"), `${tsResult.exitCode ?? "not_run"}\n`, "utf8");
-await writeFile(join(privateRoot, "python.log"), pythonResult.output, "utf8");
-await writeFile(join(privateRoot, "python.exit"), `${pythonResult.exitCode ?? "not_run"}\n`, "utf8");
 
 const sourcePathsAfter = await collectSourcePaths();
 const sourceHashesAfter = await hashFiles(sourcePathsAfter);
+const requiredSourcePathsMissingAfter = requiredSourcePaths.filter((path) =>
+  !sourceHashesAfter.some((entry) => entry.path === path && entry.present));
 const sourceHeadAfter = await gitHead();
 const ownedHashesAfter = await hashFiles(ownedPaths);
 const sourcePathChanged = JSON.stringify(sourcePathsBefore) !== JSON.stringify(sourcePathsAfter);
@@ -356,7 +435,10 @@ for (const path of missingPythonTests) {
 }
 
 const commandFailed = receipts.some((receipt) => receipt.status === "fail");
-const missingRequired = missingTsTests.length > 0 || missingPythonTests.length > 0;
+const missingRequired = missingTsTests.length > 0
+  || missingPythonTests.length > 0
+  || requiredSourcePathsMissing.length > 0
+  || requiredSourcePathsMissingAfter.length > 0;
 const counts = { pass: 0, fail: 0, blocked: 0, not_run: 0 };
 for (const receipt of receipts) {
   if (receipt.status in counts) counts[receipt.status] += 1;
@@ -377,6 +459,9 @@ const result = {
   sourceScopePathsAfter: sourcePathsAfter,
   sourceHashesBefore,
   sourceHashesAfter,
+  requiredSourcePaths,
+  requiredSourcePathsMissing,
+  requiredSourcePathsMissingAfter,
   modulesHashBefore,
   modulesHashAfter,
   sourceShaBefore: sourceHeadBefore,
@@ -399,7 +484,7 @@ const result = {
   engineeringModel: "controller:gpt-6-astra/xhigh;coding:gpt-5.6-luna/xhigh",
   testDiscovery: {
     ts: {
-      required: [requiredTsTest, ...requiredSkillTests],
+      required: requiredTsTests,
       discovered: tsTests,
       missing: missingTsTests,
       testFileCount: tsTests.length,
@@ -418,7 +503,9 @@ const result = {
   status: commandFailed || missingRequired || sourceChanged || ownedChanged ? "fail" : "pass",
   blockingReason: sourceChanged || ownedChanged
     ? "source_changed_during_run"
-    : missingRequired
+    : requiredSourcePathsMissing.length > 0 || requiredSourcePathsMissingAfter.length > 0
+      ? "required_source_missing"
+      : missingRequired
       ? "required_test_not_generated"
       : commandFailed
         ? "focused_command_failed"
@@ -430,6 +517,9 @@ await writeFile(join(evidenceRoot, "source-snapshot.json"), `${JSON.stringify({
   sourceScopePathsAfter: sourcePathsAfter,
   sourceHashesBefore,
   sourceHashesAfter,
+  requiredSourcePaths,
+  requiredSourcePathsMissing,
+  requiredSourcePathsMissingAfter,
   modulesHashBefore,
   modulesHashAfter,
   sourceShaBefore: sourceHeadBefore,
