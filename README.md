@@ -154,6 +154,8 @@ Please keep credentials, local state, runtime logs, provider responses, and real
 
 Anna grew from a personal exploration of AI agents and Harness design. Pi Agent and Oh-my-Pi have been important technical references. Thank you to the open-source community and everyone sharing feedback along the way.
 
-**Hiker** is an external ERP collaboration by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif). Its platform, server, deployment, and business data are not included here, and Hiker is not currently open source. Anna's license covers the Anna-side connector and UI integration, and does not extend to Hiker.
+**[Hiker ERP](https://github.com/kc8zshnt6n-gif/Hiker-ERP)** is an external ERP collaboration by [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif), connecting procurement, inventory, treasury, finance, and other enterprise workflows. If you are interested in enterprise software and AI agents working with business systems, take a look at its [product walkthrough and architecture](https://github.com/kc8zshnt6n-gif/Hiker-ERP).
+
+The public Hiker repository contains product presentation materials; its source code remains private. Anna connects to explicitly exposed Hiker capabilities through MCP. Hiker's platform, server, deployment, and business data are not included here. Anna's license covers the Anna-side connector and UI integration, and does not extend to Hiker.
 
 [Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) is the canonical public repository. Anna is released under the [MIT License](LICENSE); third-party dependency notices are listed in [NOTICE.md](NOTICE.md).
