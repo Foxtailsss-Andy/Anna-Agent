@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "caseId": "wb02-capability-increment",
+  "generatedAt": "2026-09-10T14:07:51.225Z",
+  "evidenceMode": "D",
+  "provider": "blocked",
+  "gitHead": "857bba3bbf593c7b6bb268c56d3bb894a39d93f7",
+  "files": [
+    {
+      "path": "increment-result.json",
+      "size": 32353,
+      "sha256": "f8ee366660de37d58730156955e70f18d2940c25b8a3b29743fe270b18bf9c2b"
+    },
+    {
+      "path": "receipt-python-workbench-capabilities.json",
+      "size": 337,
+      "sha256": "088d45916f42b6b7c203850ab52a851187e5fd843afc8573d8bd7d21b20613f3"
+    },
+    {
+      "path": "receipt-ts-workbench-capabilities.json",
+      "size": 936,
+      "sha256": "d677e254820560d23f718b3edb936b625f43098ddeb72c4df4ed134163220929"
+    },
+    {
+      "path": "runtime-receipts/v1-project-task-actual.json",
+      "size": 1152,
+      "sha256": "417155cd8fca22235ba098c03092c4c83c27e0876e4ce1084e2b19270eeac3cf"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-loading.json",
+      "size": 3753,
+      "sha256": "c3ae2431b7aacb5cb968d9db13e79f748c27302fd1ec625b2584b8d303bda1a2"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-restore.json",
+      "size": 1884,
+      "sha256": "ae8aa37317a7f4ace606d3b4c0376f6ff7efa2c8863b63355433f410202c1b53"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-definition.json",
+      "size": 6322,
+      "sha256": "2e55d754d4e3c83d8736ab22521ff8fc5fe2a885224e5f1a7b3a48ab744edae5"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-restore.json",
+      "size": 1343,
+      "sha256": "8388aba1206dc114ccea9146c719498909627aa5f2d5763cd361e7aaa6b3f1d1"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-0c0ceb11-bff5-4605-b6ae-8c0afeb2b0b0.json",
+      "size": 1124,
+      "sha256": "e58862e0ad91f7a62d990131bec203474c1353915e8d96acd822d5e2096b5d15"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-24af5d1c-f26e-4ee3-9e10-d104b394b66d.json",
+      "size": 1408,
+      "sha256": "61a7eb32b27d62e36ecc06f5055f44f3aaca3418500872302f72d53ba2f602b6"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-2f6e888a-5618-4803-9acc-a7623af432d1.json",
+      "size": 1405,
+      "sha256": "31cf138faa6f67c58dc98a2accb3a90c30fdd9f691d3d345dd51f418d0bc5a55"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-34c58394-16c1-40a7-838f-9fbf3d771224.json",
+      "size": 1408,
+      "sha256": "2fc99545673d1505a805453e3adb4426377e86c473cf3396432573153019293f"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-3db7b6c6-ee03-40b1-935f-66082c7c2221.json",
+      "size": 1408,
+      "sha256": "ba80bae5656ffd2ddde89f08d5c6485af6defbcad0bf2029693555b3e22d4708"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-55c036e1-171f-4e98-98cc-a5d690a2e96c.json",
+      "size": 1695,
+      "sha256": "c2eedf5d75233085da90e3032663c0bda5422a74a550f42a865aa8faafaf8315"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-6bb240e7-56a5-4174-9b6f-5419eb525849.json",
+      "size": 1689,
+      "sha256": "3ed48178ee51f59a9328c711f1a2eedd8dc642ccbd8627b61855087ee20cd0ce"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-984ba6cd-e24b-4993-a227-06b1ef8ed970.json",
+      "size": 1408,
+      "sha256": "130bcec13881cff2b9082561f15ad092aa376075635a1ff626594c125e916c37"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-ab87df8c-714f-4a97-9817-065247ee5ad4.json",
+      "size": 1408,
+      "sha256": "e8eac9a47c791aaf39b33efb3c1fbcf505d47d208375be0c87c7bfe798b787bc"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-b5788353-d0d2-4d37-b883-442c2348482b.json",
+      "size": 1408,
+      "sha256": "2d5480d665c58ff7b035f30fdd19992acd2f9ba51fd031d26590589f8dd8477c"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-c54e0aed-71ba-4500-9122-de812d9c8b27.json",
+      "size": 2275,
+      "sha256": "53417b790b8e5b5189cdd3e6f79b3f6f1800bf4991d879fde7b357064ce9f808"
+    },
+    {
+      "path": "runtime-receipts/workbench-capability-skill-run-fbdd7eff-b752-4820-8dcc-06615e0cb372.json",
+      "size": 1408,
+      "sha256": "9254062e1c8ffafab18aa81c3453c34d0dc48cd44cae57aae07b399665390aa4"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-1.json",
+      "size": 3727,
+      "sha256": "d1bf76eb7305a5cd8ee1b3c1015d5c9300d3e52d3f753e40af6d51ad3ed3e27b"
+    },
+    {
+      "path": "runtime-receipts/workbench-observation-2.json",
+      "size": 6287,
+      "sha256": "c06f7b338ffcf36dc40503d43b7a62bdbafc3ea00316b41eed1b8ef839f40c6f"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-1.json",
+      "size": 1638,
+      "sha256": "73143268bf9529df1b9e7a230a963953c86f530aa3085b8446159b29de4e697a"
+    },
+    {
+      "path": "runtime-receipts/workbench-revocation-2.json",
+      "size": 1636,
+      "sha256": "e07e1be334e3ecdf3e6d6a5f7f7f22cc81edf02385835b76c993b067f738fa65"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-chat.json",
+      "size": 2509,
+      "sha256": "c642c9a568efadc2ebcf4e0811200a06de8229b697740b4dff8e4be0f7758602"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-create.json",
+      "size": 2513,
+      "sha256": "82e0bfaf89ed6b7c3b851832e0abbb889c97ec23ba4260bb0bc7290cd9b96a34"
+    },
+    {
+      "path": "runtime-receipts/workbench-scope-crew.json",
+      "size": 2509,
+      "sha256": "e4be39ffb0a105b236d021662bb11e71bc29dcdb164f8aaf9d6a2d0183f2a5be"
+    },
+    {
+      "path": "runtime-receipts/workbench-v1-restore.json",
+      "size": 1527,
+      "sha256": "17c887d8b940641cd2a34c23a231b9ac04b5efd0b66c57cc2170de7d9246175e"
+    },
+    {
+      "path": "source-snapshot.json",
+      "size": 23123,
+      "sha256": "18d6aef8e32d0e1074913df42533787f7caa36696dd72ffb3cf4e7b067c15a8e"
+    }
+  ]
+}

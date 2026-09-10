@@ -181,9 +181,13 @@ export {
   type WorkspaceReadRevocation,
 } from "./memory-types";
 export {
+  buildSkillCatalog,
   loadSkillCatalogEntry,
+  parseSkillCatalogSnapshot,
+  WORKBENCH_SKILL_CATALOG_VERSION,
   type SkillCatalogEntry,
   type SkillCatalogDocument,
+  type SkillCatalogSnapshot,
   type SkillProvenance,
 } from "./skill-catalog";
 export {

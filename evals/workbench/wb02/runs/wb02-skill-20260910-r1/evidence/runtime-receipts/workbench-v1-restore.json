@@ -1,0 +1,98 @@
+{
+  "run_id": "run-wb02-v1",
+  "resumed_model_requests": 2,
+  "resumed_events": [
+    {
+      "type": "run.queued"
+    },
+    {
+      "type": "run.started"
+    },
+    {
+      "type": "run.context.ready"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "run.model.requested"
+    },
+    {
+      "type": "omp.model.response"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "omp.tool.dispatch",
+      "tool": "read_only"
+    },
+    {
+      "type": "omp.tool.response"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.resumed"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "run.model.requested"
+    },
+    {
+      "type": "omp.model.response"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "omp.tool.dispatch",
+      "tool": "read_only"
+    },
+    {
+      "type": "omp.tool.response"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "run.model.requested"
+    },
+    {
+      "type": "omp.model.response"
+    },
+    {
+      "type": "omp.transcript.message"
+    },
+    {
+      "type": "run.progress"
+    },
+    {
+      "type": "run.eval.contract"
+    },
+    {
+      "type": "run.completed"
+    }
+  ]
+}

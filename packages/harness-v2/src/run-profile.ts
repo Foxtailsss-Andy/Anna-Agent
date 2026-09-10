@@ -7,7 +7,11 @@ import type {
   WorkerProfileId,
 } from "./contracts";
 import { SchemaValidationError, expectRecord } from "./schema";
-import type { SkillCatalogEntry } from "./skill-catalog";
+import {
+  parseSkillCatalogSnapshot,
+  type SkillCatalogEntry,
+  type SkillCatalogSnapshot,
+} from "./skill-catalog";
 import type { ToolDefinition } from "./tool-gateway";
 import {
   parseCapabilityPolicySnapshot,
@@ -106,6 +110,7 @@ export interface RunProfile {
   evalPolicy: EvalPolicy;
   artifactContract: ArtifactContract;
   terminalRules: TerminalRules;
+  readonly skillCatalog?: SkillCatalogSnapshot;
   readonly capabilityPolicy?: CapabilityPolicySnapshot;
   readonly kernel?: KernelDescriptorV1;
 }
@@ -138,6 +143,7 @@ export interface ResolvedRunProfile {
   readonly evalPolicy: Readonly<EvalPolicy>;
   readonly artifactContract: Readonly<ArtifactContract>;
   readonly terminalRules: Readonly<TerminalRules>;
+  readonly skillCatalog?: SkillCatalogSnapshot;
   readonly capabilityPolicy?: CapabilityPolicySnapshot;
   readonly kernel?: KernelDescriptorV1;
 }
@@ -491,9 +497,10 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
     "evalPolicy",
     "artifactContract",
     "terminalRules",
+    "skillCatalog",
     "capabilityPolicy",
     "kernel",
-  ], ["capabilityPolicy", "kernel"]);
+  ], ["skillCatalog", "capabilityPolicy", "kernel"]);
   const workerProfile = exactRecord(value.workerProfile, "RunProfileSnapshot.workerProfile", [
     "id",
     "version",
@@ -548,6 +555,9 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
   ]);
   const kernel = Object.hasOwn(value, "kernel")
     ? parseKernelDescriptor(value.kernel)
+    : undefined;
+  const skillCatalog = Object.hasOwn(value, "skillCatalog")
+    ? parseSkillCatalogSnapshot(value.skillCatalog)
     : undefined;
 
   const snapshot: Omit<ResolvedRunProfile, "hash"> = {
@@ -636,6 +646,7 @@ export function parseResolvedRunProfileSnapshot(input: unknown): ResolvedRunProf
         "RunProfileSnapshot.terminalRules.stopCondition",
       ),
     },
+    ...(skillCatalog === undefined ? {} : { skillCatalog }),
     ...(capabilityPolicy === undefined ? {} : { capabilityPolicy }),
     ...(kernel === undefined ? {} : { kernel }),
   };
@@ -798,6 +809,9 @@ export function resolveRunProfile(
   const kernel = runProfile?.kernel === undefined
     ? undefined
     : parseKernelDescriptor(runProfile.kernel);
+  const skillCatalog = runProfile?.skillCatalog === undefined
+    ? undefined
+    : parseSkillCatalogSnapshot(runProfile.skillCatalog);
 
   if (!modelIsAllowed(model, channelModels) || !modelIsAllowed(model, workerModels)) {
     throw new Error("RunProfile.model must be allowed by ChannelPolicy and WorkerProfile");
@@ -827,7 +841,7 @@ export function resolveRunProfile(
   });
   const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
   const forbiddenTools = new Set(skills.flatMap((skill) => skill.forbiddenTools));
-  const capabilityHostTools = new Set(["capabilities.search", "capabilities.load"]);
+  const capabilityHostTools = new Set(["capabilities.search", "capabilities.load", "skills.load"]);
   const allowedTools = channelTools.filter(
     (tool) =>
       ((capabilityPolicy !== undefined && (skills.length === 0 || capabilityHostTools.has(tool)))
@@ -859,6 +873,7 @@ export function resolveRunProfile(
     evalPolicy,
     artifactContract,
     terminalRules,
+    ...(skillCatalog === undefined ? {} : { skillCatalog }),
     ...(capabilityPolicy === undefined ? {} : { capabilityPolicy }),
     ...(kernel === undefined ? {} : { kernel }),
   };

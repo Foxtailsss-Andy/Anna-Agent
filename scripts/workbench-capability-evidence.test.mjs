@@ -63,8 +63,11 @@ test("WB-02 runner records missing required loading and Python tests as not_run"
     assert.equal(evidence.ownedChanged, false);
     assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/src/production.ts"));
     assert.ok(evidence.sourceScopePathsBefore.includes("packages/harness-v2/src/capability-catalog.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("packages/harness-v2/src/skill-catalog.ts"));
     assert.ok(evidence.sourceScopePathsBefore.includes("packages/harness-v2/src/index.ts"));
     assert.ok(evidence.sourceScopePathsBefore.includes("packages/harness-v2/src/run-profile.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-capability-skills.test.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-capability-skill-restore.test.ts"));
     assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-session-fixture.ts"));
     assert.equal(evidence.sourceScopePathsBefore.includes("apps/harness-service/src/run-profile.ts"), false);
     assert.equal(evidence.sourceScopePathsBefore.includes("apps/harness-service/src/product-task.ts"), false);
@@ -100,10 +103,52 @@ test("WB-02 required Python guard fails when another capability test is present"
   }
 });
 
+test("WB-02 Skill tests are independently required", async () => {
+  const missingRestore = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skills.test.ts",
+    ],
+  });
+  try {
+    const result = await runNode(missingRestore.runner, missingRestore.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(missingRestore.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.deepEqual(evidence.testDiscovery.ts.missing, ["test/workbench-capability-skill-restore.test.ts"]);
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-skill-restore.test.ts" && receipt.status === "not_run"));
+  } finally {
+    await rm(missingRestore.root, { recursive: true, force: true });
+  }
+
+  const missingSkill = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+    ],
+  });
+  try {
+    const result = await runNode(missingSkill.runner, missingSkill.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(missingSkill.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.deepEqual(evidence.testDiscovery.ts.missing, ["test/workbench-capability-skills.test.ts"]);
+    assert.ok(evidence.receipts.some((receipt) => receipt.id === "missing-workbench-capability-skills.test.ts" && receipt.status === "not_run"));
+  } finally {
+    await rm(missingSkill.root, { recursive: true, force: true });
+  }
+});
+
 test("WB-02 source snapshot catches a changed capability core module while unchanged synthetic run passes", async () => {
   const passingFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: ["apps/harness-service/test/workbench-capability-loading.test.ts"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skills.test.ts",
+      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+    ],
   });
   try {
     const result = await runNode(passingFixture.runner, passingFixture.env);
@@ -111,13 +156,21 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
     const evidence = await readEvidence(passingFixture.roundRoot);
     assert.equal(evidence.status, "pass");
     assert.equal(evidence.sourceChanged, false);
+    assert.ok(evidence.sourceScopePathsBefore.includes("packages/harness-v2/src/skill-catalog.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-capability-skills.test.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("apps/harness-service/test/workbench-capability-skill-restore.test.ts"));
+    assert.ok(evidence.sourceScopePathsBefore.includes("skills/harness-v2/general-assistant/SKILL.md"));
   } finally {
     await rm(passingFixture.root, { recursive: true, force: true });
   }
 
   const changedFixture = await createSyntheticFixture({
     pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
-    tsFiles: ["apps/harness-service/test/workbench-capability-loading.test.ts"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skills.test.ts",
+      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+    ],
     mutatePath: "packages/harness-v2/src/capability-catalog.ts",
   });
   try {
@@ -133,6 +186,48 @@ test("WB-02 source snapshot catches a changed capability core module while uncha
   } finally {
     await rm(changedFixture.root, { recursive: true, force: true });
   }
+
+  const changedSkillFixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skills.test.ts",
+      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+    ],
+    mutatePath: "packages/harness-v2/src/skill-catalog.ts",
+  });
+  try {
+    const result = await runNode(changedSkillFixture.runner, changedSkillFixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(changedSkillFixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.equal(evidence.sourceChanged, true);
+    assert.equal(evidence.blockingReason, "source_changed_during_run");
+    assert.notEqual(evidence.modulesHashBefore, evidence.modulesHashAfter);
+  } finally {
+    await rm(changedSkillFixture.root, { recursive: true, force: true });
+  }
+
+  const changedSkillDocumentFixture = await createSyntheticFixture({
+    pythonFiles: ["tests/contracts/test_workbench_capabilities.py"],
+    tsFiles: [
+      "apps/harness-service/test/workbench-capability-loading.test.ts",
+      "apps/harness-service/test/workbench-capability-skills.test.ts",
+      "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
+    ],
+    mutatePath: "skills/harness-v2/general-assistant/SKILL.md",
+  });
+  try {
+    const result = await runNode(changedSkillDocumentFixture.runner, changedSkillDocumentFixture.env);
+    assert.notEqual(result.code, 0);
+    const evidence = await readEvidence(changedSkillDocumentFixture.roundRoot);
+    assert.equal(evidence.status, "fail");
+    assert.equal(evidence.sourceChanged, true);
+    assert.equal(evidence.blockingReason, "source_changed_during_run");
+    assert.notEqual(evidence.modulesHashBefore, evidence.modulesHashAfter);
+  } finally {
+    await rm(changedSkillDocumentFixture.root, { recursive: true, force: true });
+  }
 });
 
 async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null }) {
@@ -147,7 +242,14 @@ async function createSyntheticFixture({ pythonFiles, tsFiles, mutatePath = null 
   await cp(join(repositoryRoot, "scripts/build-evidence-manifest.mjs"), join(scripts, "build-evidence-manifest.mjs"));
   await cp(join(repositoryRoot, "scripts/verify-evidence-manifest.mjs"), join(scripts, "verify-evidence-manifest.mjs"));
   await writeFile(join(baselineEvidence, "baseline-result.json"), JSON.stringify({ datasetVersion: "wb00-dataset-v1.1" }));
-  for (const path of [...pythonFiles, ...tsFiles, "packages/harness-v2/src/capability-catalog.ts", "packages/harness-v2/src/index.ts"]) {
+  for (const path of [
+    ...pythonFiles,
+    ...tsFiles,
+    "packages/harness-v2/src/capability-catalog.ts",
+    "packages/harness-v2/src/index.ts",
+    "packages/harness-v2/src/skill-catalog.ts",
+    "skills/harness-v2/general-assistant/SKILL.md",
+  ]) {
     const target = join(root, path);
     await mkdir(resolve(target, ".."), { recursive: true });
     await writeFile(target, `synthetic fixture: ${path}\n`);

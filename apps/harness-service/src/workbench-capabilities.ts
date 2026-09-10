@@ -2,6 +2,8 @@ import type {
   CapabilityDefinitionSnapshot,
   CapabilityPolicySnapshot,
   JsonValue,
+  SkillCatalogEntry,
+  SkillCatalogSnapshot,
   ToolRequest,
   ToolResult,
 } from "@anna/harness-v2";
@@ -13,6 +15,7 @@ import {
 
 export const capabilitySearchTool = "capabilities.search" as const;
 export const capabilityLoadTool = "capabilities.load" as const;
+export const skillLoadTool = "skills.load" as const;
 
 export type WorkbenchCapabilityDefinition = CapabilityDefinitionSnapshot;
 
@@ -49,6 +52,31 @@ const capabilityLoadSchema = {
   additionalProperties: false,
 } as const satisfies Record<string, JsonValue>;
 
+const skillLoadSchema = {
+  type: "object",
+  properties: { skill_id: { type: "string" } },
+  required: ["skill_id"],
+  additionalProperties: false,
+} as const satisfies Record<string, JsonValue>;
+
+function projectSkillMetadata(
+  skill: SkillCatalogEntry,
+  allowed: ReadonlySet<string>,
+) {
+  return {
+    skill_id: skill.id,
+    loader_capability_id: skillLoadTool,
+    name: skill.name,
+    version: skill.version,
+    source: skill.provenance.source,
+    uri: skill.provenance.uri,
+    hash: skill.hash,
+    allowed_tools: [...skill.allowedTools],
+    forbidden_tools: [...skill.forbiddenTools],
+    missing_dependencies: skill.allowedTools.filter((dependency) => !allowed.has(dependency)),
+  };
+}
+
 export function capabilityToolParameters(
   name: string,
   policy?: CapabilityPolicySnapshot,
@@ -68,6 +96,15 @@ export function capabilityToolDescription(
 }
 
 const fixedCapabilities: readonly WorkbenchCapabilityDefinition[] = Object.freeze([
+  buildCapabilityDefinition({
+    id: skillLoadTool,
+    version: "1.0.0",
+    description: "Read a frozen registered Skill method and report its declared dependencies.",
+    source: "anna.workbench.skills",
+    effect: "read",
+    replayPolicy: "safe",
+    inputSchema: skillLoadSchema,
+  }),
   buildCapabilityDefinition({
     id: "crew.project.read",
     version: "1.0.0",
@@ -100,6 +137,7 @@ export function createWorkbenchCapabilityController(
     readonly projectId?: string;
     readonly loadedIds?: readonly string[];
     readonly capabilityPolicy?: CapabilityPolicySnapshot;
+    readonly skillCatalog?: SkillCatalogSnapshot;
     readonly allowedTools?: readonly string[];
     readonly dynamicToolCall?: (request: ToolRequest, signal: AbortSignal) => Promise<ToolResult>;
   },
@@ -108,9 +146,8 @@ export function createWorkbenchCapabilityController(
   const allowed = options.allowedTools === undefined
     ? new Set(catalog.map((item) => item.id))
     : new Set(options.allowedTools);
-  const visible = options.projectId === undefined
-    ? []
-    : catalog.filter((item) => allowed.has(item.id));
+  const visible = catalog.filter((item) =>
+    allowed.has(item.id) && (options.projectId !== undefined || item.id === skillLoadTool));
   const byId = new Map(visible.map((item) => [item.id, item]));
   const loaded = new Set<string>();
   for (const id of options.loadedIds ?? []) {
@@ -140,7 +177,12 @@ export function createWorkbenchCapabilityController(
             input_schema: item.inputSchema,
             status: loaded.has(item.id) ? "loaded" : "available",
           }));
-        return { status: "succeeded", output: { query: input.query, results } };
+        const skills = allowed.has(skillLoadTool)
+          ? (options.skillCatalog?.skills ?? [])
+            .filter((item) => query === "" || `${item.id} ${item.name}`.toLowerCase().includes(query))
+            .map((item) => projectSkillMetadata(item, allowed))
+          : [];
+        return { status: "succeeded", output: { query: input.query, results, skills } };
       }
       if (request.name === capabilityLoadTool) {
         const input = request.input as { ids: string[] };
@@ -166,6 +208,23 @@ export function createWorkbenchCapabilityController(
             receipt: {
               kind: "capability.load",
               capabilities: definitions,
+            },
+          },
+        };
+      }
+      if (request.name === skillLoadTool && loaded.has(skillLoadTool)) {
+        const input = request.input as { skill_id: string };
+        const skill = options.skillCatalog?.skills.find((item) => item.id === input.skill_id);
+        if (skill === undefined) {
+          return { status: "failed", output: { reason: "skill_not_available", skill_id: input.skill_id } };
+        }
+        return {
+          status: "succeeded",
+          output: {
+            accepted: true,
+            skill: {
+              ...projectSkillMetadata(skill, allowed),
+              content: skill.content,
             },
           },
         };

@@ -1,0 +1,189 @@
+{
+  "session_id": "fe4af211-596b-4370-9cef-306e98983f05",
+  "run_id": "be1e08f0-9cdd-4a24-875a-9e41b49fd89a",
+  "project_id": "proj_2",
+  "model_requests": [
+    {
+      "event_id": "1d57e0ad-2005-41e7-93f5-22dfd54f498b",
+      "seq": 6,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "4d73b161-d6e6-40f7-be2a-d4a556d9dab8",
+      "seq": 15,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a"
+      ]
+    },
+    {
+      "event_id": "78f544b3-132e-49c0-aed2-12ba6474102d",
+      "seq": 25,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    },
+    {
+      "event_id": "be96ac98-67e8-49d0-abbe-b87ec082e462",
+      "seq": 34,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a"
+      ]
+    },
+    {
+      "event_id": "aef6517e-a9db-46d9-8d29-8e8e5e89c530",
+      "seq": 44,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read",
+        "crew.channel.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a",
+        "1893e2ca55fb963ebce138e03ef669ea1f2ca95eab54f3efab4c4f4765d357ef"
+      ]
+    },
+    {
+      "event_id": "e6e4f7d8-f7ff-4f6b-af50-4204e5a95319",
+      "seq": 53,
+      "tool_definition_names": [
+        "capabilities.search",
+        "capabilities.load",
+        "crew.project.read",
+        "crew.channel.read"
+      ],
+      "tool_definition_hashes": [
+        "c8b8e53aa12c2b1791e206f75cee2a763b3b5101764d96bbac7a1f2af68dab7d",
+        "46514b866a0c530c97e07c2b0f7059bb5f1eeef28de3c8aba0ca2b864c8a2d2a",
+        "45080bb2cca451beb3af81e6b76b762beaa90304ee9bad3ebf35c75de232938a",
+        "1893e2ca55fb963ebce138e03ef669ea1f2ca95eab54f3efab4c4f4765d357ef"
+      ]
+    }
+  ],
+  "capability_loads": [
+    {
+      "event_id": "e7a6ebf5-e908-4f90-a295-daf674733c73",
+      "seq": 20,
+      "catalog_hash": "sha256:fb48cedc5092038a121cfc0df1ef3134d2e20227d571c3a98330718cf605c7ca",
+      "capability_ids": [
+        "crew.project.read"
+      ],
+      "capability_hashes": [
+        "sha256:3d6544e5e792c7eefd6b25dba1b6bddc4d5dfb9977e55888f0134275e8651b67"
+      ],
+      "load_tool_call_id": "load-project-6",
+      "load_dispatch_event_id": "81359f6e-5d22-48ec-91d3-71bac83a9d9c"
+    },
+    {
+      "event_id": "4623d8cb-4167-410b-a11e-7d9d3240da6f",
+      "seq": 39,
+      "catalog_hash": "sha256:fb48cedc5092038a121cfc0df1ef3134d2e20227d571c3a98330718cf605c7ca",
+      "capability_ids": [
+        "crew.channel.read"
+      ],
+      "capability_hashes": [
+        "sha256:c685878ca2ce9142d3a0ae5e79eacd7aba5c5c783d9cfa44391ecf5dddafd5e5"
+      ],
+      "load_tool_call_id": "load-channel-8",
+      "load_dispatch_event_id": "09a6a5b4-a744-4b44-9940-2ae29aa8c494"
+    }
+  ],
+  "tool_observations": [
+    {
+      "event_id": "236bc76f-96dd-4971-bbb5-38738a0e4212",
+      "seq": 10,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.search",
+      "input_digest": "2c0124e1dfb90a5f104591e9b3e0528ec0be8972fc807c9ad1f4e60f7461995d"
+    },
+    {
+      "event_id": "75a7b864-7d8c-4621-b2be-0a6636100988",
+      "seq": 11,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "81359f6e-5d22-48ec-91d3-71bac83a9d9c",
+      "seq": 19,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.load",
+      "input_digest": "d0301219ab38075200cecd8a8941d81d4ff37206d0e83c905c511ac1d75cfe74"
+    },
+    {
+      "event_id": "302dffe0-0510-4f18-a7c5-b158ca9d6a27",
+      "seq": 21,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "70c818bc-0635-469d-a8fb-517f2625bf97",
+      "seq": 29,
+      "type": "omp.tool.dispatch",
+      "tool_name": "crew.project.read",
+      "input_digest": "a76c23d26f8f1c3fd9dae5a6cc5e18b5dfb95fee7b3eb10844651b485d197472"
+    },
+    {
+      "event_id": "e90093df-bfa4-45d2-8829-ab758d62ae41",
+      "seq": 30,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "09a6a5b4-a744-4b44-9940-2ae29aa8c494",
+      "seq": 38,
+      "type": "omp.tool.dispatch",
+      "tool_name": "capabilities.load",
+      "input_digest": "cf86a5ef85c7a763078d60f6ad84a7602f9a7f41db4217e4b65c6a3c026f53e1"
+    },
+    {
+      "event_id": "960a2c44-a006-4927-9013-d4be14b830f8",
+      "seq": 40,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    },
+    {
+      "event_id": "f064b678-7024-44a2-af1a-1f9610ffc378",
+      "seq": 48,
+      "type": "omp.tool.dispatch",
+      "tool_name": "crew.channel.read",
+      "input_digest": "a76c23d26f8f1c3fd9dae5a6cc5e18b5dfb95fee7b3eb10844651b485d197472"
+    },
+    {
+      "event_id": "3ba6d2de-e775-48b1-a8c3-9abd471ab2e6",
+      "seq": 49,
+      "type": "omp.tool.response",
+      "tool_status": "succeeded"
+    }
+  ],
+  "observation_branch": "load_channel",
+  "observed_channel_marker": "WB02_CHANNEL_MARKER_observation_scope",
+  "usage": "unavailable"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "python-workbench-capabilities",
+  "command": "uv run pytest -q tests/contracts/test_workbench_capabilities.py",
+  "exitCode": 0,
+  "status": "pass",
+  "testSummary": "5 passed, 1 warning in 1.33s",
+  "tests": [
+    "tests/contracts/test_workbench_capabilities.py"
+  ],
+  "testFileCount": 1,
+  "evidenceModes": [
+    "D"
+  ]
+}

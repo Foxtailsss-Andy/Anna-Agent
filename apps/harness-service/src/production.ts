@@ -9,6 +9,7 @@ import {
   type LoopKernel,
   type MemoryReadMode,
   type ResolvedRunProfile,
+  type SkillCatalogSnapshot,
   type SkillCatalogEntry,
   type ToolResult,
   type ToolRequest,
@@ -62,17 +63,21 @@ import type { ProductTask } from "./product-session";
 import {
   capabilityLoadTool,
   capabilitySearchTool,
+  skillLoadTool,
   capabilityDefinitionFromPolicy,
   capabilityToolDescription,
   capabilityToolParameters,
   createWorkbenchCapabilityPolicy,
   createWorkbenchCapabilityController,
 } from "./workbench-capabilities";
+import { loadWorkbenchSkillCatalog } from "./workbench-skills";
 
 export interface LiveHarnessV2RuntimeOptions {
   readonly runtimeConfigPath?: string;
   readonly eventStorePath?: string;
   readonly skillPath?: string;
+  /** Trusted Host-only root for fixed Workbench Skill registration sources. */
+  readonly workbenchSkillRepositoryRoot?: string;
   readonly surfaces?: readonly V2SurfaceId[];
   readonly workspaceRoot?: string;
   readonly reviewApprovalOrigin?: string;
@@ -320,6 +325,7 @@ export async function createLiveHarnessV2Runtime(
     throw new Error("verified OMP runtime is required for Product Host");
   }
   const surfaces = options.surfaces ?? ["create", "cowork", "hub"];
+  const workbenchSkillCatalog = await loadWorkbenchSkillCatalog(options.workbenchSkillRepositoryRoot);
   const configuredSkillPath = options.skillPath
     ?? (typeof process.env.ANNA_HARNESS_V2_SKILL_PATH === "string"
       && process.env.ANNA_HARNESS_V2_SKILL_PATH.trim() !== ""
@@ -454,6 +460,7 @@ export async function createLiveHarnessV2Runtime(
           projectId: task?.project_id,
           loadedIds: [...loadedIds],
           capabilityPolicy,
+          skillCatalog: command.runProfileSnapshot.skillCatalog,
           allowedTools: command.runProfileSnapshot.allowedTools,
           dynamicToolCall: callLocalOrBusiness,
         });
@@ -604,7 +611,14 @@ export async function createLiveHarnessV2Runtime(
     profileFor: (surfaceId, body, fallback) => {
       const runId = isRecord(body) && typeof body.run_id === "string" ? body.run_id : undefined;
       const task = runId === undefined ? undefined : options.productTaskPeek?.(runId);
-      return narrowProductProfile(surfaceId, fallback, task, options.modelProfiles, explicitSkillEntries);
+      return narrowProductProfile(
+        surfaceId,
+        fallback,
+        task,
+        options.modelProfiles,
+        explicitSkillEntries,
+        workbenchSkillCatalog,
+      );
     },
     surfaces,
     evidenceMode: "live",
@@ -962,9 +976,10 @@ function narrowProductProfile(
   task?: ProductTask,
   modelProfiles?: LiveHarnessV2RuntimeOptions["modelProfiles"],
   explicitSkillEntries: readonly SkillCatalogEntry[] = [],
+  workbenchSkillCatalog?: SkillCatalogSnapshot,
 ): ResolvedRunProfile {
   if (task?.schema_version === 2) {
-    return workbenchV2Profile(surfaceId, profile, task, modelProfiles, explicitSkillEntries);
+    return workbenchV2Profile(surfaceId, profile, task, modelProfiles, explicitSkillEntries, workbenchSkillCatalog);
   }
   const model = selectedProductModel(profile, task, modelProfiles);
   const catalog = productToolCatalog(task);
@@ -1046,9 +1061,10 @@ function workbenchV2Profile(
   task: ProductTask,
   modelProfiles?: LiveHarnessV2RuntimeOptions["modelProfiles"],
   explicitSkillEntries: readonly SkillCatalogEntry[] = [],
+  workbenchSkillCatalog?: SkillCatalogSnapshot,
 ): ResolvedRunProfile {
   const model = selectedProductModel(profile, task, modelProfiles);
-  const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool];
+  const capabilityNames: string[] = [capabilitySearchTool, capabilityLoadTool, skillLoadTool];
   if (task.project_id !== undefined) capabilityNames.push("crew.project.read", "crew.channel.read");
   const skills = explicitSkillEntries;
   const skillAllowedTools = new Set(skills.flatMap((skill) => skill.allowedTools));
@@ -1057,6 +1073,7 @@ function workbenchV2Profile(
     (skills.length === 0
       || name === capabilitySearchTool
       || name === capabilityLoadTool
+      || name === skillLoadTool
       || skillAllowedTools.has(name))
     && !forbiddenTools.has(name));
   const workerInstructions = surfaceId === "create"
@@ -1099,6 +1116,7 @@ function workbenchV2Profile(
       artifactContract: profile.artifactContract,
       terminalRules: profile.terminalRules,
       capabilityPolicy,
+      ...(workbenchSkillCatalog === undefined ? {} : { skillCatalog: workbenchSkillCatalog }),
       ...(profile.kernel === undefined ? {} : { kernel: profile.kernel }),
     },
   });
@@ -1228,7 +1246,6 @@ async function ompActiveToolDefinitions(
 ): Promise<readonly OmpToolDefinition[]> {
   const all = await ompToolDefinitions(command, task);
   if (command.runProfileSnapshot.capabilityPolicy === undefined) return all;
-  if (task?.project_id === undefined) return all;
   const names = new Set<string>([capabilitySearchTool, capabilityLoadTool]);
   for (const id of loadedIds ?? []) names.add(id);
   return all.filter((definition) => names.has(canonicalToolName(definition.name)));

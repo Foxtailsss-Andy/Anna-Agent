@@ -18,12 +18,24 @@ const evidenceRoot = join(roundRoot, "evidence");
 const runtimeReceiptRoot = join(evidenceRoot, "runtime-receipts");
 const privateRoot = join(repositoryRoot, ".tmp-tests/wb02/evidence", roundId);
 const requiredTsTest = "test/workbench-capability-loading.test.ts";
+const requiredSkillTests = [
+  "test/workbench-capability-skills.test.ts",
+  "test/workbench-capability-skill-restore.test.ts",
+];
 const requiredPythonTest = "tests/contracts/test_workbench_capabilities.py";
 const ownedPaths = [
   "scripts/workbench-capability-evidence.mjs",
   "scripts/workbench-capability-evidence.test.mjs",
   ".github/workflows/ci.yml",
   "package.json",
+  "apps/harness-service/src/production.ts",
+  "apps/harness-service/src/workbench-capabilities.ts",
+  "apps/harness-service/src/workbench-skills.ts",
+  "packages/harness-v2/src/index.ts",
+  "packages/harness-v2/src/run-profile.ts",
+  "packages/harness-v2/src/skill-catalog.ts",
+  "apps/harness-service/test/workbench-capability-skills.test.ts",
+  "apps/harness-service/test/workbench-capability-skill-restore.test.ts",
 ];
 
 // Round creation is intentionally exclusive. Do this before any evidence work
@@ -159,6 +171,7 @@ async function collectSourcePaths() {
   const contractFixtures = await filesBelow("tests/contracts", (path) =>
     /(?:fixture|workbench[-_]capabilit|capabilit).*\.(?:py|json|ya?ml|jsonl|csv)$/.test(path));
   const testFiles = await collectCapabilityTests();
+  const registeredSkillDocuments = await filesBelow("skills", (path) => /\/SKILL\.md$/.test(path));
   return [...new Set([
     ...fixed,
     ...harnessModules,
@@ -167,6 +180,7 @@ async function collectSourcePaths() {
     ...contractFixtures,
     ...testFiles.tsTests.map((path) => `apps/harness-service/${path}`),
     ...testFiles.pythonTests,
+    ...registeredSkillDocuments,
   ])].sort((left, right) => left.localeCompare(right));
 }
 
@@ -255,7 +269,7 @@ const sourceHeadBefore = await gitHead();
 const ownedHashesBefore = await hashFiles(ownedPaths);
 const discoveredBefore = await collectCapabilityTests();
 const tsTests = discoveredBefore.tsTests;
-const missingTsTests = tsTests.includes(requiredTsTest) ? [] : [requiredTsTest];
+const missingTsTests = [requiredTsTest, ...requiredSkillTests].filter((path) => !tsTests.includes(path));
 const pythonTests = discoveredBefore.pythonTests;
 const missingPythonTests = pythonTests.includes(requiredPythonTest) ? [] : [requiredPythonTest];
 
@@ -384,7 +398,12 @@ const result = {
   usage: "unavailable",
   engineeringModel: "controller:gpt-6-astra/xhigh;coding:gpt-5.6-luna/xhigh",
   testDiscovery: {
-    ts: { required: requiredTsTest, discovered: tsTests, missing: missingTsTests, testFileCount: tsTests.length },
+    ts: {
+      required: [requiredTsTest, ...requiredSkillTests],
+      discovered: tsTests,
+      missing: missingTsTests,
+      testFileCount: tsTests.length,
+    },
     python: { required: requiredPythonTest, discovered: pythonTests, missing: missingPythonTests, testFileCount: pythonTests.length },
   },
   testFileCounts: { ts: tsResult.testFileCount, python: pythonResult.testFileCount, receipts: receipts.length },
