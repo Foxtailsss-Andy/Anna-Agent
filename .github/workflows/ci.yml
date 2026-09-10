@@ -59,6 +59,30 @@ jobs:
       - name: Build web and Harness v2 service
         run: npm run build && npm run harness:v2:build
 
+      - name: Run WB-00 baseline integrity test
+        run: node --test scripts/workbench-baseline-integrity.test.mjs
+
+      - name: Run WB-00 baseline fixture and freeze evidence
+        env:
+          ANNA_WB00_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run workbench:baseline
+
+      - name: Verify WB-00 baseline schema and manifest
+        if: always()
+        env:
+          ANNA_WB00_RUN_DIR: evals/workbench/wb00/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run workbench:baseline:verify
+
+      - name: Retain WB-00 baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wb00-baseline-evidence
+          path: |
+            evals/workbench/wb00/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
+            .tmp-tests/wb00/coding
+          if-no-files-found: error
+
       - name: Run Python tests
         run: uv run pytest -q
 

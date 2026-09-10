@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "observationId": "OBS-OMP-ANSWER",
+  "status": "fail",
+  "runId": "wb00-product-signal-run",
+  "signalKind": "answer",
+  "httpStatus": 409,
+  "responseCode": "harness_signal_unavailable"
+}

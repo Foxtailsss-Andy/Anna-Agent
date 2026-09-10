@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "observationId": "OBS-OMP-ANSWER",
+  "status": "fail",
+  "runId": "baseline-answer-run",
+  "operation": "answer",
+  "error": "OmpKernelControlUnavailableError"
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "caseId": "wb00-baseline-20260910",
+  "generatedAt": "2026-09-10T03:09:20.366Z",
+  "evidenceMode": "baseline",
+  "provider": "unavailable",
+  "gitHead": "d461a1a344d82d7bd95ca5073b0a1e2a700d2162",
+  "files": [
+    {
+      "path": "baseline-result.json",
+      "size": 34447,
+      "sha256": "26f253572cea4a045ff193808b767b1b98651f9d4781ea0fdda17ae0068e807e"
+    },
+    {
+      "path": "receipt-create-profile.json",
+      "size": 331,
+      "sha256": "56b7f82bd7422633d2b97680171ee322dfc2f63a9a27a1f457d2ab29f3eda3c6"
+    },
+    {
+      "path": "receipt-omp-answer.json",
+      "size": 188,
+      "sha256": "e5f6011fab384bec0c06896cc6e7caa19cd50ab38d980b0843db317186a47892"
+    },
+    {
+      "path": "receipt-omp-parallel.json",
+      "size": 1852,
+      "sha256": "3ea2bc7d59bf0a0910cd7b36f596a5c0c0e4ed27f6e49de0e54e5dc84f2803cb"
+    },
+    {
+      "path": "receipt-product-signal.json",
+      "size": 215,
+      "sha256": "94c37eeae9289ccfa33971e0df1896eb212d9bb3e43fd85e4f1547b24b458a4a"
+    },
+    {
+      "path": "receipt-skill-intersection.json",
+      "size": 357,
+      "sha256": "859a387b8ba75240dccd3e91ba533e394f668636566e192583819ffdb251d6b0"
+    },
+    {
+      "path": "runtime-lock.json",
+      "size": 286,
+      "sha256": "a6a955f70d1e2447ac8ba7383c218615aebb2b90b9432c177329bc8af83dbad5"
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "observationId": "OBS-OMP-PARALLEL-BARRIER",
+  "status": "pass",
+  "runIds": [
+    "wb00-parallel-run-a",
+    "wb00-parallel-run-b"
+  ],
+  "barrier": {
+    "enteredCount": 2,
+    "released": true
+  },
+  "events": {
+    "wb00-parallel-run-a": [
+      {
+        "type": "run.queued",
+        "seq": 0
+      },
+      {
+        "type": "run.started",
+        "seq": 1
+      },
+      {
+        "type": "run.context.ready",
+        "seq": 2
+      },
+      {
+        "type": "omp.transcript.message",
+        "seq": 3
+      },
+      {
+        "type": "run.progress",
+        "seq": 4
+      },
+      {
+        "type": "run.model.requested",
+        "seq": 5
+      },
+      {
+        "type": "omp.model.response",
+        "seq": 6
+      },
+      {
+        "type": "omp.transcript.message",
+        "seq": 7
+      },
+      {
+        "type": "run.progress",
+        "seq": 8
+      },
+      {
+        "type": "run.eval.contract",
+        "seq": 9
+      },
+      {
+        "type": "run.completed",
+        "seq": 10
+      }
+    ],
+    "wb00-parallel-run-b": [
+      {
+        "type": "run.queued",
+        "seq": 0
+      },
+      {
+        "type": "run.started",
+        "seq": 1
+      },
+      {
+        "type": "run.context.ready",
+        "seq": 2
+      },
+      {
+        "type": "omp.transcript.message",
+        "seq": 3
+      },
+      {
+        "type": "run.progress",
+        "seq": 4
+      },
+      {
+        "type": "run.model.requested",
+        "seq": 5
+      },
+      {
+        "type": "omp.model.response",
+        "seq": 6
+      },
+      {
+        "type": "omp.transcript.message",
+        "seq": 7
+      },
+      {
+        "type": "run.progress",
+        "seq": 8
+      },
+      {
+        "type": "run.eval.contract",
+        "seq": 9
+      },
+      {
+        "type": "run.completed",
+        "seq": 10
+      }
+    ]
+  }
+}

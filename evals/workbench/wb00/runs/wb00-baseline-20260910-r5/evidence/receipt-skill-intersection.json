@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "observationId": "OBS-CREATE-PROFILE-INTERSECTION",
+  "status": "pass",
+  "channelTools": [
+    "tool.allowed",
+    "tool.skill-only",
+    "tool.forbidden"
+  ],
+  "skillAllowedTools": [
+    "tool.allowed",
+    "tool.forbidden"
+  ],
+  "skillForbiddenTools": [
+    "tool.forbidden"
+  ],
+  "resolvedTools": [
+    "tool.allowed"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "observationId": "OBS-CREATE-PROFILE-INTERSECTION",
+  "status": "fail",
+  "surface": "create",
+  "allowedTools": [
+    "todo",
+    "create.emit_skill_draft",
+    "create.emit_prompt_draft",
+    "create.emit_python_tool_draft"
+  ],
+  "absentGeneralTools": [
+    "web_search",
+    "workdir.read_file"
+  ]
+}

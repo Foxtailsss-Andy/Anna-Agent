@@ -1,0 +1,951 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "1.2",
+  "wbTicket": "WB-00",
+  "requirementIds": [
+    "R-01",
+    "R-02",
+    "R-17",
+    "R-18",
+    "R-19"
+  ],
+  "acceptanceIds": [
+    "AC-18a"
+  ],
+  "evaluationBaselineId": "wb00-baseline-20260910",
+  "evalRoundId": "wb00-baseline-20260910-r3",
+  "datasetVersion": "wb00-dataset-v1",
+  "datasetSha256": "sha256:69fef8d3a8f3c448fcc250914efa6496a9d224bf928141a3077dedb6140a4f7f",
+  "sourceSha": "d461a1a344d82d7bd95ca5073b0a1e2a700d2162",
+  "dirtyDiffDigest": "sha256:e27e63fcc215cb574377e8b497c08129db373dcf235e238518df91596cc83a15",
+  "ticketFileDigests": {
+    "apps/harness-service/test/workbench-baseline-omp.test.ts": "sha256:ad8cd07bfcd6d5669ab48db1a6e3000c30405009578d7b85293b06a2de631caf",
+    "scripts/workbench-baseline.mjs": "sha256:f1773ffad1694c162f49e808cd4dc4a602ed8f374bd36eb5740ba06a451e3cae",
+    "scripts/workbench-baseline-verify.mjs": "sha256:87587e3eabda96a4ec8f09a26fb1a21641495977d8ddc8a7769d1c484074a1ef",
+    "evals/workbench/wb00/dataset.json": "sha256:69fef8d3a8f3c448fcc250914efa6496a9d224bf928141a3077dedb6140a4f7f",
+    "evals/workbench/wb00/README.md": "sha256:276d7be14d6e305c7a585501448acf8b9cc2474416681d52495d9366d71b4c36",
+    "package.json": "sha256:0dd5102f6b0e0d4eee550e93310608ceedc72bc389ce498f41231ada09af587b",
+    ".github/workflows/ci.yml": "sha256:a303c4723cd6ef87e89ca4a7972090af4e937e249e66e128db0cd451af31b472"
+  },
+  "implementationBoundary": {
+    "evidenceOwner": "WB-00 baseline fixture",
+    "runtimeAuthority": "Anna Node Harness Host -> OMP Loop Kernel",
+    "externalTransport": "deterministic model transport boundary fixture",
+    "internalState": "real OMP worker, Runtime, EventStore and Gateway",
+    "productObservation": "separate product observation command; not inferred here"
+  },
+  "runtime": {
+    "platform": "darwin-arm64",
+    "ompVersion": "18.0.11",
+    "bunVersion": "1.3.14",
+    "runtimeManifestSha256": "sha256:d3ff0284f9d7a4489d66e78fb5b1d3819471a59f4c9dcd01d0e118b6994a241d",
+    "dependencyLockSha256": "see OMP descriptor/runtime manifest; not duplicated here"
+  },
+  "runtimeModelConfigFingerprint": "unavailable",
+  "engineeringModelFingerprint": "controller:gpt-6-astra/xhigh;coding:gpt-5.6-luna/xhigh",
+  "usage": "unavailable",
+  "generatedAt": "2026-09-10T03:09:20.366Z",
+  "testStartedAt": "2026-09-10T03:09:20.366Z",
+  "commands": [
+    {
+      "command": "npm run test --workspace=@anna/harness-service -- --run test/workbench-baseline-omp.test.ts",
+      "exitCode": 0,
+      "evidenceMode": "D+O"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "OBS-CREATE-PROFILE-INTERSECTION",
+      "requirementIds": [
+        "R-01",
+        "R-02"
+      ],
+      "status": "fail",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "Create can discover a general capability without a fixed artifact kind.",
+      "actualOutcome": "Public resolver removes tools outside the selected Skill; the current Create profile does not expose general workdir/web search tools.",
+      "receiptRefs": [
+        "receipt-create-profile.json",
+        "receipt-skill-intersection.json"
+      ]
+    },
+    {
+      "observationId": "OBS-OMP-ANSWER",
+      "requirementIds": [
+        "R-01",
+        "R-02"
+      ],
+      "status": "fail",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "The OMP-backed control boundary accepts an answer signal.",
+      "actualOutcome": "OmpLoopKernel.answer() raises OmpKernelControlUnavailableError; ProductHost maps the live signal to 409 harness_signal_unavailable.",
+      "receiptRefs": [
+        "receipt-omp-answer.json",
+        "receipt-product-signal.json"
+      ]
+    },
+    {
+      "observationId": "OBS-OMP-PARALLEL-BARRIER",
+      "requirementIds": [
+        "R-01",
+        "R-02",
+        "R-19"
+      ],
+      "status": "pass",
+      "evidenceModes": [
+        "D",
+        "O"
+      ],
+      "expectedOutcome": "Two independent Runs overlap at the actual OMP provider transport barrier.",
+      "actualOutcome": "Both synthetic Run IDs entered the same external transport barrier and completed through real OMP worker/EventStore/Gateway paths.",
+      "receiptRefs": [
+        "receipt-omp-parallel.json"
+      ]
+    }
+  ],
+  "slots": [
+    {
+      "caseId": "L-01",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源、日期、地点和建议一致",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:e48cec45cb152f494f5bfdf9817f1f85a07c341ac805b9d3a533525195636d25",
+      "sourceWindow": "forecast date is fixed relative to test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-01",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源、日期、地点和建议一致",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:e48cec45cb152f494f5bfdf9817f1f85a07c341ac805b9d3a533525195636d25",
+      "sourceWindow": "forecast date is fixed relative to test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-01",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源、日期、地点和建议一致",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:e48cec45cb152f494f5bfdf9817f1f85a07c341ac805b9d3a533525195636d25",
+      "sourceWindow": "forecast date is fixed relative to test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-02",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源可打开且时间窗口符合",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:8a8b29da1e0eaac5a65db1bb89a4a69c7fc1709ea5cae6e10f82856edad9767d",
+      "sourceWindow": "seven UTC calendar days ending at test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-02",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源可打开且时间窗口符合",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:8a8b29da1e0eaac5a65db1bb89a4a69c7fc1709ea5cae6e10f82856edad9767d",
+      "sourceWindow": "seven UTC calendar days ending at test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-02",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "来源可打开且时间窗口符合",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:8a8b29da1e0eaac5a65db1bb89a4a69c7fc1709ea5cae6e10f82856edad9767d",
+      "sourceWindow": "seven UTC calendar days ending at test_started_at",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-03",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "补充约束改变后续查证与结论",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:67daf77d9e9ec20fbb43b588c8fb48832935634bb1801f0047ff21d2657c96fc",
+      "sourceWindow": "research window recorded at test start",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-03",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "补充约束改变后续查证与结论",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:67daf77d9e9ec20fbb43b588c8fb48832935634bb1801f0047ff21d2657c96fc",
+      "sourceWindow": "research window recorded at test start",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-03",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "补充约束改变后续查证与结论",
+      "actualOutcome": "No live provider attempt was made.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:67daf77d9e9ec20fbb43b588c8fb48832935634bb1801f0047ff21d2657c96fc",
+      "sourceWindow": "research window recorded at test start",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-04",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "引用项目任务、讨论或产物事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:04d4c9d16f43a32a9c661ccb1d4ebc6a654ddb2487e93ebfc557b2a7f6a25823",
+      "sourceWindow": "synthetic project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-04",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "引用项目任务、讨论或产物事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:04d4c9d16f43a32a9c661ccb1d4ebc6a654ddb2487e93ebfc557b2a7f6a25823",
+      "sourceWindow": "synthetic project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-04",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "引用项目任务、讨论或产物事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:04d4c9d16f43a32a9c661ccb1d4ebc6a654ddb2487e93ebfc557b2a7f6a25823",
+      "sourceWindow": "synthetic project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-05",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "按需结合项目资料与外部事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:d4e7f25cc49e8d24e6dea5eebf7437ee366414669ccdcfe09dd3371040e62b77",
+      "sourceWindow": "synthetic project snapshot version 1 plus fixed technical question",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-05",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "按需结合项目资料与外部事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:d4e7f25cc49e8d24e6dea5eebf7437ee366414669ccdcfe09dd3371040e62b77",
+      "sourceWindow": "synthetic project snapshot version 1 plus fixed technical question",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-05",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "按需结合项目资料与外部事实",
+      "actualOutcome": "Crew live question evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:d4e7f25cc49e8d24e6dea5eebf7437ee366414669ccdcfe09dd3371040e62b77",
+      "sourceWindow": "synthetic project snapshot version 1 plus fixed technical question",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-06",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "M"
+      ],
+      "expectedOutcome": "读回数值、范围和来源一致",
+      "actualOutcome": "Cowork live connector readback remains unavailable.",
+      "blockingReason": "EXT-MCP-READ: no configured live Hiker/MCP connector",
+      "inputFixtureHash": "sha256:c0872998f9be5b767d351c6e63116f99cdb9498703bb09952e12b280b9354078",
+      "sourceWindow": "synthetic board snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-06",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "M"
+      ],
+      "expectedOutcome": "读回数值、范围和来源一致",
+      "actualOutcome": "Cowork live connector readback remains unavailable.",
+      "blockingReason": "EXT-MCP-READ: no configured live Hiker/MCP connector",
+      "inputFixtureHash": "sha256:c0872998f9be5b767d351c6e63116f99cdb9498703bb09952e12b280b9354078",
+      "sourceWindow": "synthetic board snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-06",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "M"
+      ],
+      "expectedOutcome": "读回数值、范围和来源一致",
+      "actualOutcome": "Cowork live connector readback remains unavailable.",
+      "blockingReason": "EXT-MCP-READ: no configured live Hiker/MCP connector",
+      "inputFixtureHash": "sha256:c0872998f9be5b767d351c6e63116f99cdb9498703bb09952e12b280b9354078",
+      "sourceWindow": "synthetic board snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-07",
+      "attemptIndex": 1,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "total_revenue=300;average_revenue=150;result_file_contains_checked_values",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 CSV execution slot was run.",
+      "inputFixtureHash": "sha256:84ad0259de792cec5da09cc892625f8b804206a11714e018bc79c236c386a461",
+      "sourceWindow": "fixture file version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-07",
+      "attemptIndex": 2,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "total_revenue=300;average_revenue=150;result_file_contains_checked_values",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 CSV execution slot was run.",
+      "inputFixtureHash": "sha256:84ad0259de792cec5da09cc892625f8b804206a11714e018bc79c236c386a461",
+      "sourceWindow": "fixture file version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-07",
+      "attemptIndex": 3,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "total_revenue=300;average_revenue=150;result_file_contains_checked_values",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 CSV execution slot was run.",
+      "inputFixtureHash": "sha256:84ad0259de792cec5da09cc892625f8b804206a11714e018bc79c236c386a461",
+      "sourceWindow": "fixture file version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-08",
+      "attemptIndex": 1,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "修改范围正确且 wb00-average.test.py 通过",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 script repair execution slot was run.",
+      "inputFixtureHash": "sha256:7d5ba9dbadae818d2219993b43d684880902620fca5a11e92beaec058504415f",
+      "sourceWindow": "fixture script/test version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-08",
+      "attemptIndex": 2,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "修改范围正确且 wb00-average.test.py 通过",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 script repair execution slot was run.",
+      "inputFixtureHash": "sha256:7d5ba9dbadae818d2219993b43d684880902620fca5a11e92beaec058504415f",
+      "sourceWindow": "fixture script/test version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-08",
+      "attemptIndex": 3,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "修改范围正确且 wb00-average.test.py 通过",
+      "actualOutcome": "No attempt recorded; preserve the slot for a later ticket.",
+      "blockingReason": "No WB-00 script repair execution slot was run.",
+      "inputFixtureHash": "sha256:7d5ba9dbadae818d2219993b43d684880902620fca5a11e92beaec058504415f",
+      "sourceWindow": "fixture script/test version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-09",
+      "attemptIndex": 1,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存版本在新 Session 实际加载并受控调用",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:21437d24b896bab91690a2df707b3bc9855c869c93f79c1f16c70f16fc0475e6",
+      "sourceWindow": "Skill fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-09",
+      "attemptIndex": 2,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存版本在新 Session 实际加载并受控调用",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:21437d24b896bab91690a2df707b3bc9855c869c93f79c1f16c70f16fc0475e6",
+      "sourceWindow": "Skill fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-09",
+      "attemptIndex": 3,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存版本在新 Session 实际加载并受控调用",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:21437d24b896bab91690a2df707b3bc9855c869c93f79c1f16c70f16fc0475e6",
+      "sourceWindow": "Skill fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-10",
+      "attemptIndex": 1,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存产物与实际模型输入一致",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:a55901525a90a7482b8bee824062bd51e723d1f15c1bea52673189e4e1337c97",
+      "sourceWindow": "Prompt fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-10",
+      "attemptIndex": 2,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存产物与实际模型输入一致",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:a55901525a90a7482b8bee824062bd51e723d1f15c1bea52673189e4e1337c97",
+      "sourceWindow": "Prompt fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-10",
+      "attemptIndex": 3,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "保存产物与实际模型输入一致",
+      "actualOutcome": "No attempt recorded; the fixed slot remains for a later live observation.",
+      "blockingReason": "No actual Create save and new-Session attempt was run in WB-00.",
+      "inputFixtureHash": "sha256:a55901525a90a7482b8bee824062bd51e723d1f15c1bea52673189e4e1337c97",
+      "sourceWindow": "Prompt fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-11",
+      "attemptIndex": 1,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "强沙箱执行、输入输出和启用状态可核对",
+      "actualOutcome": "No activation or execution attempt recorded.",
+      "blockingReason": "Python Tool activation is a later WB-07 boundary.",
+      "inputFixtureHash": "sha256:ae4df3c37294afbad04670c3d3d3a82ddd6e0c01cb9493cac7d95ef3c269f107",
+      "sourceWindow": "Python Tool fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-11",
+      "attemptIndex": 2,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "强沙箱执行、输入输出和启用状态可核对",
+      "actualOutcome": "No activation or execution attempt recorded.",
+      "blockingReason": "Python Tool activation is a later WB-07 boundary.",
+      "inputFixtureHash": "sha256:ae4df3c37294afbad04670c3d3d3a82ddd6e0c01cb9493cac7d95ef3c269f107",
+      "sourceWindow": "Python Tool fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-11",
+      "attemptIndex": 3,
+      "status": "not_run",
+      "evidenceModes": [
+        "D"
+      ],
+      "expectedOutcome": "强沙箱执行、输入输出和启用状态可核对",
+      "actualOutcome": "No activation or execution attempt recorded.",
+      "blockingReason": "Python Tool activation is a later WB-07 boundary.",
+      "inputFixtureHash": "sha256:ae4df3c37294afbad04670c3d3d3a82ddd6e0c01cb9493cac7d95ef3c269f107",
+      "sourceWindow": "Python Tool fixture version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-12",
+      "attemptIndex": 1,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "工具过程、版本、评审和依赖可追溯",
+      "actualOutcome": "Crew Worker live delivery and review evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:fbf51b75ed407d00cd26d0a1d251263506007490843f6812d2f20af9ea9f3db2",
+      "sourceWindow": "synthetic Crew project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-12",
+      "attemptIndex": 2,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "工具过程、版本、评审和依赖可追溯",
+      "actualOutcome": "Crew Worker live delivery and review evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:fbf51b75ed407d00cd26d0a1d251263506007490843f6812d2f20af9ea9f3db2",
+      "sourceWindow": "synthetic Crew project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    },
+    {
+      "caseId": "L-12",
+      "attemptIndex": 3,
+      "status": "blocked",
+      "evidenceModes": [
+        "L"
+      ],
+      "expectedOutcome": "工具过程、版本、评审和依赖可追溯",
+      "actualOutcome": "Crew Worker live delivery and review evidence remains unavailable.",
+      "blockingReason": "EXT-PROVIDER: no configured live model provider",
+      "inputFixtureHash": "sha256:fbf51b75ed407d00cd26d0a1d251263506007490843f6812d2f20af9ea9f3db2",
+      "sourceWindow": "synthetic Crew project snapshot version 1",
+      "eventReceiptRefs": [],
+      "toolResultRefs": [],
+      "artifactHashes": [],
+      "validationResults": [
+        "focused_omp_baseline_passed"
+      ],
+      "modelUsage": "unavailable",
+      "retryCount": 0,
+      "userInterventionCount": 0,
+      "baselineDelta": "initial WB-00 baseline"
+    }
+  ],
+  "summary": {
+    "denominator": 36,
+    "successfulAttempts": 0,
+    "counts": {
+      "pass": 0,
+      "fail": 0,
+      "blocked": 21,
+      "not_run": 15
+    },
+    "qualityGate": "AC-18a baseline only; final 33/36 gate is not applied here"
+  }
+}

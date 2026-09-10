@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "1.2",
+  "datasetVersion": "wb00-dataset-v1",
+  "evaluationBaselineId": "wb00-baseline-20260910",
+  "fixedDenominator": 36,
+  "attemptsPerCase": 3,
+  "qualityGate": {
+    "finalRoundAttempts": 36,
+    "minimumSuccessfulAttempts": 33,
+    "minimumSuccessfulAttemptsPerCase": 2,
+    "crossRoundAccumulation": false,
+    "retryCountsAsNewAttempt": false
+  },
+  "scoring": {
+    "success": "The expected outcome is backed by the declared source, tool or artifact evidence and required validation.",
+    "failure": "The required behavior was attempted and the observed result contradicts the expected outcome.",
+    "blocked": "The case cannot run because a declared external condition is unavailable; no success is inferred.",
+    "not_run": "The slot has no execution attempt in this baseline; it remains in the denominator."
+  },
+  "cases": [
+    { "caseId": "L-01", "surface": "home_create", "task": "查明天杭州市的天气和户外活动建议", "inputFixture": "city=杭州市;date=one_calendar_day_after_test_start;activity=outdoor;language=zh-CN", "sourceWindow": "forecast date is fixed relative to test_started_at", "expectedEvidence": "来源、日期、地点和建议一致" },
+    { "caseId": "L-02", "surface": "home", "task": "了解 OpenTelemetry GenAI semantic conventions 最近一周的重要进展", "inputFixture": "topic=OpenTelemetry GenAI semantic conventions;window=7_utc_days_before_test_start;source_type=official_or_primary", "sourceWindow": "seven UTC calendar days ending at test_started_at", "expectedEvidence": "来源可打开且时间窗口符合" },
+    { "caseId": "L-03", "surface": "home", "task": "研究 SQLite WAL 与 OpenTelemetry GenAI semantic conventions 的适用场景，随后补充仅限 macOS arm64 且无外部网络约束", "inputFixture": "topics=SQLite WAL|OpenTelemetry GenAI semantic conventions;follow_up=macOS_arm64_only,no_external_network;requirement=revise_recommendation", "sourceWindow": "research window recorded at test start", "expectedEvidence": "补充约束改变后续查证与结论" },
+    { "caseId": "L-04", "surface": "crew", "task": "基于 wb00-crew-project 合成项目资料解释延期原因", "inputFixture": "project_id=wb00-crew-project;task=WB00-DATA-02;artifact=integration-plan-v1;channel=wb00-channel", "sourceWindow": "synthetic project snapshot version 1", "expectedEvidence": "引用项目任务、讨论或产物事实" },
+    { "caseId": "L-05", "surface": "crew", "task": "核对 wb00-crew-project 方案中的 SQLite WAL 是否适用于 macOS arm64 本地事件存储", "inputFixture": "project_id=wb00-crew-project;proposal=SQLite-WAL-local-event-store;constraint=macOS_arm64", "sourceWindow": "synthetic project snapshot version 1 plus fixed technical question", "expectedEvidence": "按需结合项目资料与外部事实" },
+    { "caseId": "L-06", "surface": "cowork", "task": "解释 wb00-cowork-board 2026-09-10 的 actual_receipt 变化并核对业务来源", "inputFixture": "board_id=wb00-cowork-board;metric=actual_receipt;period=2026-09-10;expected_source=synthetic_hiker_read", "sourceWindow": "synthetic board snapshot version 1", "expectedEvidence": "读回数值、范围和来源一致" },
+    { "caseId": "L-07", "surface": "home", "task": "分析 wb00-sales.csv 并产生可检查的结果文件", "inputFixture": "file=wb00-sales.csv\nmonth,revenue\n2026-07,100\n2026-08,200\n", "sourceWindow": "fixture file version 1", "expectedEvidence": "total_revenue=300;average_revenue=150;result_file_contains_checked_values" },
+    { "caseId": "L-08", "surface": "home", "task": "修复 wb00-average.py 并运行 wb00-average.test.py", "inputFixture": "file=wb00-average.py\ndef average(values):\n    return sum(values) / (len(values) - 1)\n\nfile=wb00-average.test.py\nassert average([100,200]) == 150\n", "sourceWindow": "fixture script/test version 1", "expectedEvidence": "修改范围正确且 wb00-average.test.py 通过" },
+    { "caseId": "L-09", "surface": "create", "task": "创建 wb00/collection-risk Skill，并在新 Session 使用它读取合成回款数据", "inputFixture": "skill_id=wb00/collection-risk;version=0.1.0;allowed_tool=hiker.report.get_collection_summary;new_session=wb00-session-2", "sourceWindow": "Skill fixture version 1", "expectedEvidence": "保存版本在新 Session 实际加载并受控调用" },
+    { "caseId": "L-10", "surface": "create", "task": "创建 wb00/monthly-review Prompt，并在新 Session 应用到 2026-08", "inputFixture": "prompt_id=wb00/monthly-review;variable=period;value=2026-08;new_session=wb00-session-2", "sourceWindow": "Prompt fixture version 1", "expectedEvidence": "保存产物与实际模型输入一致" },
+    { "caseId": "L-11", "surface": "create", "task": "创建 wb00/overdue-ratio Python Tool，并在启用后调用", "inputFixture": "tool_id=wb00/overdue-ratio;code=overdue/total;input={overdue:50,total:200};expected=0.25;activation=explicit", "sourceWindow": "Python Tool fixture version 1", "expectedEvidence": "强沙箱执行、输入输出和启用状态可核对" },
+    { "caseId": "L-12", "surface": "crew", "task": "Worker 完成 wb00-crew-project 的数据交付，按批注修改 v1 后提交 v2 评审", "inputFixture": "project_id=wb00-crew-project;worker=wb00-data-worker;artifact_v1=wb00-data.csv;review_comment=add_source_column;artifact_v2=wb00-data-v2.csv", "sourceWindow": "synthetic Crew project snapshot version 1", "expectedEvidence": "工具过程、版本、评审和依赖可追溯" }
+  ],
+  "slotPolicy": {
+    "statusValues": ["pass", "fail", "blocked", "not_run"],
+    "preserveEverySlot": true,
+    "attemptIndexStartsAt": 1
+  }
+}

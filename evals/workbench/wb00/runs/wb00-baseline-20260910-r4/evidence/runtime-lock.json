@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "platform": "darwin-arm64",
+  "ompVersion": "18.0.11",
+  "bunVersion": "1.3.14",
+  "runtimeManifestSha256": "sha256:d3ff0284f9d7a4489d66e78fb5b1d3819471a59f4c9dcd01d0e118b6994a241d",
+  "runtimeModelConfigFingerprint": "unavailable",
+  "usage": "unavailable"
+}
