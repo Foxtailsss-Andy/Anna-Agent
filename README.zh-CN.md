@@ -154,6 +154,8 @@ npm run desktop:smoke-asar
 
 Anna 起源于对 AI Agent 和 Harness 设计的个人探索。Pi Agent 与 Oh-my-Pi 为项目提供了重要技术参考，感谢开源社区，以及一路分享反馈的朋友。
 
-**Hiker** 是由 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif) 开发的外部 ERP 合作项目。本仓库不包含 Hiker 平台、服务端、部署与业务数据，Hiker 目前尚未开源。Anna 的许可覆盖 Anna 侧连接器与界面集成，不延伸至 Hiker。
+**[Hiker ERP](https://github.com/kc8zshnt6n-gif/Hiker-ERP)** 是由 [kc8zshnt6n-gif](https://github.com/kc8zshnt6n-gif) 开发的外部 ERP 合作项目，连接采购、库存、资金、财务等企业业务。如果你关注企业软件，以及 AI Agent 与业务系统的协作，推荐看看它的 [产品演示与架构介绍](https://github.com/kc8zshnt6n-gif/Hiker-ERP/blob/main/README.zh-CN.md)。
+
+Hiker 的公开仓库目前用于产品展示，源码仍未公开。Anna 通过 MCP 连接 Hiker 明确开放的能力。本仓库不包含 Hiker 平台、服务端、部署与业务数据；Anna 的许可覆盖 Anna 侧连接器与界面集成，不延伸至 Hiker。
 
 [Foxtailsss-Andy/Anna-Agent](https://github.com/Foxtailsss-Andy/Anna-Agent) 是唯一公开维护仓库。Anna 使用 [MIT License](LICENSE)，第三方依赖说明见 [NOTICE.md](NOTICE.md)。
