@@ -25,6 +25,14 @@ Keep the prepared runtime in `build/omp-runtime/darwin-arm64`. Worker or protoco
 
 Home Chat/Create, Cowork and Crew are retained product requirements. See the [current Goal and live gates](docs/product/anna-harness-product-parity-goal-2026-08-31.md). The [community backlog](docs/product/anna-harness-first-community-backlog-2026-08-31.md) covers deeper recovery combinations, additional platforms and future capabilities, not removal of existing product functions.
 
+## RC1 source preview
+
+Use `npm run desktop:run` for the RC1 product flow. `npm run dev` alone starts Vite and does not start the Product Host or its business peer. Ordinary conversations use the Host's `/api/workbench` Session/Run API; they require the same authenticated identity and protected state as the desktop product.
+
+After launch, start an ordinary question in Home/Create, continue the same conversation, and use session history to reopen it. Choose a workdir explicitly before asking Anna to read its files. Cowork dashboards and existing business actions remain available independently of ordinary conversation; Crew conversation is scoped to the selected project. Stop targets the selected Run. A missing provider configuration is an explicit failure, not a generated answer.
+
+The [RC1 release record](docs/releases/rc1-developer-preview.md) separates deterministic external transports, real local OMP execution, and outstanding live/provider and platform checks. RC1 adds no new installer or broad recovery/sandbox guarantee.
+
 ## Configuration ownership
 
 The product launcher accepts these local paths:

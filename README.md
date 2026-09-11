@@ -8,13 +8,13 @@ Anna is a personal open-source project exploring how an AI agent can carry work 
 
 The aim is to keep the work understandable: what Anna is doing, which tools she can use, what needs your decision, and where the result came from.
 
-**Developer Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**RC1 · Source Developer Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [中文](README.zh-CN.md) · [Explore Anna](#what-you-can-explore) · [Quick start](#quick-start) · [Current status](#current-status) · [Codex pet](#meet-anna-your-codex-companion) · [Development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
-> **September 5, 2026 · The next Anna update is coming soon**
+> **RC1 · A shared conversation flow across the workspaces**
 >
-> With the release of [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), we're working with Astra in Codex to investigate and fix underlying issues in Anna, with a focus on architecture and runtime reliability. This work is in progress; we'll share the changes and validation results with the next update. Thank you for following this personal project and sharing your feedback.
+> Home/Create, Cowork, and Crew connect ordinary questions to persistent Sessions and Runs on the shared Harness. Anna can answer directly or use available search, URL, Skill, and explicitly selected file capabilities. Existing resource creation and business workflows remain available. See the [RC1 changes, validation, and limitations](docs/releases/rc1-developer-preview.md). This is a source preview for developers; it does not include a new signed application installer.
 
 ## What you can explore
 
@@ -62,13 +62,13 @@ Anna is in active development. The current source is intended for developers and
 
 | Area | Status |
 | --- | --- |
-| **Current `main`** | Home, Cowork, and Crew use a shared Node Harness Host with the Oh-my-Pi model/tool loop. Architecture and reliability improvements are ongoing. |
-| **Recorded live validation** | Home document generation, Prompt creation, Stop, and next-turn context; Crew Worker delivery, review/rework, and contextual Anna; Hiker dashboard reads and an Agent capability query. See the [August 31–September 1 validation record](docs/superpowers/handoff/2026-08-31-harness-product-parity.md) for scope and remaining gates. |
+| **RC1 source** | Ordinary conversations use persistent Sessions and Runs through the shared Node Harness Host and Oh-my-Pi loop. Follow-up, capability results, navigation, and stopping a selected Run are covered by the [RC1 record](docs/releases/rc1-developer-preview.md). |
+| **Earlier live validation** | Home document generation, Prompt creation, Stop, and next-turn context; Crew Worker delivery, review/rework, and contextual Anna; Hiker dashboard reads and an Agent capability query. See the [August 31–September 1 validation record](docs/superpowers/handoff/2026-08-31-harness-product-parity.md) for scope and remaining gates. |
 | **External business operations** | The Hiker service used for that validation exposed read tools. Authorized write and read-back acceptance remain blocked on the service exposing the required capability. |
 | **Desktop distribution** | Validation currently targets macOS arm64. The local application build is unsigned and unnotarized; Windows/Linux release acceptance remains open. |
 | **Application releases** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) predates the current Harness execution path. The Codex pet has its own asset release. |
 
-Production readiness, exhaustive recovery coverage, and benchmark results remain outside the current release claims. CI checks, interface demos, and live external-service runs provide different evidence; the [current acceptance goals](docs/product/anna-harness-product-parity-goal-2026-08-31.md) track those boundaries.
+RC1 uses deterministic external transports to verify the real local identity, persistence, Gateway, and OMP execution path. Current live Provider/MCP acceptance remains blocked; earlier live records do not establish RC1 live acceptance. Full workbench scheduling, ask/answer, recovery, Memory, Sandbox, and Windows/Linux acceptance remain pending. Production readiness and benchmark results remain outside the current release claims. CI checks, interface demos, and live external-service runs provide different evidence; the [current acceptance goals](docs/product/anna-harness-product-parity-goal-2026-08-31.md) track those boundaries.
 
 ## Quick start
 
