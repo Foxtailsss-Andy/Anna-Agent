@@ -27,6 +27,9 @@ export interface WorkbenchRunRecord {
   readonly source_event_id: string;
   readonly source_event_derived?: boolean;
   readonly resource_refs: readonly string[];
+  readonly skill_id?: string;
+  readonly agent_id?: string;
+  readonly model_profile_id?: string;
   readonly requested_artifact?: string;
   readonly conversation_id: string;
   readonly conversation_source?: "conversation" | "run_id_fallback";
@@ -287,6 +290,9 @@ function sameRunIdentity(left: WorkbenchRunRecord, right: WorkbenchRunRecord): b
     && left.surface === right.surface
     && left.project_id === right.project_id
     && left.parent_run_id === right.parent_run_id
+    && left.skill_id === right.skill_id
+    && left.agent_id === right.agent_id
+    && left.model_profile_id === right.model_profile_id
     && left.requested_artifact === right.requested_artifact
     && JSON.stringify(left.resource_refs) === JSON.stringify(right.resource_refs);
 }
@@ -382,6 +388,9 @@ function isRunRecord(value: unknown): value is WorkbenchRunRecord {
     && (value.source_event_derived === undefined || typeof value.source_event_derived === "boolean")
     && Array.isArray(value.resource_refs)
     && value.resource_refs.every((item) => typeof item === "string")
+    && (value.skill_id === undefined || typeof value.skill_id === "string")
+    && (value.agent_id === undefined || typeof value.agent_id === "string")
+    && (value.model_profile_id === undefined || typeof value.model_profile_id === "string")
     && typeof value.conversation_id === "string"
     && (value.conversation_source === undefined || value.conversation_source === "conversation" || value.conversation_source === "run_id_fallback")
     && typeof value.created_at === "string"

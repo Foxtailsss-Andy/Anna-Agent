@@ -55,6 +55,8 @@ import {
 import { resolveCreateRuntimeBoundary } from "./createRuntimeBoundary";
 import { RightPanel, type PanelArtifact, type PanelFile } from "./RightPanel";
 import { nextPlaceholder, scenesOf, type Scene } from "./templates";
+import { WorkbenchChatPanel } from "../workbench/WorkbenchChatPanel";
+import { useWorkbenchSession } from "../workbench/useWorkbenchSession";
 import "./HomePage.css";
 
 type Rec = Record<string, unknown>;
@@ -167,6 +169,7 @@ export function HomePage({ displayName }: { displayName: string }) {
   const { persona } = usePersona();
   const mode = bus.homeMode;
   const runStream = useRunStream(DEFAULT_TOOL_LABELS);
+  const workbench = useWorkbenchSession(mode);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   /* ---- composer 状态 ---- */
@@ -193,6 +196,8 @@ export function HomePage({ displayName }: { displayName: string }) {
 
   /* ---- 会话状态 ---- */
   const [sessionMode, setSessionMode] = useState<HomeMode | null>(null);
+  const [workbenchRequested, setWorkbenchRequested] = useState(false);
+  const [createArtifactIntent, setCreateArtifactIntent] = useState(false);
   /* L1b 会话连续性:本 chat 会话的 thread_id(首轮成功后从 run 捕获,续聊回传)。
      仅 chat;新建/回看/切 create 会话时清空,避免跨线程串接。 */
   const threadIdRef = useRef<string | null>(null);
@@ -294,6 +299,8 @@ export function HomePage({ displayName }: { displayName: string }) {
   useEffect(() => {
     const id = bus.consumeOpenChatRun();
     if (!id) return;
+    setWorkbenchRequested(false);
+    workbench.reset();
     getChatRun(id)
       .then((run) => {
         const r = run as Rec;
@@ -326,8 +333,25 @@ export function HomePage({ displayName }: { displayName: string }) {
   }, [bus.openChatRunSeq]);
 
   useEffect(() => {
+    const entry = bus.consumeOpenWorkbenchSession();
+    if (!entry) return;
+    if (runStream.running) runStream.stop();
+    runStream.reset();
+    setSessionMode(entry.surface);
+    setWorkbenchRequested(true);
+    setViewingRun(null);
+    setCompletedRun(null);
+    setCreateRun(null);
+    setCreateError(null);
+    void workbench.restore(entry.sessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bus.openWorkbenchSessionSeq]);
+
+  useEffect(() => {
     const id = bus.consumeOpenCreateRun();
     if (!id) return;
+    setWorkbenchRequested(false);
+    workbench.reset();
     threadIdRef.current = null; // 切到 create 会话:thread 为 chat 专属,清空
     bgRunIdRef.current = null; // 离开 chat 后台 run 上下文
     const v2Configured = v2ApiBase() !== "";
@@ -368,6 +392,9 @@ export function HomePage({ displayName }: { displayName: string }) {
     threadIdRef.current = null; // 新建任务 = 全新会话线程
     bgRunIdRef.current = null;
     setSessionMode(null);
+    setWorkbenchRequested(false);
+    workbench.reset();
+    setCreateArtifactIntent(false);
     setViewingRun(null);
     setCompletedRun(null);
     setCreateRun(null);
@@ -385,7 +412,7 @@ export function HomePage({ displayName }: { displayName: string }) {
     seenArtifactCountRef.current = 0;
     fetchedRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bus.newChatSeq]);
+  }, [bus.newChatSeq, workbench.reset]);
 
   /* 完成:取全 run(chat=artifact.content/assistant_message;create=校验三面)+ 刷侧栏 */
   useEffect(() => {
@@ -448,7 +475,10 @@ export function HomePage({ displayName }: { displayName: string }) {
 
   /** M4 微交互:模板落入 → 光标落首个【占位符】整段选中;Tab 跳转在 composer。 */
   const insertTemplate = useCallback((scene: Scene, text: string) => {
-    if (scene.kind) setKind(scene.kind);
+    if (scene.kind) {
+      setKind(scene.kind);
+      setCreateArtifactIntent(true);
+    }
     setOpenScene(null);
     setDraft((prev) => {
       const next = prev.trim() ? `${prev}\n${text}` : text;
@@ -522,6 +552,7 @@ export function HomePage({ displayName }: { displayName: string }) {
   const chatSend = useCallback(() => {
     const message = composeMessage();
     if (!message) return;
+    setWorkbenchRequested(true);
     setSessionMode("chat");
     setViewingRun(null);
     setCompletedRun(null);
@@ -532,34 +563,43 @@ export function HomePage({ displayName }: { displayName: string }) {
     setDraft("");
     setSteerNote(null); /* J3:新一轮开始,上一轮的插话回执不该留在屏上 */
     setAttachments([]);
-    /* L3b:submit(run 与请求解耦,断线不杀 run)→ 从 seq 0 订阅(replay+跟随);
-       传输中断且未见终帧 → startBackground 按退避重连续帧;见终帧走既有完成流。 */
-    void runStream.startBackground(
-      async () => {
-        const res = await submitChatRun({
-          message,
-          // L1b:本会话已捕获 thread_id → 续聊回传,后端拼同 thread 既往轮;首轮为 undefined=新线程。
-          threadId: threadIdRef.current ?? undefined,
-          modelProfileId: profileId !== defaultProfileId ? profileId : undefined,
-          skillId: skillTag?.id,
-          agentId: agentId || undefined,
-          workdirId: workdir?.id,
-        });
-        bgRunIdRef.current = res.run_id;
-        // L1b:优先从 submit 响应捕获 thread_id(办妥 getChatRun 兜底,见完成 effect)。
-        if (!threadIdRef.current && res.thread_id) threadIdRef.current = res.thread_id;
-        return res.run_id;
-      },
-      (runId, fromSeq, onFrame, signal) => subscribeChatRun(runId, fromSeq, { onFrame, signal }),
-    );
-    /* 侧栏立即出现 generating 条目(呼吸点,V2 H-09 活跃项) */
+    void workbench.start(message, {
+      ...(workdir === null ? {} : { resourceRefs: [`workdir:${workdir.id}`] }),
+      ...(skillTag === null ? {} : { skillId: skillTag.id }),
+      ...(agentId === "" ? {} : { agentId }),
+      ...(profileId === defaultProfileId ? {} : { modelProfileId: profileId }),
+    });
+    /* Workbench 的订阅由 useWorkbenchSession 管理；页面卸载/切换只清理轮询，不发 stop。 */
     window.setTimeout(() => bus.refreshSidebar(), 600);
-  }, [composeMessage, runStream, profileId, defaultProfileId, skillTag, agentId, workdir, bus]);
+    return;
+  }, [composeMessage, workbench, workdir, skillTag, agentId, profileId, defaultProfileId, bus]);
 
   /* B1:Create 走流式管线(与 Chat 同一 useRunStream,LoopCard 同构,N7) */
   const createSend = useCallback(() => {
     const message = composeMessage();
     if (!message) return;
+    if (!createArtifactIntent) {
+      setWorkbenchRequested(true);
+      setSessionMode("create");
+      setViewingRun(null);
+      setCompletedRun(null);
+      setCreateRun(null);
+      setCreateError(null);
+      setLastMessage(message);
+      setDraft("");
+      setSteerNote(null);
+      setAttachments([]);
+      void workbench.start(message, {
+        ...(workdir === null ? {} : { resourceRefs: [`workdir:${workdir.id}`] }),
+        ...(skillTag === null ? {} : { skillId: skillTag.id }),
+        ...(agentId === "" ? {} : { agentId }),
+        ...(profileId === defaultProfileId ? {} : { modelProfileId: profileId }),
+      });
+      window.setTimeout(() => bus.refreshSidebar(), 600);
+      return;
+    }
+    setWorkbenchRequested(false);
+    workbench.reset();
     setSessionMode("create");
     setViewingRun(null);
     setCompletedRun(null);
@@ -618,24 +658,28 @@ export function HomePage({ displayName }: { displayName: string }) {
       );
     }
     window.setTimeout(() => bus.refreshSidebar(), 600);
-  }, [composeMessage, kind, agentId, workdir, permission, runStream, bus]);
+  }, [composeMessage, createArtifactIntent, kind, agentId, workdir, permission, runStream, workbench, skillTag, profileId, defaultProfileId, bus]);
 
   const onSend = useCallback(() => {
-    if (runStream.running) return;
+    if (runStream.running || workbench.starting || workbench.running) return;
     if (mode === "chat") chatSend();
     else createSend();
-  }, [mode, chatSend, createSend, runStream.running]);
+  }, [mode, chatSend, createSend, runStream.running, workbench.starting, workbench.running]);
 
   /* L3b 停止:chat 后台 run 断开订阅 ≠ 停后端(run 仍在跑),须显式 stopChatRun;
      然后本地 stop() 断流并显「已停止」。create/其它模式保持原语义(主动断流即停)。 */
   const handleStop = useCallback(() => {
+    if ((sessionMode === "chat" || sessionMode === "create") && workbenchRequested) {
+      void workbench.stop("Stopped by user");
+      return;
+    }
     if (sessionMode === "chat" && bgRunIdRef.current) {
       // 停止 RPC 失败(网络断=重连场景)→ 诚实标记,不伪称已停止(后端 run 可能仍在跑)。
       // 本地 stop() 不阻塞:本地视图照常停止跟随,note 只关乎后端真相。
       void stopChatRun(bgRunIdRef.current).catch(() => runStream.noteStopUndelivered());
     }
     runStream.stop();
-  }, [sessionMode, runStream]);
+  }, [sessionMode, workbenchRequested, workbench.stop, runStream]);
 
   /* J3 插话:运行中说的话交给**正在跑的这次 run**(不是新 run)。
      真凭证走后端 —— 时间线上的「收到补充指示」来自 run.interjected 事件帧,前端不自造。
@@ -795,17 +839,18 @@ export function HomePage({ displayName }: { displayName: string }) {
       value={draft}
       onChange={setDraft}
       onSend={onSend}
-      running={runStream.running}
+      running={runStream.running || workbench.starting || workbench.running}
       onStop={handleStop}
+      stopDisabled={workbenchRequested && (workbench.starting || !workbench.runId)}
       /* J3:仅 chat 会话态且已有后台 run —— 只有这里存在「正在跑的这一次」可供补话 */
-      onInterject={sessionMode === "chat" ? handleInterject : undefined}
+      onInterject={sessionMode === "chat" && !workbenchRequested ? handleInterject : undefined}
       placeholder={sessionMode ? (mode === "create" ? "补充要求、调整草案，或吩咐下一件事……" : "追问、补充，或吩咐下一件事……") : PLACEHOLDERS[mode]}
       inputRef={inputRef}
       skillTag={skillTag}
       onClearSkillTag={() => setSkillTag(null)}
       /* V2 H-10:会话内 kind 已在用户气泡回显,composer 不重复 tag(问候态才选) */
-      kindLabel={mode === "create" && !sessionMode ? KIND_LABEL[kind] : undefined}
-      onResetKind={() => setKind("skill")}
+      kindLabel={mode === "create" && !sessionMode && createArtifactIntent ? KIND_LABEL[kind] : undefined}
+      onResetKind={() => { setKind("skill"); setCreateArtifactIntent(false); }}
       skills={skills}
       onPickSkill={(id, label) => setSkillTag({ id, label })}
       profiles={profiles.length ? profiles : [{ id: defaultProfileId, label: "日常" }]}
@@ -828,7 +873,7 @@ export function HomePage({ displayName }: { displayName: string }) {
       onAddPath={onAddPath}
       permission={mode === "create" ? permission : undefined}
       onPermission={mode === "create" ? setPermission : undefined}
-      envLocked={runStream.running}
+      envLocked={runStream.running || workbench.starting || workbench.running}
       ctxPercent={sessionMode !== null ? runStream.ctxPercent : undefined}
     />
   );
@@ -913,9 +958,40 @@ export function HomePage({ displayName }: { displayName: string }) {
             )}
           </div>
 
+          {mode === "create" && (
+            <div className="ir-home__create-kinds" aria-label="显式创建类型">
+              {(Object.keys(KIND_LABEL) as CreateDraftKind[]).map((createKind) => (
+                <button
+                  key={createKind}
+                  type="button"
+                  className={`ir-home__create-kind${createArtifactIntent && kind === createKind ? " ir-home__create-kind--on" : ""}`}
+                  onClick={() => { setKind(createKind); setCreateArtifactIntent(true); }}
+                >
+                  {KIND_LABEL[createKind]}
+                </button>
+              ))}
+            </div>
+          )}
+
           {composer}
         </div>
       </div>
+    );
+  }
+
+  if ((sessionMode === "chat" || sessionMode === "create") && workbenchRequested) {
+    return (
+      <WorkbenchChatPanel
+        session={workbench.session}
+        prompt={workbench.prompt || lastMessage}
+        status={workbench.starting ? "queued" : workbench.status}
+        runId={workbench.runId}
+        error={workbench.error}
+        capabilities={workbench.capabilities}
+        events={workbench.events}
+        onStop={() => void workbench.stop("Stopped by user")}
+        composer={composer}
+      />
     );
   }
 

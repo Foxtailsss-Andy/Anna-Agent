@@ -41,9 +41,11 @@ export interface ComposerProps {
   projectId: string;
   members: TeamMember[];
   onRefresh: () => void;
+  /** 普通追问交给当前 Crew Project 的 Workbench Session。 */
+  onAskAnna?: (text: string) => Promise<void | { ok: true } | { ok: false; error: string }>;
 }
 
-export function Composer({ projectId, members, onRefresh }: ComposerProps) {
+export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerProps) {
   const [text, setText] = useState("");
   const [caret, setCaret] = useState(0);
   const [inserted, setInserted] = useState<InsertedMention[]>([]);
@@ -125,6 +127,23 @@ export function Composer({ projectId, members, onRefresh }: ComposerProps) {
     }
   };
 
+  const submitAskAnna = async () => {
+    if (empty || busy || onAskAnna === undefined) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await onAskAnna(text.trim());
+      if (result && result.ok === false) throw new Error(result.error);
+      setText("");
+      setInserted([]);
+      setCaret(0);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.body || String(e) : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitCommand = async () => {
     if (empty || busy) return;
     setBusy(true);
@@ -175,7 +194,7 @@ export function Composer({ projectId, members, onRefresh }: ComposerProps) {
         isComposing: e.nativeEvent.isComposing,
         preventDefault: () => e.preventDefault(),
       },
-      { running: busy, hasText: !empty, onSend: () => void submitSay() },
+      { running: busy, hasText: !empty, onSend: () => void (onAskAnna === undefined ? submitSay() : submitAskAnna()) },
     );
   };
 
@@ -239,6 +258,28 @@ export function Composer({ projectId, members, onRefresh }: ComposerProps) {
           >
             @ 成员
           </button>
+          {onAskAnna !== undefined && (
+            <button
+              type="button"
+              className="ir-chan-toolpill"
+              onClick={() => void submitAskAnna()}
+              disabled={empty || busy}
+              title="使用当前项目与频道事实回答"
+            >
+              问 Anna
+            </button>
+          )}
+          {onAskAnna !== undefined && (
+            <button
+              type="button"
+              className="ir-chan-toolpill"
+              onClick={() => void submitSay()}
+              disabled={empty || busy}
+              title="把消息写入当前频道"
+            >
+              发频道
+            </button>
+          )}
           <button
             type="button"
             className="ir-chan-toolpill"
@@ -251,7 +292,7 @@ export function Composer({ projectId, members, onRefresh }: ComposerProps) {
           <button
             type="button"
             className={`ir-chan-composer__send${composing ? " is-composing" : ""}`}
-            onClick={submitSay}
+            onClick={onAskAnna === undefined ? submitSay : submitAskAnna}
             disabled={empty || busy}
             aria-label="发送"
           >

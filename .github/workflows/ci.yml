@@ -59,6 +59,12 @@ jobs:
       - name: Build web and Harness v2 service
         run: npm run build && npm run harness:v2:build
 
+      - name: Install Chromium for the RC1 product flow
+        run: npx playwright install chromium
+
+      - name: Exercise RC1 through the real product UI
+        run: node --test tests/frontend/rc1_workbench_ui.test.mjs
+
       - name: Run WB-00 baseline integrity test
         run: node --test scripts/workbench-baseline-integrity.test.mjs
 

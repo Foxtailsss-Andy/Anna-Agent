@@ -34,6 +34,7 @@ import {
 } from "./workbench-session";
 import { planProductV1Migration } from "./workbench-migration";
 import { resolveWorkbenchWorkdir, workdirResourceId } from "./workbench-files";
+import { registeredWorkbenchSkills } from "./workbench-skills";
 
 const maxJsonBodyBytes = 1_024 * 1_024;
 const terminalEvents = new Set([
@@ -531,6 +532,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       const body = asRecord(await readJsonBody(request));
       assertAllowedKeys(body, [
         "prompt", "source_event_id", "surface", "parent_run_id", "resource_refs", "requested_artifact",
+        "skill_id", "agent_id", "model_profile_id",
       ]);
       const prompt = requiredSettingString(body.prompt, "prompt");
       const sourceEventId = requiredSettingString(body.source_event_id, "source_event_id");
@@ -543,6 +545,28 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         throw new ProductHttpError(422, "resource_refs_not_supported");
       }
       const requestedArtifact = requestedArtifactKind(body.requested_artifact);
+      const requestedSkillId = optionalId(body.skill_id, "skill_id");
+      const skillSource = requestedSkillId === undefined
+        ? undefined
+        : registeredWorkbenchSkills.find((skill) => {
+            const canonical = skill.id.slice("skill:".length);
+            return skill.id === requestedSkillId
+              || canonical === requestedSkillId
+              || canonical.replaceAll("/", "-") === requestedSkillId;
+          });
+      const skillId = skillSource?.id;
+      const agentId = optionalId(body.agent_id, "agent_id");
+      const modelProfileId = optionalId(body.model_profile_id, "model_profile_id");
+      if (requestedSkillId !== undefined && skillSource === undefined) {
+        throw new ProductHttpError(409, "skill_not_registered");
+      }
+      if (modelProfileId !== undefined && modelProfileId !== "default") {
+        const config = await readProductConfig(options.runtimeConfigPath);
+        const profiles = Array.isArray(config.model_profiles) ? config.model_profiles.filter(isRecord) : [];
+        if (!profiles.some((profile) => profile.id === modelProfileId)) {
+          throw new ProductHttpError(409, "model_profile_unavailable");
+        }
+      }
       if (parentRunId !== undefined) {
         const parent = await workbenchSessions.getRun(parentRunId);
         if (parent === undefined || parent.session_id !== session.session_id) {
@@ -567,6 +591,9 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         admission_status: "pending",
         ...(session.project_id === undefined ? {} : { project_id: session.project_id }),
         ...(parentRunId === undefined ? {} : { parent_run_id: parentRunId }),
+        ...(skillId === undefined ? {} : { skill_id: skillId }),
+        ...(agentId === undefined ? {} : { agent_id: agentId }),
+        ...(modelProfileId === undefined ? {} : { model_profile_id: modelProfileId }),
         ...(requestedArtifact === undefined ? {} : { requested_artifact: requestedArtifact }),
       };
       const lookup = await workbenchSessions.createOrGetRun(run);
@@ -630,6 +657,38 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         session_id: session.session_id,
         source_event_id: lookup.run.source_event_id,
         status,
+      });
+      return;
+    }
+    const runStopMatch = pathname.match(/^\/api\/workbench\/runs\/([^/]+)\/stop$/);
+    if (runStopMatch !== null && request.method === "POST") {
+      const scope = await resolveWorkbenchScope(request);
+      const run = await workbenchSessions.getRun(decodeSegment(runStopMatch[1]));
+      if (run === undefined) throw new ProductHttpError(404, "run_not_found");
+      const session = await workbenchSessions.getSession(run.session_id);
+      if (session === undefined) throw new ProductHttpError(404, "run_not_found");
+      await authorizeWorkbenchSession(request, session, scope);
+      const body = asRecord(await readJsonBody(request));
+      assertAllowedKeys(body, ["reason"]);
+      if (body.reason !== undefined && typeof body.reason !== "string") {
+        throw new ProductHttpError(400, "invalid_stop_request");
+      }
+      if (options.runtime.stop === undefined) {
+        throw new ProductHttpError(503, "harness_control_unavailable");
+      }
+      const reason = typeof body.reason === "string" && body.reason.trim() !== ""
+        ? body.reason
+        : "Stopped by user";
+      const result = await options.runtime.stop(
+        run.workspace_id,
+        run.channel_id,
+        run.run_id,
+        reason,
+      );
+      const detail = await readWorkbenchRun(run);
+      responseJson(response, 202, {
+        run_id: run.run_id,
+        status: result?.status ?? detail?.status ?? "cancelled",
       });
       return;
     }
@@ -783,7 +842,14 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     }
     const task: ProductTask = {
       ...productTaskForWorkbenchRun(run),
-      ...(history.length === 0 ? {} : { context: { conversation_history: history } }),
+      ...(history.length === 0
+        ? {}
+        : {
+            context: {
+              ...(productTaskForWorkbenchRun(run).context ?? {}),
+              conversation_history: history,
+            },
+          }),
     };
     if (options.businessOrigin === undefined) return task;
     try {
@@ -1195,6 +1261,15 @@ function productTaskForWorkbenchRun(run: WorkbenchRunRecord): ProductTask {
     ...(run.project_id === undefined ? {} : { project_id: run.project_id }),
     ...(run.parent_run_id === undefined ? {} : { parent_run_id: run.parent_run_id }),
     resource_refs: run.resource_refs,
+    ...(run.model_profile_id === undefined ? {} : { model_profile_id: run.model_profile_id }),
+    ...((run.skill_id === undefined && run.agent_id === undefined)
+      ? {}
+      : {
+          context: {
+            ...(run.skill_id === undefined ? {} : { skill_id: run.skill_id }),
+            ...(run.agent_id === undefined ? {} : { agent_id: run.agent_id }),
+          },
+        }),
     ...(run.requested_artifact === undefined ? {} : { requested_artifact: run.requested_artifact }),
     source_event_id: run.source_event_id,
   };
@@ -1215,6 +1290,9 @@ function publicWorkbenchRun(
     ...(run.conversation_source === undefined ? {} : { conversation_source: run.conversation_source }),
     ...(run.project_id === undefined ? {} : { project_id: run.project_id }),
     ...(run.parent_run_id === undefined ? {} : { parent_run_id: run.parent_run_id }),
+    ...(run.skill_id === undefined ? {} : { skill_id: run.skill_id }),
+    ...(run.agent_id === undefined ? {} : { agent_id: run.agent_id }),
+    ...(run.model_profile_id === undefined ? {} : { model_profile_id: run.model_profile_id }),
     status: detail?.status ?? "queued",
     ...(run.admission_status === undefined ? {} : { admission_status: run.admission_status }),
     ...(run.admission_error === undefined ? {} : { admission_error: run.admission_error }),

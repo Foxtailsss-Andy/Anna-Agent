@@ -65,6 +65,8 @@ export interface HomeComposerProps {
   onSend: () => void;
   running: boolean;
   onStop: () => void;
+  /** Workbench has not received the new Run id yet; no existing Run is safe to stop. */
+  stopDisabled?: boolean;
   /**
    * J3 插话:提供时,运行中的 composer 不再锁死 —— 输入并回车是给**当前 run**
    * 补一句指示(不是新 run)。不提供 → 运行中沿既有的「只能停止」行为。
@@ -642,7 +644,7 @@ export function HomeComposer(props: HomeComposerProps) {
             {profilePanel}
           </div>
           {running && (
-            <button type="button" className="hcp__stop" onClick={onStop}>
+            <button type="button" className="hcp__stop" onClick={onStop} disabled={props.stopDisabled === true}>
               <span className="hcp__stop-square" aria-hidden="true" />
               停止
             </button>

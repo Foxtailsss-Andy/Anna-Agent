@@ -616,6 +616,7 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
 
         {/* 频道列 328px(F3);C4 全幅阅读/下载上抛到阅读器/下载器 */}
         <ChannelColumn
+          key={projectId}
           projectId={projectId}
           project={project}
           channel={channel}

@@ -120,6 +120,29 @@
   margin-bottom: 26px;
 }
 
+.ir-home__create-kinds {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: -12px 0 18px;
+}
+
+.ir-home__create-kind {
+  border: 1px solid rgb(87 91 196 / 18%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 40%);
+  color: var(--ink-2);
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ir-home__create-kind--on {
+  background: var(--iris-soft, #efeffa);
+  color: var(--iris-deep, #44479f);
+}
+
 .ir-home__chips {
   display: flex;
   gap: 10px;

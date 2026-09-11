@@ -24,12 +24,13 @@ import { hhmm, str, useDashboardRun } from "./useDashboardRun";
 import "./cowork.css";
 
 export function HikerPage() {
-  const [copilot, setCopilot] = useState<{ open: boolean; question: string }>({ open: false, question: "" });
+  const [copilot, setCopilot] = useState<{ open: boolean; question: string; mode: "business" | "ordinary" }>({ open: false, question: "", mode: "business" });
 
   const { run, loading, loadedAt, refreshError, load } = useDashboardRun(() => createHikerDashboardRun());
 
   const refresh = useCallback(() => load(() => createHikerDashboardRun(), true), [load]);
-  const ask = useCallback((question: string) => setCopilot({ open: true, question }), []);
+  const ask = useCallback((question: string) => setCopilot({ open: true, question, mode: "business" }), []);
+  const askOrdinary = useCallback(() => setCopilot({ open: true, question: "", mode: "ordinary" }), []);
   const closeCopilot = useCallback(() => setCopilot((c) => ({ ...c, open: false })), []);
 
   const status = str(run?.status);
@@ -58,6 +59,9 @@ export function HikerPage() {
         <button type="button" className="ir-cwk-refresh" onClick={refresh} disabled={loading}>
           刷新
         </button>
+        <button type="button" className="ir-cwk-refresh" onClick={askOrdinary}>
+          普通对话
+        </button>
         {loading && <DashboardRefreshBadge />}
       </div>
       <ProvenanceLine text={provText} />
@@ -71,7 +75,7 @@ export function HikerPage() {
       header={header}
       fullState={fullState}
       hasView={!!view}
-      slideOver={<SlideOverCopilot open={copilot.open} question={copilot.question} target="hiker" onClose={closeCopilot} />}
+      slideOver={<SlideOverCopilot open={copilot.open} question={copilot.question} mode={copilot.mode} target="hiker" onClose={closeCopilot} />}
     >
       {view && (
         <>

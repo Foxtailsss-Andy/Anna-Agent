@@ -19,6 +19,7 @@ import { listDrafts } from "../../lib/api/create";
 import { getRuntimeStatus } from "../../lib/api/admin";
 import { listProjects } from "../../lib/api/crew";
 import type { CrewProject } from "../../lib/api/crew";
+import { listWorkbenchSessions, type WorkbenchSession } from "../../lib/api/workbench";
 import { deriveUnreadBadge, projectProgress } from "../../pages/crew/crewModel";
 import { IrisPetal } from "../anna/IrisPetal";
 import type { CoworkItem, CrewItem, HomeMode, ShellSection, SidebarSegment } from "./AnnaShell";
@@ -256,9 +257,11 @@ export function Sidebar({
   /* 未读徽标:复用外壳通知铃的共享轮询源(单一 5s 拉取,避免双拉) */
   const { unreadCount } = useCrewNotifications();
   const [chatRuns, setChatRuns] = useState<RunEntry[] | null>(null);
+  const [workbenchSessions, setWorkbenchSessions] = useState<WorkbenchSession[] | null>(null);
   const [drafts, setDrafts] = useState<RunEntry[] | null>(null);
   const [check, setCheck] = useState<SelfCheck>({ tone: "dim", text: "自检 · 装载中" });
   const [activeChatRun, setActiveChatRun] = useState<string>("");
+  const [activeWorkbenchSession, setActiveWorkbenchSession] = useState<string>("");
   const [activeCreateRun, setActiveCreateRun] = useState<string>("");
   /* Crew 段真数据:项目列表(子列表 + 飞出层) */
   const [projects, setProjects] = useState<CrewProject[] | null>(null);
@@ -281,6 +284,9 @@ export function Sidebar({
     listChatRuns()
       .then((runs) => setChatRuns((runs as Rec[]).map(chatEntry).filter((r) => r.id)))
       .catch(() => setChatRuns([]));
+    listWorkbenchSessions()
+      .then(({ sessions }) => setWorkbenchSessions(sessions))
+      .catch(() => setWorkbenchSessions([]));
     listDrafts()
       .then((runs) => setDrafts((runs as Rec[]).map(draftEntry).filter((r) => r.id)))
       .catch(() => setDrafts([]));
@@ -312,6 +318,13 @@ export function Sidebar({
   const openRun = (id: string) => {
     setActiveChatRun(id);
     bus.openChatRun(id);
+  };
+  const openWorkbench = (sessionId: string) => {
+    setActiveWorkbenchSession(sessionId);
+    const surface = workbenchSessions?.find((session) => session.session_id === sessionId)?.surface === "create"
+      ? "create"
+      : "chat";
+    bus.openWorkbenchSession(sessionId, surface);
   };
   const openDraft = (id: string) => {
     setActiveCreateRun(id);
@@ -382,25 +395,44 @@ export function Sidebar({
     </>,
   );
 
+  const workbenchHistoryItems = (surface?: "chat" | "create") =>
+    (workbenchSessions ?? [])
+      .filter((session) => surface === undefined || session.surface === surface)
+      .slice(0, 8)
+      .map((session) => {
+        const latest = session.runs?.at(-1);
+        const title = latest?.prompt?.trim() || `Session ${session.session_id.slice(0, 8)}`;
+        return item({
+          key: `workbench-${session.session_id}`,
+          label: title.length > 14 ? `${title.slice(0, 14)}…` : title,
+          on: section === "home" && activeWorkbenchSession === session.session_id,
+          dot: latest?.status === "running" || latest?.status === "queued",
+          onClick: () => openWorkbench(session.session_id),
+        });
+      });
+
   /* Home 段历史组:随模式换标题与数据源,条目文法不变(H-13 ②) */
   const homeHistory =
     homeMode === "chat"
       ? group(
           "历史对话",
-          chatRuns === null ? (
+          chatRuns === null || workbenchSessions === null ? (
             <div className="ir-side__note">装载中……</div>
-          ) : chatRuns.length === 0 ? (
+          ) : chatRuns.length === 0 && workbenchSessions.length === 0 ? (
             <div className="ir-side__note">还没有对话记录</div>
           ) : (
-            chatRuns.slice(0, 8).map((r) =>
-              item({
-                key: r.id,
-                label: r.title,
-                on: section === "home" && activeChatRun === r.id,
-                dot: r.status === "generating",
-                onClick: () => openRun(r.id),
-              }),
-            )
+            <>
+              {workbenchHistoryItems("chat")}
+              {chatRuns.slice(0, 8).map((r) =>
+                item({
+                  key: r.id,
+                  label: r.title,
+                  on: section === "home" && activeChatRun === r.id,
+                  dot: r.status === "generating",
+                  onClick: () => openRun(r.id),
+                }),
+              )}
+            </>
           ),
           labelLit,
         )
@@ -408,18 +440,21 @@ export function Sidebar({
           "构建记录",
           drafts === null ? (
             <div className="ir-side__note">装载中……</div>
-          ) : drafts.length === 0 ? (
+          ) : drafts.length === 0 && (workbenchSessions ?? []).filter((session) => session.surface === "create").length === 0 ? (
             <div className="ir-side__note">还没有构建记录</div>
           ) : (
-            drafts.slice(0, 8).map((r) =>
-              item({
-                key: r.id,
-                label: r.title,
-                on: section === "home" && activeCreateRun === r.id,
-                dot: r.status === "generating",
-                onClick: () => openDraft(r.id),
-              }),
-            )
+            <>
+              {workbenchHistoryItems("create")}
+              {drafts.slice(0, 8).map((r) =>
+                item({
+                  key: r.id,
+                  label: r.title,
+                  on: section === "home" && activeCreateRun === r.id,
+                  dot: r.status === "generating",
+                  onClick: () => openDraft(r.id),
+                }),
+              )}
+            </>
           ),
           labelLit,
         );

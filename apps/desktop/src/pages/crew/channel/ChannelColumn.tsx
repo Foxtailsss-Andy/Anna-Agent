@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 import { IrisPetal } from "../../../components/anna/IrisPetal";
 import { StateNote } from "../../../components/anna/StateNote";
@@ -29,6 +30,7 @@ import { SayBubble } from "./SayBubble";
 import { messageFamily, type MentionMeta } from "./channelModel";
 import { intentOriginMessageId, isIntentCommand } from "./intentCard";
 import { SYSTEM_ANNA_MENTION_ID } from "./pickerModel";
+import { useWorkbenchSession } from "../../workbench/useWorkbenchSession";
 import "./channel.css";
 
 function timeOf(iso: string): string {
@@ -76,6 +78,7 @@ export function ChannelColumn({
   onLocate,
   onOpenReview,
 }: ChannelColumnProps) {
+  const workbench = useWorkbenchSession("crew", projectId);
   const [collapsed, setCollapsed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const prevLen = useRef(0);
@@ -131,6 +134,13 @@ export function ChannelColumn({
       const mem = memberMap.get(id);
       return { name: mem?.display_name ?? id, isAgent: mem?.kind === "agent" };
     });
+
+  const askAnna = async (text: string) => {
+    return workbench.start(text);
+  };
+  const currentMessages = (workbench.session?.messages ?? []).filter((message) => message.run_id === workbench.runId);
+  const currentAnswer = [...currentMessages].reverse().find((message) => message.role === "assistant")?.content;
+  const workbenchStatus = workbench.starting ? "正在建立会话" : workbench.status;
 
   const renderMessage = (msg: ChannelMessage) => {
     const author = resolveAuthor(msg);
@@ -260,9 +270,30 @@ export function ChannelColumn({
           channel.map(renderMessage)
         )}
         <ActivityRows tasks={project.tasks ?? []} members={members} />
+        {(workbench.runId || workbench.error) && (
+          <div className="ir-crew-workbench" role="status">
+            <div className="ir-crew-workbench__head">
+              <IrisPetal size={12} />
+              <span>Anna · {workbenchStatus}</span>
+              {workbench.runId && <span className="ir-crew-workbench__id">{workbench.runId.slice(0, 8)}</span>}
+            </div>
+            {workbench.capabilities.length > 0 && (
+              <div className="ir-crew-workbench__caps">
+                {workbench.capabilities.map((capability) => <span key={capability}>{capability}</span>)}
+              </div>
+            )}
+            {currentAnswer && <div className="ir-crew-workbench__answer"><ReactMarkdown>{currentAnswer}</ReactMarkdown></div>}
+            {workbench.error && <div className="ir-crew-workbench__error">{workbench.error}</div>}
+            {workbench.running && (
+              <button type="button" className="ir-crew-workbench__stop" onClick={() => void workbench.stop("Stopped by user")}>
+                停止此 Run
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      <Composer projectId={projectId} members={members} onRefresh={onRefresh} />
+      <Composer projectId={projectId} members={members} onRefresh={onRefresh} onAskAnna={askAnna} />
     </aside>
   );
 }

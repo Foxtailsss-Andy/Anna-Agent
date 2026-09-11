@@ -12,7 +12,7 @@
   max-width: 100%;
   transform: translateX(100%);
   transition: transform var(--dur-lift) var(--ease-lift);
-  z-index: 20;
+  z-index: 70;
   pointer-events: none;
 }
 .ir-copilot--open {
@@ -126,6 +126,35 @@
 .ir-copilot__answer :first-child { margin-top: 0; }
 .ir-copilot__answer :last-child { margin-bottom: 0; }
 .ir-copilot__answer p { margin: 0 0 8px; }
+
+.ir-copilot__run-id {
+  margin: 8px 0;
+  color: var(--ink-3);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+}
+
+.ir-copilot__capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0;
+}
+
+.ir-copilot__capabilities span {
+  border-radius: 999px;
+  background: rgb(87 91 196 / 9%);
+  color: var(--iris-deep, #44479f);
+  padding: 3px 7px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+}
+
+.ir-copilot__error {
+  margin-top: 10px;
+  color: #9c3340;
+  font-size: 12px;
+}
 
 /* Composer 底栏 */
 .ir-copilot__composer {

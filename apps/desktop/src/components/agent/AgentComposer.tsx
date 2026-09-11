@@ -29,6 +29,8 @@ export interface AgentComposerProps {
   onSend: () => void;
   running?: boolean;
   onStop?: () => void;
+  /** Workbench has not received the new Run id yet; no existing Run is safe to stop. */
+  stopDisabled?: boolean;
   placeholder?: string;
   /** 调优(真) */
   onTune?: () => void;
@@ -182,7 +184,7 @@ export function AgentComposer(props: AgentComposerProps) {
           )}
 
           {running && (
-            <button type="button" className="acp__stop" onClick={onStop}>停止</button>
+            <button type="button" className="acp__stop" onClick={onStop} disabled={props.stopDisabled === true}>停止</button>
           )}
           <button
             type="button"

@@ -54,6 +54,10 @@ export interface ShellBus {
   openChatRun: (runId: string) => void;
   openChatRunSeq: number;
   consumeOpenChatRun: () => string | null;
+  /** Workbench Session 历史/活动项 → Home 读取同一 Session 投影 */
+  openWorkbenchSession: (sessionId: string, surface?: HomeMode) => void;
+  openWorkbenchSessionSeq: number;
+  consumeOpenWorkbenchSession: () => { sessionId: string; surface: HomeMode } | null;
   /** 侧栏「＋新建任务」→ Home 回到问候空态,携带当前模式(H-13 ④) */
   newChat: () => void;
   newChatSeq: number;
@@ -77,6 +81,9 @@ const NOOP_BUS: ShellBus = {
   openChatRun: () => {},
   openChatRunSeq: 0,
   consumeOpenChatRun: () => null,
+  openWorkbenchSession: () => {},
+  openWorkbenchSessionSeq: 0,
+  consumeOpenWorkbenchSession: () => null,
   newChat: () => {},
   newChatSeq: 0,
   openCreateRun: () => {},
@@ -161,6 +168,8 @@ export function AnnaShell({
   const [prefillSeq, setPrefillSeq] = useState(0);
   const pendingChatRunRef = useRef<string | null>(null);
   const [openChatRunSeq, setOpenChatRunSeq] = useState(0);
+  const pendingWorkbenchSessionRef = useRef<{ sessionId: string; surface: HomeMode } | null>(null);
+  const [openWorkbenchSessionSeq, setOpenWorkbenchSessionSeq] = useState(0);
   const [newChatSeq, setNewChatSeq] = useState(0);
   const pendingCreateRunRef = useRef<string | null>(null);
   const [openCreateRunSeq, setOpenCreateRunSeq] = useState(0);
@@ -244,6 +253,18 @@ export function AnnaShell({
     return id;
   }, []);
 
+  const openWorkbenchSession = useCallback((sessionId: string, surface: HomeMode = "chat") => {
+    pendingWorkbenchSessionRef.current = { sessionId, surface };
+    setOpenWorkbenchSessionSeq((n) => n + 1);
+    setHomeMode("chat");
+    onNavigate("home");
+  }, [onNavigate]);
+  const consumeOpenWorkbenchSession = useCallback((): { sessionId: string; surface: HomeMode } | null => {
+    const id = pendingWorkbenchSessionRef.current;
+    pendingWorkbenchSessionRef.current = null;
+    return id;
+  }, []);
+
   /** 新建任务:回 Home 问候页,携带当前模式(H-13 ④,不弹菜单) */
   const newChat = useCallback(() => {
     setNewChatSeq((n) => n + 1);
@@ -279,6 +300,9 @@ export function AnnaShell({
       openChatRun,
       openChatRunSeq,
       consumeOpenChatRun,
+      openWorkbenchSession,
+      openWorkbenchSessionSeq,
+      consumeOpenWorkbenchSession,
       newChat,
       newChatSeq,
       openCreateRun,
@@ -287,7 +311,7 @@ export function AnnaShell({
       refreshSidebar,
       sidebarSeq,
     }),
-    [onNavigate, openCrewProject, homeMode, prefillChat, prefillSeq, consumePrefill, openChatRun, openChatRunSeq, consumeOpenChatRun, newChat, newChatSeq, openCreateRun, openCreateRunSeq, consumeOpenCreateRun, refreshSidebar, sidebarSeq],
+    [onNavigate, openCrewProject, homeMode, prefillChat, prefillSeq, consumePrefill, openChatRun, openChatRunSeq, consumeOpenChatRun, openWorkbenchSession, openWorkbenchSessionSeq, consumeOpenWorkbenchSession, newChat, newChatSeq, openCreateRun, openCreateRunSeq, consumeOpenCreateRun, refreshSidebar, sidebarSeq],
   );
 
   return (
