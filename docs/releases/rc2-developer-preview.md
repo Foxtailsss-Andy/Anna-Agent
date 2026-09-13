@@ -29,7 +29,9 @@ Release baseline: [`9dee3583fa96`](https://github.com/Foxtailsss-Andy/Anna-Agent
 
 RC1 的原失败继续保留：product job 通过，checks job 失败，UI/Python 步骤被跳过。本轮验证单独记录，不改写 RC1 结果。
 
-Candidate validation is pending. The [RC2 prerelease](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) will identify the final source commit and its CI result.
+The [RC2 prerelease record](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) records the final source commit, local validation results, and CI run for that exact commit. Publication requires both CI jobs (`checks` and `product`) to pass, local typechecking, the full JavaScript and Python suites, Web/Host builds, frontend smoke, the real product UI regression, and closure of the independent Standards/Spec reviews. The CI dependency guard separately covers failed prerequisites, failed generation with and without a manifest, missing output after successful generation, and cancellation.
+
+[RC2 预发布记录](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) 集中记录最终提交、本地验证结果与对应 SHA 的 CI 链接。发布门槛包括两个 CI job 通过、本地类型检查、完整 JS/Python、Web/Host 构建、前端 smoke、真实产品 UI 回归及 Standards/Spec 独立审查闭环。目录测试与 CI guard 的通过不代表真实 Provider/MCP 或分发验收完成。
 
 ## Limits / 限制
 

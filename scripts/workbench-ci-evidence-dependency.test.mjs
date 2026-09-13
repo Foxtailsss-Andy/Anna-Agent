@@ -53,6 +53,7 @@ const healthy = {
   steps: {
     npm_install: "success",
     omp_prepare: "success",
+    python_setup: "success",
     python_install: "success",
     web_host_build: "success",
     chromium_install: "success",
@@ -69,6 +70,11 @@ const healthy = {
     "evals/workbench/wb02/runs/ci-123-1/evidence/manifest.json",
   ],
 };
+const evidenceCases = [
+  ["wb00_baseline", "Verify WB-00 baseline schema and manifest", "Retain WB-00 baseline evidence", "wb00"],
+  ["wb01_evidence", "Verify WB-01 session evidence manifest", "Retain WB-01 session evidence", "wb01"],
+  ["wb02_evidence", "Verify WB-02 capability evidence manifest", "Retain WB-02 capability evidence", "wb02"],
+];
 
 test("independent product and evidence checks continue after a test failure", () => {
   for (const name of [
@@ -77,6 +83,7 @@ test("independent product and evidence checks continue after a test failure", ()
     "Build web and Harness v2 service",
     "Exercise RC1 through the real product UI",
     "Run WB-00 baseline fixture and freeze evidence",
+    "Install Python dependencies",
     "Run Python tests",
     "Run WB-02 capability evidence CLI guards",
   ]) {
@@ -86,6 +93,7 @@ test("independent product and evidence checks continue after a test failure", ()
   assert.match(condition("Exercise RC1 through the real product UI"), /steps\.python_install\.outcome == 'success'/);
   assert.match(condition("Run WB-00 baseline fixture and freeze evidence"), /steps\.omp_prepare\.outcome == 'success'/);
   assert.match(condition("Run Python tests"), /steps\.python_install\.outcome == 'success'/);
+  assert.match(condition("Install Python dependencies"), /steps\.python_setup\.outcome == 'success'/);
 
   const testFailure = structuredClone(healthy);
   testFailure.steps.javascript_tests = "failure";
@@ -103,12 +111,8 @@ test("independent product and evidence checks continue after a test failure", ()
   }
 });
 
-test("evidence verification and upload only run when producer output exists", () => {
-  for (const [producer, verifier, upload, ticket] of [
-    ["wb00_baseline", "Verify WB-00 baseline schema and manifest", "Retain WB-00 baseline evidence", "wb00"],
-    ["wb01_evidence", "Verify WB-01 session evidence manifest", "Retain WB-01 session evidence", "wb01"],
-    ["wb02_evidence", "Verify WB-02 capability evidence manifest", "Retain WB-02 capability evidence", "wb02"],
-  ]) {
+test("verifies generated evidence and retains partial output", () => {
+  for (const [producer, verifier, upload, ticket] of evidenceCases) {
     const verifyCondition = condition(verifier);
     const uploadCondition = condition(upload);
     assert.match(verifyCondition, new RegExp(`steps\\.${producer}\\.outcome == 'success'`));
@@ -128,11 +132,7 @@ test("evidence verification and upload only run when producer output exists", ()
     assert.equal(evaluate(condition(name), healthy), expected, `${name} healthy path`);
   }
 
-  for (const [producer, verifier, upload, ticket] of [
-    ["wb00_baseline", "Verify WB-00 baseline schema and manifest", "Retain WB-00 baseline evidence", "wb00"],
-    ["wb01_evidence", "Verify WB-01 session evidence manifest", "Retain WB-01 session evidence", "wb01"],
-    ["wb02_evidence", "Verify WB-02 capability evidence manifest", "Retain WB-02 capability evidence", "wb02"],
-  ]) {
+  for (const [producer, verifier, upload, ticket] of evidenceCases) {
     const producerFailedNoOutput = structuredClone(healthy);
     producerFailedNoOutput.steps[producer] = "failure";
     producerFailedNoOutput.files = producerFailedNoOutput.files.filter((file) => !file.startsWith(`evals/workbench/${ticket}/`));
@@ -159,13 +159,20 @@ test("evidence producers retain direct runtime dependencies", () => {
   assert.match(condition("Run WB-02 capability increment evidence"), /steps\.python_install\.outcome == 'success'/);
   assert.match(condition("Run WB-02 capability increment evidence"), /steps\.omp_prepare\.outcome == 'success'/);
 
-  const npmFailed = { cancelled: false, steps: { npm_install: "failure", omp_prepare: "skipped", python_install: "skipped" } };
+  const npmFailed = { cancelled: false, steps: { npm_install: "failure", omp_prepare: "skipped", python_setup: "success", python_install: "success" } };
   assert.equal(evaluate(condition("Run JavaScript tests"), npmFailed), false);
-  assert.equal(evaluate(condition("Run Python tests"), npmFailed), false);
+  assert.equal(evaluate(condition("Install Python dependencies"), npmFailed), true);
+  assert.equal(evaluate(condition("Audit Python dependencies"), npmFailed), true);
+  assert.equal(evaluate(condition("Run Python tests"), npmFailed), true);
   assert.equal(evaluate(condition("Run WB-01 session increment evidence"), npmFailed), false);
   assert.equal(evaluate(condition("Run WB-02 capability increment evidence"), npmFailed), false);
 
-  const pythonFailed = { cancelled: false, steps: { npm_install: "success", omp_prepare: "success", python_install: "failure" } };
+  const pythonSetupFailed = { cancelled: false, steps: { npm_install: "success", omp_prepare: "success", python_setup: "failure", python_install: "skipped" } };
+  assert.equal(evaluate(condition("Install Python dependencies"), pythonSetupFailed), false);
+  assert.equal(evaluate(condition("Audit Python dependencies"), pythonSetupFailed), false);
+  assert.equal(evaluate(condition("Run Python tests"), pythonSetupFailed), false);
+
+  const pythonFailed = { cancelled: false, steps: { npm_install: "success", omp_prepare: "success", python_setup: "success", python_install: "failure" } };
   assert.equal(evaluate(condition("Run JavaScript tests"), pythonFailed), false);
   assert.equal(evaluate(condition("Run WB-01 session increment evidence"), pythonFailed), false);
   assert.equal(evaluate(condition("Run WB-02 capability increment evidence"), pythonFailed), false);
@@ -181,6 +188,7 @@ test("evidence producers retain direct runtime dependencies", () => {
   for (const name of [
     "Run JavaScript tests",
     "Exercise RC1 through the real product UI",
+    "Install Python dependencies",
     "Run Python tests",
     "Run WB-00 baseline fixture and freeze evidence",
     "Verify WB-00 baseline schema and manifest",
