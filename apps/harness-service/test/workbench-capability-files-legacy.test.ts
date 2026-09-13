@@ -43,23 +43,17 @@ describe("legacy Product Host workdir client seam", () => {
     const sessionStorePath = join(directory, "sessions.json");
     const workspaceRoot = join(directory, "runtime-workspace");
     await mkdir(workspaceRoot, { recursive: true });
-    const descriptor = await createOmpKernelDescriptor(materializedRoot);
     await writeFile(runtimeConfigPath, JSON.stringify({
       model_provider: "openai-compatible",
       model_name: "fixture-model",
       model_api_key: "fixture-only",
       model_endpoint: "https://provider.invalid/v1/chat/completions",
-      harness_v2_kernel: "omp",
-      harness_v2_omp_runtime_root: materializedRoot,
-      harness_v2_omp_descriptor: descriptor,
     }), "utf8");
     const live = await createLiveHarnessV2Runtime({
       runtimeConfigPath,
       eventStorePath,
       workspaceRoot,
       surfaces: ["create"],
-      requireOmp: true,
-      ompRuntimeRoot: materializedRoot,
       protectedPaths: [eventStorePath, sessionStorePath],
     });
     services.push(live);
@@ -148,31 +142,23 @@ describe("legacy Product Host workdir client seam", () => {
     const sessionStorePath = join(directory, "sessions.json");
     const workspaceRoot = join(directory, "runtime-workspace");
     await mkdir(workspaceRoot, { recursive: true });
-    const descriptor = await createOmpKernelDescriptor(materializedRoot);
     await writeFile(runtimeConfigPath, JSON.stringify({
       model_provider: "openai-compatible",
       model_name: "fixture-model",
       model_api_key: "fixture-only",
       model_endpoint: "https://provider.invalid/v1/chat/completions",
-      harness_v2_kernel: "omp",
-      harness_v2_omp_runtime_root: materializedRoot,
-      harness_v2_omp_descriptor: descriptor,
     }), "utf8");
     const sessions = new ProductSessionStore(sessionStorePath);
+    // Admission rejects the conflicting binding before a Run starts, so this fixture does not need OMP.
     const live = await createLiveHarnessV2Runtime({
       runtimeConfigPath,
       eventStorePath,
       workspaceRoot,
       surfaces: ["create"],
-      requireOmp: true,
-      ompRuntimeRoot: materializedRoot,
       productTaskFor: async (runId) => (await sessions.get(runId))?.task,
       productTaskPeek: (runId) => sessions.peek(runId)?.task,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
-      ompModelTransport: async function* () {
-        yield textResponse("legacy task continued");
-      },
     });
     services.push(live);
     const host = await startProductHost({

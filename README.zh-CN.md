@@ -8,13 +8,13 @@ Anna 是一个个人开源项目，探索如何让 AI Agent 从一次对话出�
 
 我们希望工作过程始终清楚：Anna 正在做什么、可以使用哪些工具、哪里需要你作决定，以及结果是如何产生的。
 
-**RC1 · 源码开发者预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**RC2 · 源码开发者预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [English](README.md) · [可以体验什么](#可以体验什么) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
-> **RC1 · 三个工作空间共用持续对话链路**
+> **RC2 · 修复共享工作台的发布验证问题**
 >
-> Home/Create、Cowork、Crew 的普通问题接入共享 Harness 的 Session 与 Run。Anna 可以直接回答，也可以使用可用的搜索、URL、Skill 和用户明确选择的文件读取能力。既有资源创建与业务流程继续可用。具体改动、验证与限制见 [RC1 发布记录](docs/releases/rc1-developer-preview.md)。本次交付面向开发者的源码预览，不包含新的签名安装包。
+> RC2 处理 RC1 暴露的工作目录测试超时与 CI 证据依赖问题。Home/Create、Cowork、Crew 继续共用 Session 与 Run，支持续聊、能力结果与停止指定 Run。Anna 可以直接回答，也可以使用可用的搜索、URL、Skill 和用户明确选择的文件读取能力；既有资源创建与业务流程保持可用。具体改动、验证与限制见 [RC2 发布记录](docs/releases/rc2-developer-preview.md) 和 [源码预发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)。本次不包含新的签名安装包。
 
 ## 可以体验什么
 
@@ -62,7 +62,7 @@ Anna 正在持续开发中，当前源码面向希望体验项目、参与改进
 
 | 范围 | 当前状态 |
 | --- | --- |
-| **RC1 源码** | 普通对话通过共享 Node Harness Host 与 Oh-my-Pi 循环进入持久 Session/Run；续聊、能力结果、导航与停止指定 Run 的验证范围见 [RC1 记录](docs/releases/rc1-developer-preview.md)。 |
+| **RC2 源码** | 修复工作目录身份/范围测试与 CI 证据依赖；普通对话继续通过共享 Node Harness Host 与 Oh-my-Pi 循环执行。结果见 [RC2 记录](docs/releases/rc2-developer-preview.md)；[RC1 记录](docs/releases/rc1-developer-preview.md) 保留此前行为与失败事实。 |
 | **此前的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |
 | **外部业务操作** | 该次验证连接的 Hiker 服务只开放读取工具。授权写入与读回验收仍需等待服务端开放相应能力。 |
 | **桌面分发** | 当前验证目标为 macOS arm64。本地应用构建尚未签名与公证，Windows/Linux 发布验收仍待完成。 |
@@ -70,7 +70,7 @@ Anna 正在持续开发中，当前源码面向希望体验项目、参与改进
 
 生产可用性、完整故障恢复覆盖及基准测试成绩仍待验证。CI、界面演示和真实外部服务调用各自证明不同范围，具体要求见 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
 
-RC1 使用明确固定的外部 transport，验证真实本地身份、持久化、Gateway 与 OMP 执行路径。本轮真实 Provider/MCP 验收仍为 blocked；此前真实记录不代表 RC1 live 已通过。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
+RC2 继续使用明确固定的外部 transport，验证真实本地身份、持久化、Gateway 与 OMP 执行路径。本轮真实 Provider/MCP 验收仍为 blocked；此前真实记录不代表 RC2 live 已通过。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
 
 ## 快速开始
 

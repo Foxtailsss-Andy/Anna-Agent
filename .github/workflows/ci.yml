@@ -28,59 +28,92 @@ jobs:
           python-version: "3.12"
 
       - name: Install JavaScript dependencies
+        id: npm_install
         run: npm ci
 
       - name: Prepare pinned OMP runtime
+        id: omp_prepare
         env:
           ANNA_OMP_BUN_ARCHIVE_URL: https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-darwin-aarch64.zip
         run: npm run harness:omp:prepare
 
       - name: Typecheck Bun worker
+        id: bun_typecheck
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' }}
         run: node packages/omp-loop-kernel/runtime/node_modules/typescript/bin/tsc --noEmit -p packages/omp-loop-kernel/runtime/tsconfig.json
 
       - name: Install Python dependencies
+        id: python_install
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: python -m pip install uv && uv sync --locked --extra dev
 
       - name: Audit Python dependencies
+        id: python_audit
+        if: ${{ !cancelled() && steps.python_install.outcome == 'success' }}
         run: uv run pip-audit --progress-spinner off
 
       - name: Verify public release boundary
+        id: release_verify
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: npm run release:verify
 
+      - name: Verify CI evidence dependencies
+        id: ci_evidence_dependency
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
+        run: node --test scripts/workbench-ci-evidence-dependency.test.mjs
+
       - name: Typecheck
+        id: typecheck
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: npm run typecheck
 
       - name: Run JavaScript tests
+        id: javascript_tests
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' && steps.python_install.outcome == 'success' }}
         run: npm test -- --reporter=dot
 
       - name: Run maintained frontend smoke
+        id: frontend_smoke
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: npm run frontend:smoke
 
       - name: Build web and Harness v2 service
+        id: web_host_build
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' }}
         run: npm run build && npm run harness:v2:build
 
       - name: Install Chromium for the RC1 product flow
+        id: chromium_install
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: npx playwright install chromium
 
       - name: Exercise RC1 through the real product UI
+        id: product_ui
+        if: ${{ !cancelled() && steps.web_host_build.outcome == 'success' && steps.chromium_install.outcome == 'success' && steps.python_install.outcome == 'success' }}
         run: node --test tests/frontend/rc1_workbench_ui.test.mjs
 
       - name: Run WB-00 baseline integrity test
+        id: wb00_integrity
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: node --test scripts/workbench-baseline-integrity.test.mjs
 
       - name: Run WB-00 baseline fixture and freeze evidence
+        id: wb00_baseline
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' }}
         env:
           ANNA_WB00_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run workbench:baseline
 
       - name: Verify WB-00 baseline schema and manifest
-        if: always()
+        id: wb00_verify
+        if: ${{ !cancelled() && (steps.wb00_baseline.outcome == 'success' || hashFiles(format('evals/workbench/wb00/runs/ci-{0}-{1}/evidence/manifest.json', github.run_id, github.run_attempt)) != '') }}
         env:
           ANNA_WB00_RUN_DIR: evals/workbench/wb00/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run workbench:baseline:verify
 
       - name: Retain WB-00 baseline evidence
-        if: always()
+        id: wb00_upload
+        if: ${{ !cancelled() && hashFiles(format('evals/workbench/wb00/runs/ci-{0}-{1}/**', github.run_id, github.run_attempt), '.tmp-tests/wb00/coding/**') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: wb00-baseline-evidence
@@ -90,22 +123,27 @@ jobs:
           if-no-files-found: error
 
       - name: Run Python tests
+        id: python_tests
+        if: ${{ !cancelled() && steps.python_install.outcome == 'success' }}
         run: uv run pytest -q
 
       - name: Run WB-01 session increment evidence
-        if: always()
+        id: wb01_evidence
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.python_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' }}
         env:
           ANNA_WB01_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run workbench:session:evidence
 
       - name: Verify WB-01 session evidence manifest
-        if: always()
+        id: wb01_verify
+        if: ${{ !cancelled() && (steps.wb01_evidence.outcome == 'success' || hashFiles(format('evals/workbench/wb01/runs/ci-{0}-{1}/evidence/manifest.json', github.run_id, github.run_attempt)) != '') }}
         env:
           ANNA_WB01_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run evidence:verify -- evals/workbench/wb01/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}/evidence/manifest.json
 
       - name: Retain WB-01 session evidence
-        if: always()
+        id: wb01_upload
+        if: ${{ !cancelled() && hashFiles(format('evals/workbench/wb01/runs/ci-{0}-{1}/**', github.run_id, github.run_attempt)) != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: wb01-session-evidence
@@ -114,22 +152,27 @@ jobs:
           if-no-files-found: error
 
       - name: Run WB-02 capability evidence CLI guards
+        id: wb02_ci_guards
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' }}
         run: node --test scripts/workbench-capability-evidence.test.mjs
 
       - name: Run WB-02 capability increment evidence
-        if: always()
+        id: wb02_evidence
+        if: ${{ !cancelled() && steps.npm_install.outcome == 'success' && steps.python_install.outcome == 'success' && steps.omp_prepare.outcome == 'success' }}
         env:
           ANNA_WB02_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run workbench:capability:evidence
 
       - name: Verify WB-02 capability evidence manifest
-        if: always()
+        id: wb02_verify
+        if: ${{ !cancelled() && (steps.wb02_evidence.outcome == 'success' || hashFiles(format('evals/workbench/wb02/runs/ci-{0}-{1}/evidence/manifest.json', github.run_id, github.run_attempt)) != '') }}
         env:
           ANNA_WB02_EVAL_ROUND_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: npm run evidence:verify -- evals/workbench/wb02/runs/ci-${{ github.run_id }}-${{ github.run_attempt }}/evidence/manifest.json
 
       - name: Retain WB-02 capability evidence
-        if: always()
+        id: wb02_upload
+        if: ${{ !cancelled() && hashFiles(format('evals/workbench/wb02/runs/ci-{0}-{1}/**', github.run_id, github.run_attempt)) != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: wb02-capability-evidence
