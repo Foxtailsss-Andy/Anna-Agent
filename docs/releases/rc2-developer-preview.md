@@ -10,6 +10,7 @@ This is a source prerelease for developers on macOS arm64. Follow [README](../..
 
 - The two legacy workdir registration/admission tests retain the real Python identity service, Product Host, persistent Runtime, and original assertions. They no longer initialize OMP before operations that finish before a Run starts. The two file-execution tests still use real OMP. No test timeout or production integrity check is relaxed.
 - CI checks use explicit prerequisites, so an earlier test failure does not silently skip the required product UI, Python, and evidence checks when their dependencies are ready. Verification runs after successful generation or when a manifest exists; upload runs when evidence exists. Failed generation remains a failure, partial evidence can still be retained, and cancellation stops downstream work.
+- The `checks` job has a 45-minute total budget for the complete JavaScript, UI, Python, and evidence sequence. Individual test timeouts remain unchanged. The measured initial RC2 run below explains this adjustment.
 
 两个目录登记/入场拒绝用例保留真实身份、Product Host、持久 Runtime 和原断言，去掉尚未执行模型时不需要的 OMP 初始化。两个实际文件执行用例继续使用真实 OMP；测试时限和生产完整性检查保持。
 
@@ -28,6 +29,10 @@ After removing that unnecessary setup from the two non-executing tests, the same
 Release baseline: [`9dee3583fa96`](https://github.com/Foxtailsss-Andy/Anna-Agent/commit/9dee3583fa96b590be4aacb398d5b2d4d806937d). The [RC1 record](rc1-developer-preview.md) and [failed RC1 CI run](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/34567280207) remain historical evidence. RC1's product job passed; its checks job failed, and the UI/Python steps were skipped.
 
 RC1 的原失败继续保留：product job 通过，checks job 失败，UI/Python 步骤被跳过。本轮验证单独记录，不改写 RC1 结果。
+
+The [initial RC2 CI run](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/34761823886), on candidate `d19ed2dc09313584ba4f4c9ba681a62bc138b380`, passed the full JavaScript suite in 26 minutes 45 seconds and passed the product job. GitHub then cancelled `checks` at its 30-minute limit during the UI test, before Python and the evidence steps could complete. Its annotation explicitly reported that the maximum execution time was exceeded. This cancelled run is retained as a failed release gate; the total job budget was adjusted to fit all required checks, with no change to per-test limits.
+
+首轮 RC2 CI 的完整 JS 已通过，但运行 26 分 45 秒后，剩余 UI、Python 与证据步骤无法放入原 30 分钟总预算。GitHub 明确报告 job 超时并取消 UI。该轮保留为未通过的发布门槛；`checks` 总预算调整为 45 分钟，单测超时、断言与必跑步骤均保持。
 
 The [RC2 prerelease record](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) records the final source commit, local validation results, and CI run for that exact commit. Publication requires both CI jobs (`checks` and `product`) to pass, local typechecking, the full JavaScript and Python suites, Web/Host builds, frontend smoke, the real product UI regression, and closure of the independent Standards/Spec reviews. The CI dependency guard separately covers failed prerequisites, failed generation with and without a manifest, missing output after successful generation, and cancellation.
 

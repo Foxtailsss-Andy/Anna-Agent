@@ -11,7 +11,8 @@ permissions:
 jobs:
   checks:
     runs-on: macos-latest
-    timeout-minutes: 30
+    # Full JS plus UI, Python, build, and evidence gates need the measured RC2 budget.
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
