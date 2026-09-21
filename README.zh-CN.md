@@ -1,5 +1,9 @@
 # Anna
 
+> **实验性源码预览 · 远程 CI 进行中。** [当前 main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain) · [已审候选 CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/35640135163)。本地检查与独立审查已通过，尚未宣称远程 CI 通过。
+>
+> 实测范围：24 个合成 heldout，22 个模型输入、2 个硬预检。C 为 `deepseek-v4-pro` thinking enabled/high 单次判断，D 为 `jev-1.13.0`；两者均 22/22 符合标签（12 次推荐＋10 次弃权），质量持平。Jev p50 低 85.23%，按本轮非高峰、缓存未命中价估算费用低 94.71%（高峰参考低 97.35%，非账单），总 tokens 增加 57.98%。结果不证明生产正确率、Worker 完成或整工作流加速。
+
 ![Anna。Chat、Workflows、Associate。A Governed AI Agent for Enterprise Work。](docs/public/assets/anna-readme-banner-v2.png)
 
 **处理个人任务、连接业务系统、参与项目协作的 AI 伙伴。**
