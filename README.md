@@ -1,6 +1,6 @@
 # Anna
 
-> **Experimental source preview · remote CI in progress.** [Current main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain) · [reviewed-candidate CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/35640135163). Local checks and independent review passed; remote CI is not yet claimed as passed.
+> **Experimental source preview · CI was in progress at the initial source push (2026-09-22).** [Current main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain) · [reviewed-candidate CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/35640135163). Local checks and independent review passed; use the linked current CI record for the live outcome.
 >
 > Measured scope: 24 synthetic heldout cases, 22 model inputs and 2 hard prechecks. C is one `deepseek-v4-pro` judgment with thinking enabled/high; D is `jev-1.13.0`. Both match 22/22 labels (12 recommendations + 10 abstentions). Jev p50 is 85.23% lower; at this run's off-peak/cache-miss prices estimated cost is 94.71% lower (peak reference 97.35%; not invoices). Reported total tokens are 57.98% higher. This does not establish production accuracy, Worker completion or whole-workflow acceleration.
 
