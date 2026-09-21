@@ -144,7 +144,7 @@ class SQLiteCrewStore:
     def update_project(
         self,
         project_id: str,
-        mutate: Callable[[CrewProject], None | CrewProject],
+        mutate: Callable[[CrewProject], bool | CrewProject | None],
     ) -> CrewProject:
         """Load, mutate and save a CrewProject under one BEGIN IMMEDIATE lock."""
         with self._connect() as conn:
@@ -160,7 +160,13 @@ class SQLiteCrewStore:
                 identity = (project.id, project.workspace_id, project.owner_user_id)
                 result = mutate(project)
                 if result is not None:
-                    project = result
+                    if isinstance(result, bool) and not result:
+                        conn.commit()
+                        return project
+                    if isinstance(result, bool):
+                        result = None
+                    else:
+                        project = result
                 if (project.id, project.workspace_id, project.owner_user_id) != identity:
                     raise ProjectInvariantError(
                         "project mutation cannot change id, workspace_id, or owner_user_id"

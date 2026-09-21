@@ -66,6 +66,74 @@ def test_client_submits_with_internal_token_and_waits_for_terminal():
     assert json.loads(requests[0].content)["surface"] == "chat"
 
 
+def test_client_decide_assignee_async_uses_typed_host_bridge():
+    import asyncio
+
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "schema_version": 1,
+                "decision_id": "550e8400-e29b-41d4-a716-446655440000",
+                "status": "suggested",
+                "member_id": "member_1",
+                "reason_code": "model_choice",
+                "source": "jev",
+                "meta": {
+                    "question_version": "crew-assignee-v1",
+                    "requested_model": "jev-1.13.0",
+                    "returned_model": "jev-1.13.0",
+                    "provider_request_id": "req-1",
+                    "started_at": "2026-09-21T00:00:00+00:00",
+                    "ended_at": "2026-09-21T00:00:00.100000+00:00",
+                    "elapsed_ms": 100,
+                    "input_tokens": 12,
+                    "output_tokens": 3,
+                    "confidence": None,
+                    "probabilities": None,
+                    "provider_calls": 1,
+                    "retry_count": 0,
+                    "error_code": None,
+                },
+            },
+        )
+
+    async def call():
+        client = HarnessHostClient(_config(), async_transport=httpx.MockTransport(handler))
+        return await client.decide_assignee_async(
+            {
+                "schema_version": 1,
+                "decision_id": "550e8400-e29b-41d4-a716-446655440000",
+                "workspace_id": "workspace_1",
+                "actor_user_id": "actor_1",
+                "project_id": "project_1",
+                "task_id": "task_1",
+                "input_hash": "0" * 64,
+                "question_version": "crew-assignee-v1",
+                "state": {
+                    "project_goal": "交付预览",
+                    "task": {
+                        "title": "写方案",
+                        "description": "",
+                        "role_required": "writer",
+                        "acceptance_criteria": None,
+                    },
+                    "candidates": [{"id": "member_1", "role": "writer", "kind": "human"}],
+                },
+            },
+        )
+
+    result = asyncio.run(call())
+
+    assert result.member_id == "member_1"
+    assert result.meta.provider_calls == 1
+    assert requests[0].url.path == "/_harness/crew/assignee-decision"
+    assert json.loads(requests[0].content)["state"]["candidates"][0]["id"] == "member_1"
+
+
 def test_client_rejects_host_protocol_error_without_leaking_token():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

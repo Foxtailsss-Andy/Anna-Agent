@@ -5,7 +5,7 @@
 
 import { useEffect, useRef } from "react";
 
-import type { TeamMember } from "../../../lib/api/crew";
+import type { AssignmentSuggestion, TeamMember } from "../../../lib/api/crew";
 import { MemberAvatar } from "./MemberBits";
 
 export function MemberPicker({
@@ -13,12 +13,26 @@ export function MemberPicker({
   ownerUserId,
   currentId,
   onPick,
+  suggestion,
+  suggestionPending,
+  onSuggest,
+  onAdoptSuggestion,
+  suggestionAdopting,
+  suggestable,
+  taskStatus,
   onClose,
 }: {
   members: TeamMember[];
   ownerUserId: string;
   currentId: string | null | undefined;
   onPick: (memberId: string) => void;
+  suggestion: AssignmentSuggestion | null;
+  suggestionPending: boolean;
+  onSuggest: () => void;
+  onAdoptSuggestion: () => void;
+  suggestionAdopting: boolean;
+  suggestable: boolean;
+  taskStatus: string;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -44,6 +58,36 @@ export function MemberPicker({
   return (
     <div className="ir-insp-picker" ref={ref} role="listbox" aria-label="改派给">
       <div className="ir-insp-picker__head">改派给</div>
+      {suggestable && !currentId && <button type="button" className="ir-insp-picker__suggest" onClick={onSuggest} disabled={suggestionPending || suggestionAdopting}>
+        {suggestionPending ? "正在生成建议……" : "建议人选"}
+      </button>}
+      {suggestion && (
+        <div className="ir-insp-picker__suggestion" role="status">
+          <div className="ir-insp-picker__suggestion-title">建议结果</div>
+          {suggestion.status === "suggested" && suggestion.member_id ? (
+            <>
+              <div className="ir-insp-picker__suggestion-person">
+                {members.find((m) => m.id === suggestion.member_id)?.display_name ?? suggestion.member_id}
+              </div>
+              <div className="ir-insp-picker__suggestion-fact">
+                任务角色：{suggestion.evidence.task_role} · 成员角色：{suggestion.evidence.member_role ?? "未知"}
+              </div>
+              <div className="ir-insp-picker__suggestion-meta">
+                来源：{suggestion.source === "role_rule" ? "角色规则" : "Jev"} · {suggestion.source === "role_rule" ? "未调用模型" : typeof suggestion.meta?.elapsed_ms === "number" ? `判断耗时 ${suggestion.meta.elapsed_ms}ms` : "判断耗时未知"}
+              </div>
+              {taskStatus === "blocked" && <div className="ir-insp-picker__suggestion-meta">当前任务等待依赖，采纳后仍保持等待。</div>}
+              {taskStatus === "todo" && suggestion.evidence.member_kind === "agent" && <div className="ir-insp-picker__suggestion-meta">Worker 就绪后按既有策略执行。</div>}
+              <button type="button" className="ir-insp-picker__adopt" onClick={onAdoptSuggestion} disabled={suggestionAdopting}>
+                {suggestionAdopting ? "正在采纳……" : "采纳指派"}
+              </button>
+            </>
+          ) : (
+            <div className="ir-insp-picker__suggestion-fact">
+              {suggestion.reason_code === "suggestion_expired" ? "建议已过期" : `暂无可确认人选（${suggestion.reason_code}）`}。可继续手动选择。
+            </div>
+          )}
+        </div>
+      )}
       {members.length === 0 && <div className="ir-insp-picker__empty">暂无可选成员</div>}
       {members.map((m) => (
         <button

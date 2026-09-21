@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "price": {
+    "provider": "typesafe",
+    "effective_date": "2026-09-21",
+    "input_usd_per_million": 0.042,
+    "output_usd_per_million": 0,
+    "source": "https://docs.typesafe.ai/models"
+  },
+  "jev": {
+    "request_count": 9,
+    "reserved_requests": 0,
+    "spent_usd": 0.000201558,
+    "reserved_usd": 0,
+    "unknown_usage": false
+  },
+  "main_model": {
+    "request_count": 0,
+    "reserved_requests": 0,
+    "spent_usd": 0,
+    "reserved_usd": 0,
+    "unknown_usage": false
+  },
+  "total": {
+    "spent_usd": 0.000201558,
+    "reserved_usd": 0
+  },
+  "updated_at": "2026-09-21T11:51:30.126Z"
+}

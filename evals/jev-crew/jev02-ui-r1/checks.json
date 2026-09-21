@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-09-21T12:05:13.035874+00:00",
+  "candidate_manifest": "evals/jev-crew/jev02-contract-r7/candidate.sha256",
+  "candidate_files_matched": 20,
+  "build_manifest_matched": true,
+  "jev01_source_manifest_matched": true,
+  "frozen_fixture_hashes_matched": true,
+  "heldout_calls": 0,
+  "source_secret_pattern_scan_suspects": 0,
+  "budget_ledger_matches_snapshot": true,
+  "owned_runtime_drained": true,
+  "owned_pids": [
+    81665,
+    81668,
+    81669
+  ],
+  "launcher_exit_code": 0,
+  "temporary_browser_tab_closed": true,
+  "ac15_independent_spec_review": "pass",
+  "limitations": [
+    "AC16 ready Worker live not run",
+    "Full 32-case A/B/C/D comparison not run",
+    "Final full-repository checks not run",
+    "Optional expanded asyncio-debug suite hangs on pre-change baseline as well"
+  ]
+}

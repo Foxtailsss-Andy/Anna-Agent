@@ -1,0 +1,153 @@
+[
+  {
+    "case_id": "dev-01",
+    "split": "development",
+    "category": "distinguishable",
+    "input": {
+      "state": {
+        "project_goal": "整理季度经营数据",
+        "task": {"title": "完成经营数据分析", "description": "完成经营数据分析", "role_required": "数据分析师", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev01-member-a", "role": "数据分析师", "kind": "human"},
+          {"id": "dev01-member-b", "role": "后端工程师", "kind": "agent"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": ["dev01-member-a"], "must_abstain": false, "reason": "任务角色为数据分析师，只有数据分析师候选匹配。"},
+    "label_rationale": "仅依据 project_goal、title/role_required 与候选 role/kind 判定。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-02",
+    "split": "development",
+    "category": "distinguishable",
+    "input": {
+      "state": {
+        "project_goal": "上线客户门户",
+        "task": {"title": "负责客户门户服务端开发", "description": "负责客户门户服务端开发", "role_required": "后端开发", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev02-member-b", "role": "前端工程师", "kind": "human"},
+          {"id": "dev02-member-a", "role": "后端工程师", "kind": "agent"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": ["dev02-member-a"], "must_abstain": false, "reason": "后端开发与后端工程师是同一角色语义，前端工程师不匹配。"},
+    "label_rationale": "覆盖后端开发/后端工程师中文角色同义，只使用任务角色与候选 role/kind。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-03",
+    "split": "development",
+    "category": "distinguishable",
+    "input": {
+      "state": {
+        "project_goal": "收集客户访谈纪要",
+        "task": {"title": "由人工主持客户访谈", "description": "由人工主持客户访谈", "role_required": "用户研究", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev03-member-a", "role": "用户研究员", "kind": "human"},
+          {"id": "dev03-member-b", "role": "用户研究员", "kind": "agent"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": ["dev03-member-a"], "must_abstain": false, "reason": "用户研究与用户研究员匹配，标题明确要求由人工主持，因此选择 human 候选。"},
+    "label_rationale": "Human/Worker 对照由标题中的人工要求与候选 kind 区分，不依赖 ID 或顺序。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-04",
+    "split": "development",
+    "category": "distinguishable",
+    "input": {
+      "state": {
+        "project_goal": "提高自动化回归覆盖",
+        "task": {"title": "交由 Worker 执行自动化回归检查", "description": "交由 Worker 执行自动化回归检查", "role_required": "测试工程", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev04-member-a", "role": "测试工程师", "kind": "human"},
+          {"id": "dev04-member-b", "role": "测试工程师", "kind": "agent"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": ["dev04-member-b"], "must_abstain": false, "reason": "测试工程与测试工程师匹配，标题明确要求交由 Worker 执行，因此选择 agent 候选。"},
+    "label_rationale": "覆盖测试工程/测试工程师同义；只有标题明确的 Worker 要求用于区分候选 kind。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-05",
+    "split": "development",
+    "category": "ambiguous",
+    "input": {
+      "state": {
+        "project_goal": "维护客户数据同步",
+        "task": {"title": "维护客户数据同步", "description": "维护客户数据同步", "role_required": "数据工程师", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev05-member-a", "role": "数据工程师", "kind": "agent"},
+          {"id": "dev05-member-b", "role": "数据工程师", "kind": "agent"},
+          {"id": "dev05-member-c", "role": "产品经理", "kind": "human"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名候选人的 role/kind 完全相同，现有字段无法区分应选哪一人。"},
+    "label_rationale": "相同 role、kind 的候选不能按 ID 或顺序择一；不匹配候选不消除歧义。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-06",
+    "split": "development",
+    "category": "ambiguous",
+    "input": {
+      "state": {
+        "project_goal": "协调版本发布计划",
+        "task": {"title": "协调版本发布计划", "description": "协调版本发布计划", "role_required": "项目经理", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev06-member-a", "role": "项目经理", "kind": "human"},
+          {"id": "dev06-member-b", "role": "项目经理", "kind": "human"},
+          {"id": "dev06-member-c", "role": "开发工程师", "kind": "agent"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 human 项目经理候选的 role/kind 相同，任务字段没有进一步区分信息。"},
+    "label_rationale": "相同 role/kind 的多人必须弃权，不能使用候选顺序或 ID。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-07",
+    "split": "development",
+    "category": "no_fit",
+    "input": {
+      "state": {
+        "project_goal": "完成合同风险审阅",
+        "task": {"title": "审阅合作条款", "description": "审阅合作条款", "role_required": "法务审阅", "acceptance_criteria": null},
+        "candidates": [
+          {"id": "dev07-member-a", "role": "后端工程师", "kind": "agent"},
+          {"id": "dev07-member-b", "role": "测试工程师", "kind": "human"}
+        ]
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "任务需要法务审阅，候选仅有后端工程师和测试工程师，没有匹配角色。"},
+    "label_rationale": "语义不匹配但字段完整，保留给 provider 判断；不构造候选技能。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "dev-08",
+    "split": "development",
+    "category": "no_fit",
+    "input": {
+      "state": {
+        "project_goal": "完成预算复盘",
+        "task": {"title": "完成预算复盘", "description": "完成预算复盘", "role_required": "财务分析师", "acceptance_criteria": null},
+        "candidates": []
+      },
+      "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}
+    },
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "候选列表为空，无法产生人选建议。"},
+    "label_rationale": "零候选属于业务硬预检，不能调用 provider 伪造建议。",
+    "provider_eligible": false
+  }
+]

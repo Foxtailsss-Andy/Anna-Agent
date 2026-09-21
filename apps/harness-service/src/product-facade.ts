@@ -35,6 +35,7 @@ import {
 import { planProductV1Migration } from "./workbench-migration";
 import { resolveWorkbenchWorkdir, workdirResourceId } from "./workbench-files";
 import { registeredWorkbenchSkills } from "./workbench-skills";
+import { assertNoDuplicateJsonKeys, decideAssignee, validateAssigneeDecisionInput, type AssigneeDecisionInput, type JevTelemetryRecord, type JevTransport } from "./jev-decision";
 
 const maxJsonBodyBytes = 1_024 * 1_024;
 const terminalEvents = new Set([
@@ -74,6 +75,8 @@ export interface ProductHostOptions {
   readonly businessServiceToken?: string;
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => string;
+  readonly jevTransport?: JevTransport;
+  readonly jevTelemetry?: (record: JevTelemetryRecord) => void;
 }
 
 export interface RunningProductHost {
@@ -116,6 +119,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
   const originHost = host === "::1" ? "[::1]" : host;
   let origin = "";
   let closed = false;
+  const activeJevRequests = new Set<AbortController>();
 
   const workdirProtectedPaths = (): readonly string[] => [
     options.runtimeConfigPath,
@@ -165,6 +169,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     close: () => {
       if (closePromise !== undefined) return closePromise;
       closed = true;
+      for (const controller of activeJevRequests) controller.abort();
       closePromise = new Promise<void>((resolveClose, rejectClose) => {
         server.close((error) => error ? rejectClose(error) : resolveClose());
       });
@@ -224,6 +229,11 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     pathname: string,
     query: URLSearchParams,
   ): Promise<void> {
+    if (pathname === "/_harness/crew/assignee-decision" && request.method === "POST"
+      && !hasServiceToken(request, options.serviceToken)) {
+      sendJevTerminalAndClose(response, 401, "service_token_required");
+      return;
+    }
     assertServiceToken(request, options.serviceToken);
     if (pathname === "/_harness/capabilities" && request.method === "GET") {
       responseJson(response, 200, {
@@ -232,6 +242,10 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         surfaces: [...productSurfaces],
         business_adapter: options.businessOrigin === undefined ? "unconfigured" : "configured",
       });
+      return;
+    }
+    if (pathname === "/_harness/crew/assignee-decision" && request.method === "POST") {
+      await handleJevDecision(request, response);
       return;
     }
     if (pathname === "/_harness/runs" && request.method === "POST") {
@@ -284,6 +298,98 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       return;
     }
     responseJson(response, 404, { code: "not_found" });
+  }
+
+  async function handleJevDecision(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    if (activeJevRequests.size >= 4) {
+      sendJevTerminalAndClose(response, 429, "jev_busy");
+      return;
+    }
+    const controller = new AbortController();
+    activeJevRequests.add(controller);
+    const startedAt = new Date().toISOString();
+    let deadline = false;
+    let disconnected = false;
+    const timer = setTimeout(() => {
+      deadline = true;
+      controller.abort();
+      request.resume();
+    }, 4_000);
+    const abortRequest = () => {
+      disconnected = true;
+      controller.abort();
+    };
+    request.once("aborted", abortRequest);
+    response.once("close", abortRequest);
+    try {
+      const declaredLength = request.headers["content-length"];
+      if (typeof declaredLength === "string" && Number(declaredLength) > 32 * 1024) {
+        sendJevTerminalAndClose(response, 413, "input_too_large");
+        return;
+      }
+      let input: AssigneeDecisionInput;
+      let bodyTooLarge = false;
+      try {
+        input = await abortable(readJsonBody(request, 32 * 1024, true, () => { bodyTooLarge = true; }), controller.signal) as AssigneeDecisionInput;
+      } catch (error) {
+        if (deadline) {
+          sendJevTerminalAndClose(response, 408, "jev_timeout");
+          return;
+        }
+        if (closed) {
+          request.resume();
+          sendJevTerminalAndClose(response, 503, "product_host_closed");
+          return;
+        }
+        if (bodyTooLarge) {
+          request.resume();
+          sendJevTerminalAndClose(response, 413, "input_too_large");
+          return;
+        }
+        if (error instanceof JsonBodyError && error.code === "body_too_large") {
+          throw new ProductHttpError(413, "input_too_large");
+        }
+        if (error instanceof Error && error.message === "body_too_large") {
+          throw new ProductHttpError(413, "input_too_large");
+        }
+        throw new ProductHttpError(400, "invalid_request");
+      }
+      try {
+        validateAssigneeDecisionInput(input);
+      } catch (error) {
+        if (error instanceof Error && error.message === "input_too_large") {
+          sendJevTerminalAndClose(response, 413, "input_too_large");
+          return;
+        }
+        throw new ProductHttpError(400, "invalid_request");
+      }
+      const result = await decideAssignee(input, {
+        enabled: process.env.ANNA_JEV_ENABLED,
+        apiKeyFile: process.env.ANNA_JEV_API_KEY_FILE,
+        transport: options.jevTransport,
+        signal: controller.signal,
+        startedAt,
+        telemetry: options.jevTelemetry,
+      });
+      if (closed) {
+        sendJevTerminalAndClose(response, 503, "product_host_closed");
+        return;
+      }
+      if (!disconnected && !response.destroyed) responseJson(response, 200, result);
+    } finally {
+      clearTimeout(timer);
+      request.off("aborted", abortRequest);
+      response.off("close", abortRequest);
+      activeJevRequests.delete(controller);
+    }
+  }
+
+  function sendJevTerminalAndClose(response: ServerResponse, statusCode: number, code: string): void {
+    if (response.destroyed) return;
+    const socket = response.socket;
+    response.setHeader("connection", "close");
+    response.once("finish", () => socket?.destroy());
+    responseJson(response, statusCode, { code });
   }
 
   async function handleHostRuntimeRoute(
@@ -1586,8 +1692,12 @@ function isHostRuntimeRoute(pathname: string): boolean {
 }
 
 function assertServiceToken(request: IncomingMessage, expected: string): void {
+  if (!hasServiceToken(request, expected)) throw new ProductHttpError(401, "service_token_required");
+}
+
+function hasServiceToken(request: IncomingMessage, expected: string): boolean {
   const token = request.headers["x-anna-service-token"];
-  if (typeof token !== "string" || token !== expected) throw new ProductHttpError(401, "service_token_required");
+  return typeof token === "string" && token === expected;
 }
 
 function forwardedHeaders(request: IncomingMessage, serviceToken?: string): Headers {
@@ -1629,23 +1739,50 @@ class JsonBodyError extends Error {
   }
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<unknown> {
-  const raw = await readRawBody(request);
+async function readJsonBody(
+  request: IncomingMessage,
+  maxBytes = maxJsonBodyBytes,
+  rejectDuplicateKeys = false,
+  onTooLarge?: () => void,
+): Promise<unknown> {
+  const raw = await readRawBody(request, maxBytes, onTooLarge);
   if (raw.length === 0) return {};
   try {
+    if (rejectDuplicateKeys) assertNoDuplicateJsonKeys(raw.toString("utf8"));
     return JSON.parse(raw.toString("utf8"));
   } catch {
     throw new JsonBodyError("invalid_json");
   }
 }
 
-async function readRawBody(request: IncomingMessage): Promise<Buffer> {
+async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
+  return await new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException("The operation was aborted", "AbortError"));
+    signal.addEventListener("abort", abort, { once: true });
+    void promise.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function readRawBody(request: IncomingMessage, maxBytes = maxJsonBodyBytes, onTooLarge?: () => void): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     const next = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += next.byteLength;
-    if (size > maxJsonBodyBytes) throw new JsonBodyError("body_too_large");
+    if (size > maxBytes) {
+      onTooLarge?.();
+      throw new JsonBodyError("body_too_large");
+    }
     chunks.push(next);
   }
   return Buffer.concat(chunks);

@@ -1,0 +1,15 @@
+{
+  "effective_date": "2026-09-21",
+  "jev": {
+    "provider": "typesafe",
+    "input_usd_per_million": 0.042,
+    "output_usd_per_million": 0,
+    "source": "https://docs.typesafe.ai/models"
+  },
+  "main_model": {
+    "model": "deepseek-v4-pro",
+    "input_usd_per_million": 1.32,
+    "output_usd_per_million": 3.96,
+    "basis": "peak-cache-miss-upper-bound"
+  }
+}

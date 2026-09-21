@@ -16,6 +16,7 @@ from services.chat.app.evaluator import build_judge
 from services.chat.app.orchestrator import ChatOrchestrator
 from services.create.app.orchestrator import CreateOrchestrator
 from services.crew.app.agent_worker import QueryEngineLoopAdapter
+from services.crew.app.assignment_suggestions import AssignmentSuggestionService
 from services.crew.app.decomposition import CrewDecompositionService
 from services.crew.app.execution_projection import CrewExecutionProjector
 from services.crew.app.command_drafting import CommandDraftingService
@@ -185,6 +186,8 @@ def create_app(
     app.state.product_mode = harness_backed
     app.state.harness_client = host
     app.state.business_mode_config = mode_config
+    assignment_suggestions = AssignmentSuggestionService(identity=identity, host_client=host)
+    app.state.assignment_suggestions = assignment_suggestions
 
     # Shared planning collaborators use the same Host task contract in product
     # mode. The domain services keep their existing deterministic fallbacks and
@@ -232,6 +235,7 @@ def create_app(
             auto_pilot=True,
             harness_client=host,
             product_mode=harness_backed,
+            assignment_suggestions=assignment_suggestions,
         )
     )
     app.include_router(

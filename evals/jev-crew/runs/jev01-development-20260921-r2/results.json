@@ -1,0 +1,1011 @@
+[
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-01",
+    "split": "development",
+    "category": "distinguishable",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "592bc757fe1c11102b6ad642799c2dbaeff4cc9451f6f848451cee5c9b9132d5",
+    "candidate_hash": "396a55af96ec8438141cfaaa32841352d000a0fd39d91344efeb7da676408dad",
+    "input": {
+      "project_goal": "整理季度经营数据",
+      "task": {
+        "title": "完成经营数据分析",
+        "description": "完成经营数据分析",
+        "role_required": "数据分析师",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev01-member-a",
+          "role": "数据分析师",
+          "kind": "human"
+        },
+        {
+          "id": "dev01-member-b",
+          "role": "后端工程师",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-01",
+      "task_id": "task-dev-01"
+    },
+    "expected": {
+      "allowed_member_ids": [
+        "dev01-member-a"
+      ],
+      "must_abstain": false,
+      "reason": "任务角色为数据分析师，只有数据分析师候选匹配。"
+    },
+    "label_rationale": "仅依据 project_goal、title/role_required 与候选 role/kind 判定。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 44
+    },
+    "host_elapsed_ms": 658,
+    "http_elapsed_ms": 676.7217919999994,
+    "estimated_cost_usd": 2.1252000000000003e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_choice",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "e96eec5f-7eb8-4296-8851-fa5b46aa4939",
+      "status": "suggested",
+      "member_id": "dev01-member-a",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:35.867Z",
+        "ended_at": "2026-09-21T09:16:36.525Z",
+        "elapsed_ms": 658,
+        "input_tokens": 506,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "c2": 0,
+          "abstain": 0.01
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "e96eec5f-7eb8-4296-8851-fa5b46aa4939",
+      "input_hash": "592bc757fe1c11102b6ad642799c2dbaeff4cc9451f6f848451cee5c9b9132d5",
+      "status": "suggested",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:35.867Z",
+        "ended_at": "2026-09-21T09:16:36.525Z",
+        "elapsed_ms": 658,
+        "input_tokens": 506,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "c2": 0,
+          "abstain": 0.01
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "c1",
+      "raw_probabilities": {
+        "c1": 0.99,
+        "c2": 0,
+        "abstain": 0.01
+      },
+      "final_member_id": "dev01-member-a"
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-02",
+    "split": "development",
+    "category": "distinguishable",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "0f2a36607df4fe57636380d09fb7a0d447f0dff6ca029df499a6586c863d1362",
+    "candidate_hash": "20f6d17f02e8a1e155756abb68de1e582f1200724f51496e227a28ff4a25382b",
+    "input": {
+      "project_goal": "上线客户门户",
+      "task": {
+        "title": "负责客户门户服务端开发",
+        "description": "负责客户门户服务端开发",
+        "role_required": "后端开发",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev02-member-b",
+          "role": "前端工程师",
+          "kind": "human"
+        },
+        {
+          "id": "dev02-member-a",
+          "role": "后端工程师",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-02",
+      "task_id": "task-dev-02"
+    },
+    "expected": {
+      "allowed_member_ids": [
+        "dev02-member-a"
+      ],
+      "must_abstain": false,
+      "reason": "后端开发与后端工程师是同一角色语义，前端工程师不匹配。"
+    },
+    "label_rationale": "覆盖后端开发/后端工程师中文角色同义，只使用任务角色与候选 role/kind。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 509,
+      "output_tokens": 44
+    },
+    "host_elapsed_ms": 349,
+    "http_elapsed_ms": 351.6419169999999,
+    "estimated_cost_usd": 2.1378e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_choice",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "e1f9fe1b-3eef-4a8b-964f-8a227b7fcfd6",
+      "status": "suggested",
+      "member_id": "dev02-member-a",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:36.535Z",
+        "ended_at": "2026-09-21T09:16:36.884Z",
+        "elapsed_ms": 349,
+        "input_tokens": 509,
+        "output_tokens": 44,
+        "confidence": 0.96,
+        "probabilities": {
+          "c2": 0.98,
+          "abstain": 0.02,
+          "c1": 0
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "e1f9fe1b-3eef-4a8b-964f-8a227b7fcfd6",
+      "input_hash": "0f2a36607df4fe57636380d09fb7a0d447f0dff6ca029df499a6586c863d1362",
+      "status": "suggested",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:36.535Z",
+        "ended_at": "2026-09-21T09:16:36.884Z",
+        "elapsed_ms": 349,
+        "input_tokens": 509,
+        "output_tokens": 44,
+        "confidence": 0.96,
+        "probabilities": {
+          "c2": 0.98,
+          "abstain": 0.02,
+          "c1": 0
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "c2",
+      "raw_probabilities": {
+        "c2": 0.98,
+        "abstain": 0.02,
+        "c1": 0
+      },
+      "final_member_id": "dev02-member-a"
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-03",
+    "split": "development",
+    "category": "distinguishable",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "4c3c3ff909cdcf3379236b5a4497e7c91bfdb80f14992154151759f29436c53e",
+    "candidate_hash": "860c7ef8d5aa45e82f736d4f2d8899947cd086d8a9b57cd61b1f61678ae8208a",
+    "input": {
+      "project_goal": "收集客户访谈纪要",
+      "task": {
+        "title": "由人工主持客户访谈",
+        "description": "由人工主持客户访谈",
+        "role_required": "用户研究",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev03-member-a",
+          "role": "用户研究员",
+          "kind": "human"
+        },
+        {
+          "id": "dev03-member-b",
+          "role": "用户研究员",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-03",
+      "task_id": "task-dev-03"
+    },
+    "expected": {
+      "allowed_member_ids": [
+        "dev03-member-a"
+      ],
+      "must_abstain": false,
+      "reason": "用户研究与用户研究员匹配，标题明确要求由人工主持，因此选择 human 候选。"
+    },
+    "label_rationale": "Human/Worker 对照由标题中的人工要求与候选 kind 区分，不依赖 ID 或顺序。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 507,
+      "output_tokens": 44
+    },
+    "host_elapsed_ms": 286,
+    "http_elapsed_ms": 289.20808299999953,
+    "estimated_cost_usd": 2.1294e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_choice",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "81cff4fd-2904-40b0-b119-b7de2998e374",
+      "status": "suggested",
+      "member_id": "dev03-member-a",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:36.889Z",
+        "ended_at": "2026-09-21T09:16:37.175Z",
+        "elapsed_ms": 286,
+        "input_tokens": 507,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "c2": 0,
+          "abstain": 0.01
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "81cff4fd-2904-40b0-b119-b7de2998e374",
+      "input_hash": "4c3c3ff909cdcf3379236b5a4497e7c91bfdb80f14992154151759f29436c53e",
+      "status": "suggested",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:36.889Z",
+        "ended_at": "2026-09-21T09:16:37.175Z",
+        "elapsed_ms": 286,
+        "input_tokens": 507,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "c2": 0,
+          "abstain": 0.01
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "c1",
+      "raw_probabilities": {
+        "c1": 0.99,
+        "c2": 0,
+        "abstain": 0.01
+      },
+      "final_member_id": "dev03-member-a"
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-04",
+    "split": "development",
+    "category": "distinguishable",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "51605e3b50b8375bb8e55f50116d48b579d68f5612d41cd7f22b45e63e5b22cc",
+    "candidate_hash": "287ded46fbbf2252f4ba4a1931e8659f7105083768d3e98a9785a317592d2b8f",
+    "input": {
+      "project_goal": "提高自动化回归覆盖",
+      "task": {
+        "title": "交由 Worker 执行自动化回归检查",
+        "description": "交由 Worker 执行自动化回归检查",
+        "role_required": "测试工程",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev04-member-a",
+          "role": "测试工程师",
+          "kind": "human"
+        },
+        {
+          "id": "dev04-member-b",
+          "role": "测试工程师",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-04",
+      "task_id": "task-dev-04"
+    },
+    "expected": {
+      "allowed_member_ids": [
+        "dev04-member-b"
+      ],
+      "must_abstain": false,
+      "reason": "测试工程与测试工程师匹配，标题明确要求交由 Worker 执行，因此选择 agent 候选。"
+    },
+    "label_rationale": "覆盖测试工程/测试工程师同义；只有标题明确的 Worker 要求用于区分候选 kind。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 518,
+      "output_tokens": 44
+    },
+    "host_elapsed_ms": 348,
+    "http_elapsed_ms": 350.76566600000024,
+    "estimated_cost_usd": 2.1756e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_choice",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "60169baf-4347-4462-a34a-39c5e5645cc3",
+      "status": "suggested",
+      "member_id": "dev04-member-b",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.182Z",
+        "ended_at": "2026-09-21T09:16:37.530Z",
+        "elapsed_ms": 348,
+        "input_tokens": 518,
+        "output_tokens": 44,
+        "confidence": 0.63,
+        "probabilities": {
+          "c2": 0.76,
+          "c1": 0.08,
+          "abstain": 0.16
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "60169baf-4347-4462-a34a-39c5e5645cc3",
+      "input_hash": "51605e3b50b8375bb8e55f50116d48b579d68f5612d41cd7f22b45e63e5b22cc",
+      "status": "suggested",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.182Z",
+        "ended_at": "2026-09-21T09:16:37.530Z",
+        "elapsed_ms": 348,
+        "input_tokens": 518,
+        "output_tokens": 44,
+        "confidence": 0.63,
+        "probabilities": {
+          "c2": 0.76,
+          "c1": 0.08,
+          "abstain": 0.16
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "c2",
+      "raw_probabilities": {
+        "c2": 0.76,
+        "c1": 0.08,
+        "abstain": 0.16
+      },
+      "final_member_id": "dev04-member-b"
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-05",
+    "split": "development",
+    "category": "ambiguous",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "5fc8754a2de2bf3c630e997a4aa4aadabfe84d24c3990564bfad87f2b379d5f4",
+    "candidate_hash": "0b889a09cd816ee28cc89e7f85f4e8e60146f8bd370eb0fbc72626fec39a5a79",
+    "input": {
+      "project_goal": "维护客户数据同步",
+      "task": {
+        "title": "维护客户数据同步",
+        "description": "维护客户数据同步",
+        "role_required": "数据工程师",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev05-member-a",
+          "role": "数据工程师",
+          "kind": "agent"
+        },
+        {
+          "id": "dev05-member-b",
+          "role": "数据工程师",
+          "kind": "agent"
+        },
+        {
+          "id": "dev05-member-c",
+          "role": "产品经理",
+          "kind": "human"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-05",
+      "task_id": "task-dev-05"
+    },
+    "expected": {
+      "allowed_member_ids": [],
+      "must_abstain": true,
+      "reason": "两名候选人的 role/kind 完全相同，现有字段无法区分应选哪一人。"
+    },
+    "label_rationale": "相同 role、kind 的候选不能按 ID 或顺序择一；不匹配候选不消除歧义。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 553,
+      "output_tokens": 53
+    },
+    "host_elapsed_ms": 286,
+    "http_elapsed_ms": 288.3837080000003,
+    "estimated_cost_usd": 2.3226000000000004e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_abstain",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "0f1e9a82-53c4-4cce-bc04-a34b34104168",
+      "status": "abstained",
+      "member_id": null,
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.536Z",
+        "ended_at": "2026-09-21T09:16:37.822Z",
+        "elapsed_ms": 286,
+        "input_tokens": 553,
+        "output_tokens": 53,
+        "confidence": 0.85,
+        "probabilities": {
+          "c3": 0,
+          "c1": 0.11,
+          "c2": 0.01,
+          "abstain": 0.88
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "0f1e9a82-53c4-4cce-bc04-a34b34104168",
+      "input_hash": "5fc8754a2de2bf3c630e997a4aa4aadabfe84d24c3990564bfad87f2b379d5f4",
+      "status": "abstained",
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.536Z",
+        "ended_at": "2026-09-21T09:16:37.822Z",
+        "elapsed_ms": 286,
+        "input_tokens": 553,
+        "output_tokens": 53,
+        "confidence": 0.85,
+        "probabilities": {
+          "c3": 0,
+          "c1": 0.11,
+          "c2": 0.01,
+          "abstain": 0.88
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "abstain",
+      "raw_probabilities": {
+        "c3": 0,
+        "c1": 0.11,
+        "c2": 0.01,
+        "abstain": 0.88
+      },
+      "final_member_id": null
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-06",
+    "split": "development",
+    "category": "ambiguous",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "c33e6d936daecd9e7fcdf9d16c23b9a5189be9678d8ff09832821c12b3682d31",
+    "candidate_hash": "8dce60fea9133b73a2532d9ae6ed84c941ef1cde3f0bfcfa0defc6cec2ea100e",
+    "input": {
+      "project_goal": "协调版本发布计划",
+      "task": {
+        "title": "协调版本发布计划",
+        "description": "协调版本发布计划",
+        "role_required": "项目经理",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev06-member-a",
+          "role": "项目经理",
+          "kind": "human"
+        },
+        {
+          "id": "dev06-member-b",
+          "role": "项目经理",
+          "kind": "human"
+        },
+        {
+          "id": "dev06-member-c",
+          "role": "开发工程师",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-06",
+      "task_id": "task-dev-06"
+    },
+    "expected": {
+      "allowed_member_ids": [],
+      "must_abstain": true,
+      "reason": "两名 human 项目经理候选的 role/kind 相同，任务字段没有进一步区分信息。"
+    },
+    "label_rationale": "相同 role/kind 的多人必须弃权，不能使用候选顺序或 ID。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 551,
+      "output_tokens": 53
+    },
+    "host_elapsed_ms": 353,
+    "http_elapsed_ms": 355.39520900000025,
+    "estimated_cost_usd": 2.3142000000000003e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_abstain",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "053aa8be-2895-45e4-add9-e3c3f8e7783b",
+      "status": "abstained",
+      "member_id": null,
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.828Z",
+        "ended_at": "2026-09-21T09:16:38.181Z",
+        "elapsed_ms": 353,
+        "input_tokens": 551,
+        "output_tokens": 53,
+        "confidence": 0.89,
+        "probabilities": {
+          "c2": 0.01,
+          "c3": 0,
+          "abstain": 0.91,
+          "c1": 0.08
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "053aa8be-2895-45e4-add9-e3c3f8e7783b",
+      "input_hash": "c33e6d936daecd9e7fcdf9d16c23b9a5189be9678d8ff09832821c12b3682d31",
+      "status": "abstained",
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:37.828Z",
+        "ended_at": "2026-09-21T09:16:38.181Z",
+        "elapsed_ms": 353,
+        "input_tokens": 551,
+        "output_tokens": 53,
+        "confidence": 0.89,
+        "probabilities": {
+          "c2": 0.01,
+          "c3": 0,
+          "abstain": 0.91,
+          "c1": 0.08
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "abstain",
+      "raw_probabilities": {
+        "c2": 0.01,
+        "c3": 0,
+        "abstain": 0.91,
+        "c1": 0.08
+      },
+      "final_member_id": null
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-07",
+    "split": "development",
+    "category": "no_fit",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "11356244fa19111da838d7987be250e494065e054aa3c72471a59d2f25aaf099",
+    "candidate_hash": "88efc3d7cc24cc7d72bbaa5a29224157cae0bae528708cc7110888c176656336",
+    "input": {
+      "project_goal": "完成合同风险审阅",
+      "task": {
+        "title": "审阅合作条款",
+        "description": "审阅合作条款",
+        "role_required": "法务审阅",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev07-member-a",
+          "role": "后端工程师",
+          "kind": "agent"
+        },
+        {
+          "id": "dev07-member-b",
+          "role": "测试工程师",
+          "kind": "human"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-07",
+      "task_id": "task-dev-07"
+    },
+    "expected": {
+      "allowed_member_ids": [],
+      "must_abstain": true,
+      "reason": "任务需要法务审阅，候选仅有后端工程师和测试工程师，没有匹配角色。"
+    },
+    "label_rationale": "语义不匹配但字段完整，保留给 provider 判断；不构造候选技能。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 501,
+      "output_tokens": 45
+    },
+    "host_elapsed_ms": 281,
+    "http_elapsed_ms": 282.7004999999999,
+    "estimated_cost_usd": 2.1042000000000003e-05,
+    "reserved_cost_usd": 0,
+    "reason_code": "model_abstain",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "1edec217-8dc1-48b9-ab39-b6991afbf9d3",
+      "status": "abstained",
+      "member_id": null,
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:38.187Z",
+        "ended_at": "2026-09-21T09:16:38.468Z",
+        "elapsed_ms": 281,
+        "input_tokens": 501,
+        "output_tokens": 45,
+        "confidence": 0.94,
+        "probabilities": {
+          "c1": 0,
+          "c2": 0.04,
+          "abstain": 0.96
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "1edec217-8dc1-48b9-ab39-b6991afbf9d3",
+      "input_hash": "11356244fa19111da838d7987be250e494065e054aa3c72471a59d2f25aaf099",
+      "status": "abstained",
+      "reason_code": "model_abstain",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:38.187Z",
+        "ended_at": "2026-09-21T09:16:38.468Z",
+        "elapsed_ms": 281,
+        "input_tokens": 501,
+        "output_tokens": 45,
+        "confidence": 0.94,
+        "probabilities": {
+          "c1": 0,
+          "c2": 0.04,
+          "abstain": 0.96
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "abstain",
+      "raw_probabilities": {
+        "c1": 0,
+        "c2": 0.04,
+        "abstain": 0.96
+      },
+      "final_member_id": null
+    }
+  },
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r2",
+    "execution_mode": "live",
+    "case_id": "dev-08",
+    "split": "development",
+    "category": "no_fit",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "1729606ed7587e6516c7962e5077bf113b3eb9263cc8b81b2f66f1a262e5415b",
+    "candidate_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "input": {
+      "project_goal": "完成预算复盘",
+      "task": {
+        "title": "完成预算复盘",
+        "description": "完成预算复盘",
+        "role_required": "财务分析师",
+        "acceptance_criteria": null
+      },
+      "candidates": []
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-08",
+      "task_id": "task-dev-08"
+    },
+    "expected": {
+      "allowed_member_ids": [],
+      "must_abstain": true,
+      "reason": "候选列表为空，无法产生人选建议。"
+    },
+    "label_rationale": "零候选属于业务硬预检，不能调用 provider 伪造建议。",
+    "provider_eligible": false,
+    "status": "pass",
+    "provider_called": false,
+    "provider_calls": 0,
+    "requested_model": "jev-1.13.0",
+    "returned_model": null,
+    "usage": {
+      "input_tokens": null,
+      "output_tokens": null
+    },
+    "host_elapsed_ms": 1,
+    "http_elapsed_ms": 1.8074999999998909,
+    "estimated_cost_usd": 0,
+    "reserved_cost_usd": 0,
+    "reason_code": "no_candidates",
+    "error_code": null,
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "f7ac3123-cdfb-45c9-b651-04e009c6bbaa",
+      "status": "abstained",
+      "member_id": null,
+      "reason_code": "no_candidates",
+      "source": "none",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": null,
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:38.473Z",
+        "ended_at": "2026-09-21T09:16:38.474Z",
+        "elapsed_ms": 1,
+        "input_tokens": null,
+        "output_tokens": null,
+        "confidence": null,
+        "probabilities": null,
+        "provider_calls": 0,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "f7ac3123-cdfb-45c9-b651-04e009c6bbaa",
+      "input_hash": "1729606ed7587e6516c7962e5077bf113b3eb9263cc8b81b2f66f1a262e5415b",
+      "status": "abstained",
+      "reason_code": "no_candidates",
+      "source": "none",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": null,
+        "provider_request_id": null,
+        "started_at": "2026-09-21T09:16:38.473Z",
+        "ended_at": "2026-09-21T09:16:38.474Z",
+        "elapsed_ms": 1,
+        "input_tokens": null,
+        "output_tokens": null,
+        "confidence": null,
+        "probabilities": null,
+        "provider_calls": 0,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": null,
+      "raw_probabilities": null,
+      "final_member_id": null
+    }
+  }
+]

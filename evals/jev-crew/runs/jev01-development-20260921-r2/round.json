@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "round_id": "jev01-development-20260921-r2",
+  "execution_mode": "live",
+  "fixture_version": "jev-crew-fixtures-v1",
+  "label_version": "jev-crew-labels-v1",
+  "question_version": "crew-assignee-v1",
+  "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+  "fixture_hashes": {
+    "development": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "heldout": "b1cbc119add5493bf0256825c10e81a3bd486428066028d04811c061f7654f66"
+  },
+  "candidate_source_hash": "9b4140291c43c4d6508a704e1847aa991f7dab5ae2bc4314d3122de5cf33ffdd",
+  "candidate_order_policy": "For distinguishable cases, an odd numeric suffix places the allowed candidate at position 1 and an even suffix at position 2; ambiguous and no_fit cases preserve their listed roster order. Labels never depend on order.",
+  "source_file_hashes": {
+    "apps/harness-service/src/jev-decision.ts": "3c39f6cb7ac4d1444a9157f243844c8388e107ef82f9e8fd8cad65cb530570d6",
+    "apps/harness-service/src/product-facade.ts": "b31c8365fc7f7d49cbbb67d352b692a5a4575d42f2f6992232ae177ce63014bb",
+    "apps/harness-service/src/main.ts": "754008e651ea1e8045d364782f216412125a916537b2c66d1da3159dec96abff",
+    "apps/desktop/electron/runtime-service.mjs": "6a94f84c3687a2a3894b9928766a3eba63ab8e15887f85bfdec73007dce8a7de",
+    "scripts/jev-crew-eval.mjs": "e84449c7e6863ad22d8d0ca0028c110227c6bbcb57a944b35dbe251bdec70011"
+  },
+  "built_main_sha256": "083f8a87647db7182cc8845b9846254151a061f95dd15066a359f9e1bde12000",
+  "created_at": "2026-09-21T09:16:31.526Z"
+}

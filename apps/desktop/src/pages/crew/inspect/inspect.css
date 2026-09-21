@@ -330,6 +330,13 @@ button.ir-insp-chip:hover { background: var(--tint); }
 .ir-insp-picker__name { font-size: 11.5px; font-weight: 500; }
 .ir-insp-picker__role { font-size: 9.5px; color: var(--ink-3); }
 .ir-insp-picker__cur { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--iris); }
+.ir-insp-picker__suggest { width: 100%; padding: 7px 8px; border: 1px solid color-mix(in srgb, var(--iris) 35%, transparent); border-radius: 8px; background: var(--iris-soft); color: var(--iris); cursor: pointer; text-align: left; font-size: 11px; }
+.ir-insp-picker__suggest:disabled { opacity: 0.65; cursor: wait; }
+.ir-insp-picker__suggestion { margin: 4px 0 7px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.ir-insp-picker__suggestion-title { font-size: 9px; color: var(--ink-3); margin-bottom: 4px; }
+.ir-insp-picker__suggestion-person { font-size: 12px; font-weight: 650; color: var(--ink); }
+.ir-insp-picker__suggestion-fact, .ir-insp-picker__suggestion-meta { margin-top: 3px; font-size: 9px; color: var(--ink-3); line-height: 1.45; }
+.ir-insp-picker__adopt { margin-top: 7px; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--iris); color: #fff; cursor: pointer; font-size: 10px; }
 
 /* ---------------- 任务抽屉(480 右滑 · 1h) ---------------- */
 .ir-insp-drawer-layer { position: fixed; inset: 0; z-index: 70; }

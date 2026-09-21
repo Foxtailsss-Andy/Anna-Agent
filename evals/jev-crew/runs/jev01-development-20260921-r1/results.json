@@ -1,0 +1,129 @@
+[
+  {
+    "schema_version": 1,
+    "round_id": "jev01-development-20260921-r1",
+    "execution_mode": "live",
+    "case_id": "dev-01",
+    "split": "development",
+    "category": "distinguishable",
+    "fixture_hash": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+    "question_version": "crew-assignee-v1",
+    "input_hash": "592bc757fe1c11102b6ad642799c2dbaeff4cc9451f6f848451cee5c9b9132d5",
+    "candidate_hash": "396a55af96ec8438141cfaaa32841352d000a0fd39d91344efeb7da676408dad",
+    "input": {
+      "project_goal": "整理季度经营数据",
+      "task": {
+        "title": "完成经营数据分析",
+        "description": "完成经营数据分析",
+        "role_required": "数据分析师",
+        "acceptance_criteria": null
+      },
+      "candidates": [
+        {
+          "id": "dev01-member-a",
+          "role": "数据分析师",
+          "kind": "human"
+        },
+        {
+          "id": "dev01-member-b",
+          "role": "后端工程师",
+          "kind": "agent"
+        }
+      ]
+    },
+    "scope": {
+      "workspace_id": "jev-eval-development",
+      "actor_user_id": "jev-eval-reviewer",
+      "project_id": "project-dev-01",
+      "task_id": "task-dev-01"
+    },
+    "expected": {
+      "allowed_member_ids": [
+        "dev01-member-a"
+      ],
+      "must_abstain": false,
+      "reason": "任务角色为数据分析师，只有数据分析师候选匹配。"
+    },
+    "label_rationale": "仅依据 project_goal、title/role_required 与候选 role/kind 判定。",
+    "provider_eligible": true,
+    "status": "pass",
+    "provider_called": true,
+    "provider_calls": 1,
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 506,
+      "output_tokens": 44
+    },
+    "host_elapsed_ms": 675,
+    "http_elapsed_ms": 694.4427500000002,
+    "estimated_cost_usd": 2.1252000000000003e-05,
+    "reserved_cost_usd": 0,
+    "error_code": "model_choice",
+    "retry_count": 0,
+    "host_http_status": 200,
+    "host_result": {
+      "schema_version": 1,
+      "decision_id": "d9cf1705-48e7-4003-a6c4-7c07b20bb094",
+      "status": "suggested",
+      "member_id": "dev01-member-a",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T08:49:46.935Z",
+        "ended_at": "2026-09-21T08:49:47.610Z",
+        "elapsed_ms": 675,
+        "input_tokens": 506,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "abstain": 0.01,
+          "c2": 0
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      }
+    },
+    "inference": {
+      "decision_id": "d9cf1705-48e7-4003-a6c4-7c07b20bb094",
+      "input_hash": "592bc757fe1c11102b6ad642799c2dbaeff4cc9451f6f848451cee5c9b9132d5",
+      "status": "suggested",
+      "reason_code": "model_choice",
+      "source": "jev",
+      "meta": {
+        "question_version": "crew-assignee-v1",
+        "requested_model": "jev-1.13.0",
+        "returned_model": "jev-1.13.0",
+        "provider_request_id": null,
+        "started_at": "2026-09-21T08:49:46.935Z",
+        "ended_at": "2026-09-21T08:49:47.610Z",
+        "elapsed_ms": 675,
+        "input_tokens": 506,
+        "output_tokens": 44,
+        "confidence": 0.98,
+        "probabilities": {
+          "c1": 0.99,
+          "abstain": 0.01,
+          "c2": 0
+        },
+        "provider_calls": 1,
+        "retry_count": 0,
+        "error_code": null
+      },
+      "raw_choice": "c1",
+      "raw_probabilities": {
+        "c1": 0.99,
+        "abstain": 0.01,
+        "c2": 0
+      },
+      "final_member_id": "dev01-member-a"
+    }
+  }
+]

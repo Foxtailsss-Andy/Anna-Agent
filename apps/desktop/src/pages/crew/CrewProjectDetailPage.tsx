@@ -14,6 +14,7 @@ import { StateNote } from "../../components/anna/StateNote";
 import { getIdentity } from "../../lib/api/identity";
 import {
   assignTask,
+  cancelAssignmentSuggestion,
   getProject,
   getProjectMemory,
   listChannel,
@@ -24,6 +25,7 @@ import {
   runAgentTask,
   startTask,
   submitTask,
+  suggestAssignment,
   type ChannelMessage,
   type CrewProject,
   type MemoryItem,
@@ -79,6 +81,10 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
   const [error, setError] = useState<string | null>(null);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const projectIdRef = useRef(projectId);
+  const projectRef = useRef(project);
+  projectIdRef.current = projectId;
+  projectRef.current = project;
 
   // F4 覆盖层状态
   const [view, setView] = useState<ViewId>("graph");
@@ -308,7 +314,15 @@ export function CrewProjectDetailPage({ projectId }: { projectId: string | null 
       isOwner,
       members,
       memory,
-      assign: (taskId, memberId) => assignTask(projectId!, taskId, memberId).then(refresh),
+      assign: (taskId, memberId, decisionId) => {
+        const requestProjectId = projectId!;
+        return assignTask(requestProjectId, taskId, memberId, decisionId).then(() => {
+          if (decisionId && (projectIdRef.current !== requestProjectId || projectRef.current?.id !== requestProjectId)) return;
+          return refresh();
+        });
+      },
+      suggestAssignment: (taskId, requestId, signal) => suggestAssignment(projectId!, taskId, requestId, signal),
+      cancelAssignmentSuggestion: (taskId, decisionId) => cancelAssignmentSuggestion(projectId!, taskId, decisionId).then(() => undefined),
       start: (taskId) => startTask(projectId!, taskId).then(refresh),
       submit: (taskId, artifact) => submitTask(projectId!, taskId, artifact).then(refresh),
       // run-agent 返回 {run_ref};立即 refresh 让 run_ref 落任务后抽屉 trace 可见。

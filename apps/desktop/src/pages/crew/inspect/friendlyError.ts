@@ -65,6 +65,14 @@ export function friendlyTaskError(e: unknown): string {
       return "这是评审门——不用开始、也不提交，直接评审：通过或驳回。";
     case "task_not_assignable":
       return "该任务已在推进中，不能直接改派——让当前执行者提交，或先在频道协调。";
+    case "suggestion_stale":
+      return "任务或成员资料已变化，建议已过期；请刷新后手动选择。";
+    case "suggestion_expired":
+      return "建议已过期，请重新生成或手动选择成员。";
+    case "suggestion_conflict":
+      return "这条建议已被其他操作处理，请刷新后重新选择。";
+    case "suggestion_canceled":
+      return "建议已取消，可继续手动选择成员。";
     default: {
       const detail = typeof body?.detail === "string" ? body.detail : e.body;
       return detail || `请求失败（HTTP ${e.status}）`;

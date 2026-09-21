@@ -1,0 +1,9 @@
+{
+  "command": "npm run build",
+  "started_at": "2026-09-21T12:40:12.353100+00:00",
+  "ended_at": "2026-09-21T12:40:20.233821+00:00",
+  "elapsed_seconds": 7.881,
+  "exit_code": 0,
+  "head": "ba4b80d091703fffbe93fa7fe109bc885fdcd20f",
+  "candidate_scope": "npm-source-r2.sha256; eval scripts and documentation still in development"
+}

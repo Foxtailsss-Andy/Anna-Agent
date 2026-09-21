@@ -1,0 +1,38 @@
+{
+  "decision_id": "9f664eca-7ccb-4dce-aa85-678521ecca11",
+  "project_id": "proj_1",
+  "task_id": "task_1_brief",
+  "status": "suggested",
+  "source": "jev",
+  "member_id": "acc_boss",
+  "reason_code": "model_choice",
+  "expires_at": "2026-09-21T11:54:44.301863+00:00",
+  "evidence": {
+    "task_role": "PM",
+    "member_role": "产品",
+    "member_kind": "human"
+  },
+  "meta": {
+    "question_version": "crew-assignee-v1",
+    "requested_model": "jev-1.13.0",
+    "returned_model": "jev-1.13.0",
+    "provider_request_id": null,
+    "started_at": "2026-09-21T11:49:44.423Z",
+    "ended_at": "2026-09-21T11:49:45.090Z",
+    "elapsed_ms": 667,
+    "input_tokens": 648,
+    "output_tokens": 68,
+    "confidence": 0.93,
+    "probabilities": {
+      "c1": 0,
+      "c3": 0.01,
+      "c2": 0,
+      "c5": 0.95,
+      "c4": 0,
+      "abstain": 0.04
+    },
+    "provider_calls": 1,
+    "retry_count": 0,
+    "error_code": null
+  }
+}

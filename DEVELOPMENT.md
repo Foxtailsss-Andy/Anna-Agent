@@ -33,6 +33,20 @@ After launch, start an ordinary question in Home/Create, continue the same conve
 
 The [RC1 release record](docs/releases/rc1-developer-preview.md) separates deterministic external transports, real local OMP execution, and outstanding live/provider and platform checks. RC1 adds no new installer or broad recovery/sandbox guarantee.
 
+## Optional Jev Crew suggestions
+
+Jev is disabled by default. To enable the experimental single-task suggestion, store a TypeSafe key as plain UTF-8 in a protected file outside the repository and the Agent-readable workspace, with file permission `0600` and parent directory permission `0700`. Pass only its path to the launcher:
+
+```bash
+ANNA_JEV_ENABLED=1 ANNA_JEV_API_KEY_FILE=/absolute/protected/path/typesafe.key npm run desktop:run
+```
+
+Only the Node Host receives this key reference. The request model is pinned to `jev-1.13.0`. A generation-model configuration is not required for Jev suggestions; ready Worker execution still requires the existing Host model configuration and execution policy.
+
+In Crew, open an unassigned, non-gate `todo` or `blocked` task and click **建议人选**. Opening the picker alone makes no model request. When Jev is needed, the explicit request sends the project goal, task title/description/role/acceptance criteria, and candidate local IDs/roles/kinds to TypeSafe. Names, email addresses, channel history and memory are excluded. A unique exact-role match uses a rule and makes no Jev request. Missing configuration, no suitable candidate or provider failure leaves manual selection available.
+
+Inspect the source and click **采纳指派** to commit the assignment. Human tasks do not start a Worker; blocked Workers wait for dependencies. Ready Workers follow the existing execution policy. The displayed **判断耗时** covers the Host decision, excluding UI/API overhead and human thinking time. See the [preview candidate record](docs/releases/jev-crew-preview.md) for evaluation evidence and limits.
+
 ## Configuration ownership
 
 The product launcher accepts these local paths:

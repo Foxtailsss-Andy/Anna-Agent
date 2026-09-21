@@ -1,0 +1,171 @@
+{
+  "id": "proj_1",
+  "workspace_id": "ws_crew_demo",
+  "owner_user_id": "acc_boss",
+  "goal_text": "【Jev 合成验证】由人工产品经理梳理产品目标、用户需求与验收标准，形成需求简报。",
+  "sop_template_id": "marketing_collateral",
+  "status": "active",
+  "source": "user",
+  "showcase": null,
+  "tasks": [
+    {
+      "id": "task_1_brief",
+      "project_id": "proj_1",
+      "key": "brief",
+      "title": "营销 Brief",
+      "description": "",
+      "status": "todo",
+      "role_required": "PM",
+      "assignee_member_id": null,
+      "depends_on": [],
+      "is_gate": false,
+      "reviews_task_id": null,
+      "acceptance_criteria": null,
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    },
+    {
+      "id": "task_2_copy",
+      "project_id": "proj_1",
+      "key": "copy",
+      "title": "文案撰写",
+      "description": "",
+      "status": "blocked",
+      "role_required": "文案",
+      "assignee_member_id": null,
+      "depends_on": [
+        "task_1_brief"
+      ],
+      "is_gate": false,
+      "reviews_task_id": null,
+      "acceptance_criteria": null,
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    },
+    {
+      "id": "task_3_copy_review",
+      "project_id": "proj_1",
+      "key": "copy_review",
+      "title": "文案评审",
+      "description": "",
+      "status": "blocked",
+      "role_required": "boss",
+      "assignee_member_id": null,
+      "depends_on": [
+        "task_2_copy"
+      ],
+      "is_gate": true,
+      "reviews_task_id": "task_2_copy",
+      "acceptance_criteria": "信息准确、调性一致、无合规问题。",
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    },
+    {
+      "id": "task_4_visual",
+      "project_id": "proj_1",
+      "key": "visual",
+      "title": "视觉设计",
+      "description": "",
+      "status": "blocked",
+      "role_required": "设计",
+      "assignee_member_id": null,
+      "depends_on": [
+        "task_3_copy_review"
+      ],
+      "is_gate": false,
+      "reviews_task_id": null,
+      "acceptance_criteria": null,
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    },
+    {
+      "id": "task_5_visual_review",
+      "project_id": "proj_1",
+      "key": "visual_review",
+      "title": "视觉评审",
+      "description": "",
+      "status": "blocked",
+      "role_required": "boss",
+      "assignee_member_id": null,
+      "depends_on": [
+        "task_4_visual"
+      ],
+      "is_gate": true,
+      "reviews_task_id": "task_4_visual",
+      "acceptance_criteria": "视觉符合品牌规范与文案表达。",
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    },
+    {
+      "id": "task_6_publish",
+      "project_id": "proj_1",
+      "key": "publish",
+      "title": "投放、发布",
+      "description": "",
+      "status": "blocked",
+      "role_required": "运营",
+      "assignee_member_id": null,
+      "depends_on": [
+        "task_5_visual_review"
+      ],
+      "is_gate": false,
+      "reviews_task_id": null,
+      "acceptance_criteria": null,
+      "artifact": null,
+      "artifact_versions": [],
+      "review_comment": null,
+      "blocker": null,
+      "run_ref": null,
+      "run_started_at": null,
+      "origin": "sop",
+      "created_from_message_id": null,
+      "run_inflight": false
+    }
+  ],
+  "audit_events": [
+    {
+      "created_at": "2026-09-21T11:25:02.399895+00:00",
+      "payload": {
+        "goal_text": "【Jev 合成验证】由人工产品经理梳理产品目标、用户需求与验收标准，形成需求简报。",
+        "template_id": "marketing_collateral"
+      },
+      "run_id": "proj_1",
+      "type": "crew.project.created"
+    }
+  ]
+}

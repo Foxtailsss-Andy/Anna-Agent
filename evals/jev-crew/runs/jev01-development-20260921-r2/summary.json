@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "round_id": "jev01-development-20260921-r2",
+  "execution_mode": "live",
+  "fixture_version": "jev-crew-fixtures-v1",
+  "label_version": "jev-crew-labels-v1",
+  "question_version": "crew-assignee-v1",
+  "source_head": "503408e8f01a6b55b2c85f94cb94cd5b8b462bc3",
+  "fixture_hashes": {
+    "development": "badb37094dbe2cbda1f37482214847591592d9d61ce85651516c04b7384fdfbe",
+    "heldout": "b1cbc119add5493bf0256825c10e81a3bd486428066028d04811c061f7654f66"
+  },
+  "split": "development",
+  "heldout_requests": 0,
+  "stopped_reason": null,
+  "counts": {
+    "pass": 8,
+    "fail": 0,
+    "blocked": 0,
+    "not_run": 0
+  },
+  "slots": [
+    {
+      "case_id": "dev-01",
+      "split": "development",
+      "category": "distinguishable",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-02",
+      "split": "development",
+      "category": "distinguishable",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-03",
+      "split": "development",
+      "category": "distinguishable",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-04",
+      "split": "development",
+      "category": "distinguishable",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-05",
+      "split": "development",
+      "category": "ambiguous",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-06",
+      "split": "development",
+      "category": "ambiguous",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-07",
+      "split": "development",
+      "category": "no_fit",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": true,
+      "provider_called": true,
+      "provider_calls": 1,
+      "error_code": null
+    },
+    {
+      "case_id": "dev-08",
+      "split": "development",
+      "category": "no_fit",
+      "execution_mode": "live",
+      "status": "pass",
+      "provider_eligible": false,
+      "provider_called": false,
+      "provider_calls": 0,
+      "error_code": null
+    }
+  ],
+  "generated_at": "2026-09-21T09:16:38.487Z"
+}

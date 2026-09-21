@@ -8,13 +8,29 @@ Anna 是一个个人开源项目，探索如何让 AI Agent 从一次对话出�
 
 我们希望工作过程始终清楚：Anna 正在做什么、可以使用哪些工具、哪里需要你作决定，以及结果是如何产生的。
 
-**RC2 · 源码开发者预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**Jev Crew · 实验源码预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [English](README.md) · [可以体验什么](#可以体验什么) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
-> **RC2 · 修复共享工作台的发布验证问题**
+> **先看建议，再决定指派给谁**
 >
-> RC2 处理 RC1 暴露的工作目录测试超时与 CI 证据依赖问题。Home/Create、Cowork、Crew 继续共用 Session 与 Run，支持续聊、能力结果与停止指定 Run。Anna 可以直接回答，也可以使用可用的搜索、URL、Skill 和用户明确选择的文件读取能力；既有资源创建与业务流程保持可用。具体改动、验证与限制见 [RC2 发布记录](docs/releases/rc2-developer-preview.md) 和 [源码预发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)。本次不包含新的签名安装包。
+> Crew 可以为一个未指派任务建议一位成员或 Worker。在现有选人浮层中点击「建议人选」，查看来源后采纳，也可以直接手动选择。唯一精确角色匹配走规则，其余符合条件的情况由 Jev 做有界语义选择；资料不足时可以待定。生成建议不会指派或执行任务。本源码预览提供明确采纳的建议，详见[变化、证据与限制](docs/releases/jev-crew-preview.md)；[RC2 源码发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)保留为独立历史记录。
+
+## Jev 实测对照
+
+本轮冻结 **24 个合成保留案例**，其中 22 个适合模型判断，另 2 个硬预检案例没有调用 C/D。两种模型均 **22/22 符合预先标签**：12 次正确推荐、10 次正确弃权，错误标签判断、API 与格式错误均为 0；相同 22 例上，原角色规则符合标签 12/22。
+
+| 指标（22 个有效案例） | DeepSeek 单次判断（C） | 生产 Jev adapter（D） |
+| --- | ---: | ---: |
+| 请求 → 返回模型 | `deepseek-v4-pro` → 同名 | `jev-1.13.0` → 同名 |
+| 设置 / 真实请求数 | thinking enabled、high；最多 4096 输出 / 22 | Typed Choice / 22 |
+| 观测 p50 / p95 | 2007.078 / 2692.501 ms | 296.349 / 421.889 ms |
+| 实际报告的输入 / 输出 tokens | 4,887 / 2,873 | 11,233 / 1,026 |
+| 高峰、缓存未命中参考估算费用 | $0.017827920 | $0.000471786 |
+
+Jev 的 **p50 低 85.23%**、**p95 低 84.33%**、**参考估算费用低 97.35%**，标签符合率与 DeepSeek **持平**。实际报告的总 tokens **增加 57.98%**，不同 tokenizer 的计数也不能视作等量算力。费用使用 DeepSeek 高峰、缓存未命中价格记预算，未经账单核实；按本轮非高峰时段、仍假定缓存未命中计算，估算费用低 **94.71%**，缓存命中还可能进一步降低 DeepSeek 费用。
+
+这是一次小型、顺序执行的判断对照，不代表生产准确率、浏览器端到端时延，或旧 Crew/Host/OMP 完整链路（B）的提速。**8 个开发案例单独统计**。详见[完整结果、分母与方法](evals/jev-crew/jev03-final-20260922-r1/REPORT.md)。
 
 ## 可以体验什么
 
@@ -62,6 +78,7 @@ Anna 正在持续开发中，当前源码面向希望体验项目、参与改进
 
 | 范围 | 当前状态 |
 | --- | --- |
+| **Jev Crew 候选** | 可选的单任务建议与明确采纳。合成数据上的真实浏览器 → Jev → 指派 → SQLite 回读已验证。本轮 C/D 判断实测、已验指派行为与 Worker/平台限制见[发布记录](docs/releases/jev-crew-preview.md)。 |
 | **RC2 源码** | 修复工作目录身份/范围测试与 CI 证据依赖；普通对话继续通过共享 Node Harness Host 与 Oh-my-Pi 循环执行。结果见 [RC2 记录](docs/releases/rc2-developer-preview.md)；[RC1 记录](docs/releases/rc1-developer-preview.md) 保留此前行为与失败事实。 |
 | **此前的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |
 | **外部业务操作** | 该次验证连接的 Hiker 服务只开放读取工具。授权写入与读回验收仍需等待服务端开放相应能力。 |
@@ -70,7 +87,7 @@ Anna 正在持续开发中，当前源码面向希望体验项目、参与改进
 
 生产可用性、完整故障恢复覆盖及基准测试成绩仍待验证。CI、界面演示和真实外部服务调用各自证明不同范围，具体要求见 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
 
-RC2 继续使用明确固定的外部 transport，验证真实本地身份、持久化、Gateway 与 OMP 执行路径。本轮真实 Provider/MCP 验收仍为 blocked；此前真实记录不代表 RC2 live 已通过。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
+此前 RC2 使用固定外部 transport 验证本地身份、持久化、Gateway 与 OMP 执行路径，其完整 Provider/MCP 实测门槛保留为 blocked；上方 Jev 数字覆盖本次有界建议判断。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
 
 ## 快速开始
 

@@ -1,0 +1,218 @@
+[
+  {
+    "case_id": "heldout-01",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "形成销售经营看板", "task": {"title": "完成销售经营分析", "description": "完成销售经营分析", "role_required": "商业分析师", "acceptance_criteria": null}, "candidates": [{"id": "h01-member-a", "role": "商业分析师", "kind": "human"}, {"id": "h01-member-b", "role": "前端工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h01-member-a"], "must_abstain": false, "reason": "任务需要商业分析师，只有商业分析师角色匹配。"},
+    "label_rationale": "仅依赖任务角色与候选 role/kind，候选角色清晰区分。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-02",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "提升发布质量", "task": {"title": "负责质量保障回归", "description": "负责质量保障回归", "role_required": "质量保障", "acceptance_criteria": null}, "candidates": [{"id": "h02-member-b", "role": "销售经理", "kind": "human"}, {"id": "h02-member-a", "role": "测试工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h02-member-a"], "must_abstain": false, "reason": "质量保障与测试工程师语义匹配，销售经理不匹配。"},
+    "label_rationale": "覆盖质量保障/测试工程师同义，只依据任务与候选字段。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-03",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "完成月度财务结算", "task": {"title": "核对月度财务账目", "description": "核对月度财务账目", "role_required": "财务专员", "acceptance_criteria": null}, "candidates": [{"id": "h03-member-a", "role": "财务人员", "kind": "human"}, {"id": "h03-member-b", "role": "数据工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h03-member-a"], "must_abstain": false, "reason": "财务专员与财务人员匹配，数据工程师不匹配。"},
+    "label_rationale": "覆盖财务专员/财务人员中文同义，未依赖描述外的技能。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-04",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "完成品牌页面改版", "task": {"title": "制作品牌视觉页面", "description": "制作品牌视觉页面", "role_required": "视觉设计师", "acceptance_criteria": null}, "candidates": [{"id": "h04-member-b", "role": "产品经理", "kind": "agent"}, {"id": "h04-member-a", "role": "视觉设计师", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h04-member-a"], "must_abstain": false, "reason": "任务需要视觉设计师，只有视觉设计师角色匹配。"},
+    "label_rationale": "跨产品与设计角色对照，标签仅使用项目目标、任务角色和候选字段。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-05",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "发布中文帮助中心", "task": {"title": "校对中文帮助内容", "description": "校对中文帮助内容", "role_required": "本地化编辑", "acceptance_criteria": null}, "candidates": [{"id": "h05-member-a", "role": "本地化编辑", "kind": "human"}, {"id": "h05-member-b", "role": "后端工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h05-member-a"], "must_abstain": false, "reason": "中文帮助内容校对需要本地化编辑，后端工程师不匹配。"},
+    "label_rationale": "任务与候选角色明确区分语言编辑和工程角色。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-06",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "稳定线上服务", "task": {"title": "部署线上服务并检查运行状态", "description": "部署线上服务并检查运行状态", "role_required": "运维工程师", "acceptance_criteria": null}, "candidates": [{"id": "h06-member-b", "role": "产品经理", "kind": "human"}, {"id": "h06-member-a", "role": "运维工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h06-member-a"], "must_abstain": false, "reason": "部署与运行状态任务需要运维工程师，产品经理不匹配。"},
+    "label_rationale": "跨 Worker 与 Human 角色覆盖，依据任务角色和候选 kind/role。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-07",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "帮助客户使用新系统", "task": {"title": "为客户准备系统培训", "description": "为客户准备系统培训", "role_required": "培训讲师", "acceptance_criteria": null}, "candidates": [{"id": "h07-member-a", "role": "培训讲师", "kind": "human"}, {"id": "h07-member-b", "role": "项目经理", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h07-member-a"], "must_abstain": false, "reason": "客户培训任务需要培训讲师，项目经理不匹配。"},
+    "label_rationale": "任务角色与候选 role 直接对应，包含 Human/Worker 组合。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-08",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "治理主数据质量", "task": {"title": "制定数据治理检查方案", "description": "制定数据治理检查方案", "role_required": "数据治理专员", "acceptance_criteria": null}, "candidates": [{"id": "h08-member-b", "role": "数据分析师", "kind": "human"}, {"id": "h08-member-a", "role": "数据治理专员", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h08-member-a"], "must_abstain": false, "reason": "任务需要数据治理专员，数据分析师不匹配该角色。"},
+    "label_rationale": "使用细分数据角色的明确差异，不依赖虚构技能或候选顺序。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-09",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "降低报销单据差错", "task": {"title": "由人工核对报销票据", "description": "由人工核对报销票据", "role_required": "财务审核", "acceptance_criteria": null}, "candidates": [{"id": "h09-member-a", "role": "财务审核员", "kind": "human"}, {"id": "h09-member-b", "role": "财务审核员", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h09-member-a"], "must_abstain": false, "reason": "财务审核与财务审核员匹配，标题明确要求人工处理，因此选择 human 候选。"},
+    "label_rationale": "由人工核对与候选 kind 形成可解释区分，角色同义来自任务字段。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-10",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "持续生成知识库草稿", "task": {"title": "交由 Worker 自动生成知识库初稿", "description": "交由 Worker 自动生成知识库初稿", "role_required": "内容编辑", "acceptance_criteria": null}, "candidates": [{"id": "h10-member-b", "role": "市场专员", "kind": "human"}, {"id": "h10-member-a", "role": "内容编辑", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h10-member-a"], "must_abstain": false, "reason": "任务要求内容编辑并明确交由 Worker 自动生成，选择 agent 候选。"},
+    "label_rationale": "只有标题明确的 Worker 要求用于区分候选 kind，未使用姓名或顺序。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-11",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "优化移动端使用体验", "task": {"title": "迭代移动端交互原型", "description": "迭代移动端交互原型", "role_required": "交互设计师", "acceptance_criteria": null}, "candidates": [{"id": "h11-member-a", "role": "交互设计师", "kind": "human"}, {"id": "h11-member-b", "role": "项目经理", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h11-member-a"], "must_abstain": false, "reason": "交互原型任务需要交互设计师，项目经理不匹配。"},
+    "label_rationale": "跨交互设计与项目管理角色，依据任务角色与候选 role/kind。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-12",
+    "split": "heldout",
+    "category": "distinguishable",
+    "input": {"state": {"project_goal": "按期完成跨团队版本发布", "task": {"title": "协调跨部门发布排期", "description": "协调跨部门发布排期", "role_required": "项目协调", "acceptance_criteria": null}, "candidates": [{"id": "h12-member-b", "role": "后端工程师", "kind": "agent"}, {"id": "h12-member-a", "role": "项目经理", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": ["h12-member-a"], "must_abstain": false, "reason": "项目协调与项目经理语义匹配，后端工程师不匹配。"},
+    "label_rationale": "覆盖项目协调/项目经理中文角色同义，并与工程角色形成跨角色对照。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-13",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "规划客户门户迭代", "task": {"title": "规划客户门户迭代", "description": "规划客户门户迭代", "role_required": "产品经理", "acceptance_criteria": null}, "candidates": [{"id": "h13-member-a", "role": "产品经理", "kind": "human"}, {"id": "h13-member-b", "role": "产品经理", "kind": "human"}, {"id": "h13-member-c", "role": "测试工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 human 产品经理的 role/kind 相同，任务没有区分字段。"},
+    "label_rationale": "同 role/kind 的多人必须弃权，不能凭候选 ID 或列表位置选择。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-14",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "稳定服务部署流程", "task": {"title": "维护服务部署流程", "description": "维护服务部署流程", "role_required": "运维工程师", "acceptance_criteria": null}, "candidates": [{"id": "h14-member-a", "role": "运维工程师", "kind": "agent"}, {"id": "h14-member-b", "role": "运维工程师", "kind": "agent"}, {"id": "h14-member-c", "role": "产品经理", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 agent 运维工程师候选的 role/kind 相同，无法从现有字段区分。"},
+    "label_rationale": "同 role/kind 候选保留歧义，其他不匹配候选不能提供区分依据。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-15",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "完善帮助中心文章", "task": {"title": "编辑帮助中心文章", "description": "编辑帮助中心文章", "role_required": "内容编辑", "acceptance_criteria": null}, "candidates": [{"id": "h15-member-a", "role": "内容编辑", "kind": "human"}, {"id": "h15-member-b", "role": "内容编辑", "kind": "human"}, {"id": "h15-member-c", "role": "市场专员", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 human 内容编辑完全同类，任务字段不足以选择其中一人。"},
+    "label_rationale": "只按 role/kind 判断，不能用候选 ID、顺序或未提供的技能区分。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-16",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "完成月度结算", "task": {"title": "整理月度财务数据", "description": "整理月度财务数据", "role_required": "财务专员", "acceptance_criteria": null}, "candidates": [{"id": "h16-member-a", "role": "财务专员", "kind": "agent"}, {"id": "h16-member-b", "role": "财务专员", "kind": "agent"}, {"id": "h16-member-c", "role": "数据分析师", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 agent 财务专员的 role/kind 相同，现有字段无法进一步区分。"},
+    "label_rationale": "同 role/kind 的多人不能任意择一，数据分析师不构成有效区分。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-17",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "理解用户活跃变化", "task": {"title": "分析用户活跃变化", "description": "分析用户活跃变化", "role_required": "数据分析师", "acceptance_criteria": null}, "candidates": [{"id": "h17-member-a", "role": "数据分析师", "kind": "human"}, {"id": "h17-member-b", "role": "数据分析师", "kind": "human"}, {"id": "h17-member-c", "role": "产品经理", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 human 数据分析师同类，任务资料没有选择依据。"},
+    "label_rationale": "相同 role/kind 的候选应弃权，不能把任意首人视为正确。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-18",
+    "split": "heldout",
+    "category": "ambiguous",
+    "input": {"state": {"project_goal": "提高回归测试覆盖", "task": {"title": "执行版本回归测试", "description": "执行版本回归测试", "role_required": "测试工程师", "acceptance_criteria": null}, "candidates": [{"id": "h18-member-a", "role": "测试工程师", "kind": "agent"}, {"id": "h18-member-b", "role": "测试工程师", "kind": "agent"}, {"id": "h18-member-c", "role": "产品经理", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "两名 agent 测试工程师候选的 role/kind 相同，无法区分。"},
+    "label_rationale": "同角色同 kind 的多候选必须弃权，不使用 ID 或顺序打破平局。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-19",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "降低合同合规风险", "task": {"title": "复核供应商合同条款", "description": "复核供应商合同条款", "role_required": "法务顾问", "acceptance_criteria": null}, "candidates": [{"id": "h19-member-a", "role": "后端工程师", "kind": "agent"}, {"id": "h19-member-b", "role": "采购专员", "kind": "human"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "任务需要法务顾问，候选角色均不匹配。"},
+    "label_rationale": "语义不匹配但候选与任务字段完整，交由 provider 判断弃权。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-20",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "探索推荐模型方案", "task": {"title": "评估机器学习建模方案", "description": "评估机器学习建模方案", "role_required": "机器学习工程师", "acceptance_criteria": null}, "candidates": [{"id": "h20-member-a", "role": "数据分析师", "kind": "human"}, {"id": "h20-member-b", "role": "前端工程师", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "机器学习工程师与数据分析师、前端工程师均不构成可确认的匹配。"},
+    "label_rationale": "跨角色不匹配案例，保留给 provider 判断，不虚构候选技能。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-21",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "发布医疗内容", "task": {"title": "复核医疗内容术语", "description": "复核医疗内容术语", "role_required": "医学审校", "acceptance_criteria": null}, "candidates": [{"id": "h21-member-a", "role": "内容编辑", "kind": "human"}, {"id": "h21-member-b", "role": "财务专员", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "医学审校需要对应角色，现有内容编辑和财务专员均不匹配。"},
+    "label_rationale": "无合适角色但输入可供语义判断，不能根据候选顺序推荐。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-22",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "规范供应商采购流程", "task": {"title": "制定供应商采购策略", "description": "制定供应商采购策略", "role_required": "采购经理", "acceptance_criteria": null}, "candidates": [{"id": "h22-member-a", "role": "项目经理", "kind": "human"}, {"id": "h22-member-b", "role": "销售经理", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "采购经理与项目经理、销售经理均不匹配，不能确认合适人选。"},
+    "label_rationale": "角色不匹配的 provider eligible 案例，标签不依赖名称或未提供技能。",
+    "provider_eligible": true
+  },
+  {
+    "case_id": "heldout-23",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "完成服务端改造", "task": {"title": "完成服务端改造", "description": "完成服务端改造", "role_required": "后端工程师", "acceptance_criteria": null}, "candidates": []}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": false, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "候选列表为空，属于硬预检拒绝。"},
+    "label_rationale": "零候选不应调用 provider，也不应凭空生成成员。",
+    "provider_eligible": false
+  },
+  {
+    "case_id": "heldout-24",
+    "split": "heldout",
+    "category": "no_fit",
+    "input": {"state": {"project_goal": "确认版本是否允许发布", "task": {"title": "评审发布准入门", "description": "评审发布准入门", "role_required": "项目经理", "acceptance_criteria": null}, "candidates": [{"id": "h24-member-a", "role": "项目经理", "kind": "human"}, {"id": "h24-member-b", "role": "项目经理", "kind": "agent"}]}, "qualification": {"status": "todo", "assignee_member_id": null, "is_gate": true, "task_scope": "single_task"}},
+    "expected": {"allowed_member_ids": [], "must_abstain": true, "reason": "评审门任务不进入单任务人选建议，属于业务硬预检。"},
+    "label_rationale": "is_gate=true 的评审门不送 provider，即使候选角色与任务相同。",
+    "provider_eligible": false
+  }
+]

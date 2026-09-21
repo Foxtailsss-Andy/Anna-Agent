@@ -1,0 +1,124 @@
+{
+  "development": {
+    "A": {
+      "slots": 8,
+      "eligible": 7,
+      "counts": {
+        "pass": 2,
+        "fail": 5
+      },
+      "called": 0,
+      "recommendations": 3,
+      "abstentions": 4,
+      "raw_correct": null,
+      "raw_wrong_ids": [],
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_cost_usd": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "C": {
+      "slots": 8,
+      "eligible": 7,
+      "counts": {
+        "pass": 7
+      },
+      "called": 7,
+      "recommendations": 4,
+      "abstentions": 3,
+      "raw_correct": 7,
+      "raw_wrong_ids": [],
+      "input_tokens": 1553,
+      "output_tokens": 1481,
+      "estimated_cost_usd": 0.00791472,
+      "p50_ms": 2059.066416999998,
+      "p95_ms": 9533.392208000001
+    },
+    "D": {
+      "slots": 8,
+      "eligible": 7,
+      "counts": {
+        "pass": 7
+      },
+      "called": 7,
+      "recommendations": 4,
+      "abstentions": 3,
+      "raw_correct": 7,
+      "raw_wrong_ids": [],
+      "input_tokens": 3581,
+      "output_tokens": 327,
+      "estimated_cost_usd": 0.000150402,
+      "p50_ms": 304.05266699999993,
+      "p95_ms": 695.8127919999997
+    },
+    "change_percent_D_vs_C": {
+      "input_tokens": 130.58596265292982,
+      "output_tokens": -77.92032410533423,
+      "estimated_cost_usd": -98.09971799381407,
+      "p50_ms": -85.2334696690845,
+      "p95_ms": -92.70130949384307
+    }
+  },
+  "heldout": {
+    "A": {
+      "slots": 24,
+      "eligible": 22,
+      "counts": {
+        "pass": 12,
+        "fail": 10
+      },
+      "called": 0,
+      "recommendations": 14,
+      "abstentions": 8,
+      "raw_correct": null,
+      "raw_wrong_ids": [],
+      "input_tokens": null,
+      "output_tokens": null,
+      "estimated_cost_usd": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "C": {
+      "slots": 24,
+      "eligible": 22,
+      "counts": {
+        "pass": 22
+      },
+      "called": 22,
+      "recommendations": 12,
+      "abstentions": 10,
+      "raw_correct": 22,
+      "raw_wrong_ids": [],
+      "input_tokens": 4887,
+      "output_tokens": 2873,
+      "estimated_cost_usd": 0.01782792,
+      "p50_ms": 2007.0782080000063,
+      "p95_ms": 2692.501084000003
+    },
+    "D": {
+      "slots": 24,
+      "eligible": 22,
+      "counts": {
+        "pass": 22
+      },
+      "called": 22,
+      "recommendations": 12,
+      "abstentions": 10,
+      "raw_correct": 22,
+      "raw_wrong_ids": [],
+      "input_tokens": 11233,
+      "output_tokens": 1026,
+      "estimated_cost_usd": 0.000471786,
+      "p50_ms": 296.3490419999871,
+      "p95_ms": 421.8889169999966
+    },
+    "change_percent_D_vs_C": {
+      "input_tokens": 129.8547165950481,
+      "output_tokens": -64.28820048729551,
+      "estimated_cost_usd": -97.35366773016706,
+      "p50_ms": -85.23480346611456,
+      "p95_ms": -84.33096575124736
+    }
+  }
+}

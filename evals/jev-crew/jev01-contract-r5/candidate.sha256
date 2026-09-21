@@ -1,0 +1,8 @@
+73f32c48aacd456759fe4ebfc855ff90c8d455a5b66b50e494c2b9ac42f4e6a9  apps/harness-service/src/jev-decision.ts
+b31c8365fc7f7d49cbbb67d352b692a5a4575d42f2f6992232ae177ce63014bb  apps/harness-service/src/product-facade.ts
+754008e651ea1e8045d364782f216412125a916537b2c66d1da3159dec96abff  apps/harness-service/src/main.ts
+6f6ee78e4b8bb599a430ad4680ed4291185aea46b850c1c12f29175f1fad7e6b  apps/harness-service/test/jev-decision.test.ts
+6a94f84c3687a2a3894b9928766a3eba63ab8e15887f85bfdec73007dce8a7de  apps/desktop/electron/runtime-service.mjs
+6d0898432bbc2dc35e3b51b266710695e788a21c64635d99c9b1868ad0969aea  tests/frontend/jev_runtime_env.test.mjs
+e84449c7e6863ad22d8d0ca0028c110227c6bbcb57a944b35dbe251bdec70011  scripts/jev-crew-eval.mjs
+255decd0487726c2716530c99e2f808a090ace00a18d2d5e6e11dd69652487ab  scripts/jev-crew-eval.test.mjs

@@ -1,0 +1,6 @@
+72083531216348f427ffd316bc3beb216b955a0321018669b58e40f38b2bf160  scripts/jev-crew-eval.mjs
+3ceb01d3131614159a8f7007ca6563b8a45fdb59cee26e75cf8e24ef68e0f4e5  scripts/jev-crew-eval.test.mjs
+c7cfff8510f53f54e39a112b6ffb7e249c63c82d0b43380ad87aaa108eea1691  scripts/jev-crew-eval-host.mjs
+7a0e5461e585ae9904f9523c3ef253cbaa15af57b5057d71b1efec2a95f1e266  scripts/jev-crew-b-matcher.py
+08a55593f10aab0f0363c94133e6bbd5660f129f5581325d3240b855f1c3346e  scripts/jev-crew-baseline.py
+3575ae415f1dc74ccb561e8c3a85cb95d79b11a1668ce70a776379a7abda166c  evals/jev-crew/prices-20260921.json

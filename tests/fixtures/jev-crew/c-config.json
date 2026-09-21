@@ -1,0 +1,4 @@
+{
+  "model": "deepseek-v4-pro",
+  "endpoint": "https://api.deepseek.com/chat/completions"
+}

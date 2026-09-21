@@ -1,0 +1,70 @@
+{
+  "environment": {
+    "platform": "macOS 26.6.2 arm64",
+    "node": "v24.12.0",
+    "python": "3.12.13"
+  },
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "npm test -- --reporter=dot",
+      "round": "initial",
+      "passed": 652,
+      "failed": 1,
+      "exit_code": 1,
+      "reason": "Two new Chinese ellipsis strings violated the existing punctuation check."
+    },
+    {
+      "command": "npm test -- --reporter=dot",
+      "round": "after punctuation repair",
+      "passed": 1268,
+      "failed": 0,
+      "skipped": 7,
+      "exit_code": 0,
+      "source_manifest": "npm-source-r2.sha256",
+      "source_unchanged_after_run": true
+    },
+    {
+      "command": "node --test --test-timeout=15000 tests/frontend/jev_member_picker.test.mjs",
+      "passed": 11,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "command": "./.venv/bin/python -m pytest -q",
+      "passed": 1112,
+      "failed": 1,
+      "exit_code": 1,
+      "reason": "Static pricing citation URLs in the evaluation script triggered the egress source scan; repair moves citation metadata into JSON."
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "elapsed_seconds": 7.881,
+      "command_metadata": "build-command.json"
+    },
+    {
+      "command": "node --test scripts/jev-crew-eval.test.mjs",
+      "passed": 24,
+      "failed": 0,
+      "exit_code": 0,
+      "stage": "final frozen tools"
+    },
+    {
+      "command": "./.venv/bin/python -m pytest -q tests/gates/test_gate_egress.py",
+      "passed": 8,
+      "failed": 0,
+      "exit_code": 0,
+      "stage": "after metadata repair"
+    },
+    {
+      "command": "npm run release:verify",
+      "exit_code": 0,
+      "violations": 0
+    }
+  ],
+  "raw_logs": "Retained byte-for-byte in the operator publication archive; publication-provenance.json lists archived paths. Final targeted checks and remote CI are recorded separately."
+}

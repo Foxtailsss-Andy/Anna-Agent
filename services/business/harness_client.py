@@ -23,6 +23,76 @@ ProductSurface = Literal[
 PermissionMode = Literal["readonly", "ask", "contained-write", "full"]
 
 
+class AssigneeCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    role: str
+    kind: Literal["human", "agent"]
+
+
+class AssigneeDecisionTask(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str
+    role_required: str
+    acceptance_criteria: str | None
+
+
+class AssigneeDecisionState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_goal: str
+    task: AssigneeDecisionTask
+    candidates: list[AssigneeCandidate]
+
+
+class AssigneeDecisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    decision_id: str
+    workspace_id: str
+    actor_user_id: str
+    project_id: str
+    task_id: str
+    input_hash: str
+    question_version: Literal["crew-assignee-v1"]
+    state: AssigneeDecisionState
+
+
+class AssigneeDecisionMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question_version: Literal["crew-assignee-v1"]
+    requested_model: Literal["jev-1.13.0"]
+    returned_model: str | None
+    provider_request_id: str | None
+    started_at: str
+    ended_at: str
+    elapsed_ms: int
+    input_tokens: int | None
+    output_tokens: int | None
+    confidence: float | None
+    probabilities: dict[str, float] | None
+    provider_calls: int
+    retry_count: Literal[0]
+    error_code: str | None
+
+
+class AssigneeDecisionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    decision_id: str
+    status: Literal["suggested", "abstained", "unavailable"]
+    member_id: str | None
+    reason_code: str
+    source: Literal["jev", "none"]
+    meta: AssigneeDecisionMeta
+
+
 class ProductTask(BaseModel):
     """The only task shape the business process may submit to the Host."""
 
@@ -377,6 +447,29 @@ class HarnessHostClient:
             "GET", f"/_harness/runs/{quote(_path_id(run_id), safe='')}"
         )
         return _run_from_response(run_id, body)
+
+    async def decide_assignee_async(
+        self,
+        request: AssigneeDecisionRequest | Mapping[str, Any],
+    ) -> AssigneeDecisionResult:
+        """Call the Host's typed, bounded Crew assignee decision seam."""
+        payload = (
+            request
+            if isinstance(request, AssigneeDecisionRequest)
+            else AssigneeDecisionRequest.model_validate(request)
+        )
+        body = await self._request_async(
+            "POST",
+            "/_harness/crew/assignee-decision",
+            json=payload.model_dump(mode="json"),
+        )
+        try:
+            return AssigneeDecisionResult.model_validate(body)
+        except ValueError as exc:
+            raise HarnessHostError(
+                "Harness Host returned an invalid assignee decision",
+                code="invalid_assignee_decision",
+            ) from exc
 
     async def events_async(self, run_id: str, *, after_seq: int = -1) -> list[dict[str, Any]]:
         body = await self._request_async(

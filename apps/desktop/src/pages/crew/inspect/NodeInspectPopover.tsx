@@ -121,7 +121,7 @@ export function NodeInspectPopover(props: NodeInspectPopoverProps) {
     ? gateOps(gateVisual(task))
     : withAgentRun(popoverOps(card, visual), canRunAgent(task, actions.members));
 
-  const executorRow = assignee && (
+  const executorRow = assignee ? (
     <div className="ir-insp-exec">
       <MemberAvatar member={assignee} isOwner={assignee.id === actions.ownerUserId} size={18} />
       <MemberName member={assignee} />
@@ -137,11 +137,39 @@ export function NodeInspectPopover(props: NodeInspectPopoverProps) {
           ownerUserId={actions.ownerUserId}
           currentId={task.assignee_member_id}
           onPick={ops.confirmReassign}
+          suggestion={ops.suggestion}
+          suggestionPending={ops.suggestionPending}
+          onSuggest={ops.requestSuggestion}
+          onAdoptSuggestion={ops.adoptSuggestion}
+          suggestionAdopting={ops.suggestionAdopting}
+          suggestable={!task.is_gate && ["todo", "blocked"].includes(task.status)}
+          taskStatus={task.status}
           onClose={ops.closePicker}
         />
       )}
     </div>
-  );
+  ) : !task.is_gate ? (
+    <div className="ir-insp-exec">
+      <span className="ir-insp-exec__load">未指派</span>
+      <button type="button" className="ir-insp-chip ir-insp-exec__reassign" onClick={ops.openPicker}>指派</button>
+      {ops.pickerOpen && (
+        <MemberPicker
+          members={actions.members}
+          ownerUserId={actions.ownerUserId}
+          currentId={null}
+          onPick={ops.confirmReassign}
+          suggestion={ops.suggestion}
+          suggestionPending={ops.suggestionPending}
+          onSuggest={ops.requestSuggestion}
+          onAdoptSuggestion={ops.adoptSuggestion}
+          suggestionAdopting={ops.suggestionAdopting}
+          suggestable={!task.is_gate && ["todo", "blocked"].includes(task.status)}
+          taskStatus={task.status}
+          onClose={ops.closePicker}
+        />
+      )}
+    </div>
+  ) : null;
 
   const actionRow = (
     <div className="ir-insp-actions">

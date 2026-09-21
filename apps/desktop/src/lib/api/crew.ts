@@ -99,6 +99,26 @@ export interface TeamMember {
   kind: "human" | "agent" | string;
 }
 
+export interface AssignmentSuggestion {
+  decision_id: string;
+  project_id: string;
+  task_id: string;
+  status: "suggested" | "abstained" | "unavailable";
+  source: "role_rule" | "jev" | "none";
+  member_id: string | null;
+  reason_code: string;
+  expires_at: string;
+  evidence: {
+    task_role: string;
+    member_role: string | null;
+    member_kind: string | null;
+  };
+  meta: {
+    elapsed_ms?: number | null;
+    [key: string]: unknown;
+  } | null;
+}
+
 /* ---------------- 收件箱聚合(B3;services/crew/app/inbox.py 真形状) ---------------- */
 
 /** 待我做:已派给我的任务(assigned/rework)+ 预派排队(queued)。 */
@@ -276,12 +296,41 @@ export function assignTask(
   projectId: string,
   taskId: string,
   memberId: string,
+  decisionId?: string,
 ): Promise<CrewProject> {
   return apiJson<CrewProject>(`/api/crew/projects/${projectId}/tasks/${taskId}/assign`, {
     method: "POST",
     headers: authHeaders(),
-    json: { member_id: memberId },
+    json: decisionId ? { member_id: memberId, decision_id: decisionId } : { member_id: memberId },
   });
+}
+
+export function suggestAssignment(
+  projectId: string,
+  taskId: string,
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<AssignmentSuggestion> {
+  return apiJson<AssignmentSuggestion>(
+    `/api/crew/projects/${projectId}/tasks/${taskId}/assignment-suggestions`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      json: { request_id: requestId },
+      signal,
+    },
+  );
+}
+
+export function cancelAssignmentSuggestion(
+  projectId: string,
+  taskId: string,
+  decisionId: string,
+): Promise<{ decision_id: string; status: string }> {
+  return apiJson<{ decision_id: string; status: string }>(
+    `/api/crew/projects/${projectId}/tasks/${taskId}/assignment-suggestions/${decisionId}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
 }
 
 /** 开始(assigned → running)。 */

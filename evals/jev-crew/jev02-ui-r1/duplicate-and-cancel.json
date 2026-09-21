@@ -1,0 +1,8 @@
+{
+  "duplicate_http_status": 200,
+  "audit_event_count": 2,
+  "cancel_after_commit": {
+    "decision_id": "9f664eca-7ccb-4dce-aa85-678521ecca11",
+    "status": "already_applied"
+  }
+}

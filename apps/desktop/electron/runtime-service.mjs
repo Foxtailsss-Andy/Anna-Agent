@@ -185,6 +185,9 @@ export function createProductRuntimeConfig({
     DEEPSEEK_API_KEY: _deepSeekApiKey,
     ANNA_OPENAI_API_KEY: _annaOpenAiApiKey,
     ANNA_DEEPSEEK_API_KEY: _annaDeepSeekApiKey,
+    ANNA_JEV_ENABLED: _jevEnabled,
+    ANNA_JEV_API_KEY_FILE: _jevApiKeyFile,
+    ANNA_JEV_API_KEY: _jevApiKey,
     MODEL_API_KEY: _modelApiKeyGeneric,
     MODEL_ENDPOINT: _modelEndpointGeneric,
     MODEL_NAME: _modelNameGeneric,
@@ -197,6 +200,15 @@ export function createProductRuntimeConfig({
     ...ordinaryEnv
   } = env;
   const hostWorkspaceRoot = env.ANNA_HARNESS_HOST_WORKSPACE_ROOT ?? path.join(stateRoot, "workspace");
+  const protectedPaths = [
+    hostConfigPath,
+    businessConfigPath,
+    eventStorePath,
+    sessionStorePath,
+    stateRoot,
+    hostWorkspaceRoot,
+    env.ANNA_JEV_API_KEY_FILE,
+  ].filter((value) => typeof value === "string" && value.trim() !== "");
   const hostEnv = {
     ...ordinaryEnv,
     ANNA_RUNTIME_CONFIG_PATH: hostConfigPath,
@@ -211,15 +223,10 @@ export function createProductRuntimeConfig({
     ANNA_HARNESS_SESSION_STORE_PATH: sessionStorePath,
     ANNA_HARNESS_SERVICE_TOKEN: serviceToken,
     ANNA_HARNESS_BUSINESS_PORT: String(resolvedBusinessPort),
-    ANNA_HARNESS_PROTECTED_PATHS: [
-      hostConfigPath,
-      businessConfigPath,
-      eventStorePath,
-      sessionStorePath,
-      stateRoot,
-      hostWorkspaceRoot,
-    ].join(path.delimiter),
+    ANNA_HARNESS_PROTECTED_PATHS: protectedPaths.join(path.delimiter),
     ANNA_HARNESS_BUSINESS_ENABLED: businessEnabled ? "1" : "0",
+    ANNA_JEV_ENABLED: env.ANNA_JEV_ENABLED ?? "0",
+    ...(env.ANNA_JEV_API_KEY_FILE === undefined ? {} : { ANNA_JEV_API_KEY_FILE: env.ANNA_JEV_API_KEY_FILE }),
     ...(businessOrigin === undefined ? {} : { ANNA_HARNESS_BUSINESS_ORIGIN: businessOrigin }),
     ...(env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN === undefined
       ? { ANNA_HARNESS_BUSINESS_SERVICE_TOKEN: serviceToken }

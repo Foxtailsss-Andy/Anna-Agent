@@ -2,7 +2,7 @@
  * inspect/types · 抽屉与轻检视共用的动作契约(DetailPage 装配真 API + refresh)。
  */
 
-import type { MemoryItem, TeamMember } from "../../../lib/api/crew";
+import type { AssignmentSuggestion, MemoryItem, TeamMember } from "../../../lib/api/crew";
 
 export interface InspectActions {
   /** 当前会话成员 id(认领到自己;桌面免登录 → null) */
@@ -15,7 +15,9 @@ export interface InspectActions {
   /** 项目共识条目(命中溯源 + 届时注入 chips) */
   memory: MemoryItem[];
 
-  assign(taskId: string, memberId: string): Promise<void>;
+  assign(taskId: string, memberId: string, decisionId?: string): Promise<void>;
+  suggestAssignment(taskId: string, requestId: string, signal?: AbortSignal): Promise<AssignmentSuggestion>;
+  cancelAssignmentSuggestion(taskId: string, decisionId: string): Promise<void>;
   start(taskId: string): Promise<void>;
   submit(taskId: string, artifact: string): Promise<void>;
   /** 触发 Agent 执行(run-agent;仅 agent-kind assignee 的 assigned|rework 任务) */

@@ -8,6 +8,8 @@ import { readProductConfig } from "./product-config";
 const serviceToken = process.env.ANNA_HARNESS_SERVICE_TOKEN?.trim() || randomUUID();
 const hostConfigPath = process.env.ANNA_HARNESS_HOST_CONFIG_PATH?.trim()
   || process.env.ANNA_RUNTIME_CONFIG_PATH?.trim();
+const jevKeyFile = process.env.ANNA_JEV_API_KEY_FILE?.trim();
+const protectedPaths = [jevKeyFile].filter((value): value is string => value !== undefined && value !== "");
 const businessOrigin = process.env.ANNA_HARNESS_BUSINESS_ORIGIN?.trim();
 const sessionStore = new ProductSessionStore(process.env.ANNA_HARNESS_SESSION_STORE_PATH);
 const hostConfig = await readProductConfig(hostConfigPath);
@@ -35,6 +37,7 @@ try {
       businessOrigin,
       businessServiceToken: process.env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN ?? serviceToken,
     }),
+    protectedPaths,
     productTaskFor: async (runId: string) => (await sessionStore.get(runId))?.task,
     productTaskPeek: (runId: string) => sessionStore.peek(runId)?.task,
     modelProfiles,
@@ -49,6 +52,10 @@ try {
     runtimeConfigPath: hostConfigPath,
     serviceToken,
     sessionStore,
+    protectedPaths,
+    jevTelemetry: (record) => {
+      process.stderr.write(JSON.stringify({ type: "jev.inference", ...record }) + "\n");
+    },
     ...(businessOrigin === undefined ? {} : { businessOrigin }),
     businessServiceToken: process.env.ANNA_HARNESS_BUSINESS_SERVICE_TOKEN,
   });

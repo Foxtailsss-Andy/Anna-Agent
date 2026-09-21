@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
 
 from services.crew.app import lifecycle
+from services.crew.app.assignment_suggestions import (
+    SuggestionAdoptionContext,
+    assignment_input_hash,
+)
 from services.crew.app.actors import (
     SYSTEM_ANNA_ACTOR_ID,
     SYSTEM_ACTOR_IDS,
@@ -51,6 +56,7 @@ ProposeAssignments = Callable[[CrewProject], list]
 # ``anna``) are coordination handles and must never become identity accounts.
 # None keeps every legacy construction byte-identical: no filtering.
 WorkspaceRoster = Callable[[str], set[str]]
+MemberFacts = Callable[[str], list[dict[str, str]]]
 
 # C3 意图确认卡:the task-intent祈使 regex family. A human-authored say that
 # @-mentions someone AND hits one of these phrases spawns a background draft card
@@ -69,8 +75,26 @@ class CrewPermissionError(Exception):
     """Raised when a non-owner attempts a Boss-only crew action (确认下推).
 
     Boss-ness is project ownership (the seed's own definition): the API maps
-    this to 403, and the service enforces it too so the guard survives any
-    caller."""
+        this to 403, and the service enforces it too so the guard survives any
+        caller."""
+
+
+class SuggestionAdoptionError(RuntimeError):
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
+@dataclass(frozen=True)
+class SuggestionAssignmentCommit:
+    project: CrewProject
+    first: bool
+    project_id: str
+    task_id: str
+    member_id: str
+    actor_user_id: str
+    decision_id: str
+    audit_ref: str
 
 
 def _now() -> str:
@@ -86,6 +110,28 @@ def _deep_link(project_id: str, task_id: str | None = None) -> str:
     if task_id:
         link += f"?task={task_id}"
     return link
+
+
+def _assignment_receipt(
+    project: CrewProject,
+    *,
+    task_id: str,
+    actor_user_id: str,
+    decision_id: str,
+) -> dict[str, Any] | None:
+    for event in project.audit_events:
+        if event.get("type") != "crew.task.assign":
+            continue
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        if (
+            payload.get("task_id") == task_id
+            and payload.get("actor_user_id") == actor_user_id
+            and payload.get("decision_id") == decision_id
+        ):
+            return payload
+    return None
 
 
 class CrewService:
@@ -108,6 +154,7 @@ class CrewService:
         agent_dispatcher: AgentDispatcher | None = None,
         propose_assignments: ProposeAssignments | None = None,
         roster: WorkspaceRoster | None = None,
+        member_facts: MemberFacts | None = None,
     ) -> None:
         self._store = store
         # audit is kept for interface compatibility but we write dicts directly
@@ -126,6 +173,7 @@ class CrewService:
         # DEV-8: workspace roster source for ghost-mention filtering. None = no
         # filtering (legacy constructions unchanged).
         self._roster = roster
+        self._member_facts = member_facts
 
     # ------------------------------------------------------------------
     # Project creation
@@ -284,6 +332,156 @@ class CrewService:
         # (still-blocked) task is a no-op here and runs later when it unlocks.
         self._autorun(project, _find_task(project, task_id))
         return project
+
+    def commit_from_suggestion(
+        self,
+        project_id: str,
+        task_id: str,
+        member_id: str,
+        decision_id: str,
+        actor_user_id: str,
+        suggestion_context: SuggestionAdoptionContext | None = None,
+        *,
+        workspace_id: str | None = None,
+    ) -> SuggestionAssignmentCommit:
+        """Atomically adopt one server-held suggestion and return its commit."""
+        outcome: dict[str, Any] = {}
+
+        def mutate(project: CrewProject) -> bool:
+            task = _find_task(project, task_id)
+            if workspace_id is not None and project.workspace_id != workspace_id:
+                raise SuggestionAdoptionError("suggestion_stale")
+            receipt = _assignment_receipt(
+                project, task_id=task_id, actor_user_id=actor_user_id, decision_id=decision_id
+            )
+            if receipt is not None:
+                if receipt.get("member_id") == member_id:
+                    outcome["duplicate"] = True
+                    return False
+                raise SuggestionAdoptionError("suggestion_conflict")
+            if suggestion_context is None:
+                raise SuggestionAdoptionError("suggestion_expired")
+            suggestion = suggestion_context.suggestion
+            if (
+                suggestion.status != "suggested"
+                or suggestion.decision_id != decision_id
+                or suggestion.member_id != member_id
+                or suggestion_context.question_version != "crew-assignee-v1"
+            ):
+                raise SuggestionAdoptionError("suggestion_conflict")
+            if task is None or task.is_gate or task.status not in ("todo", "blocked"):
+                raise SuggestionAdoptionError("suggestion_stale")
+            if task.assignee_member_id is not None:
+                raise SuggestionAdoptionError("suggestion_stale")
+            current_facts = self._current_member_facts(project.workspace_id)
+            selected = next((item for item in current_facts if item["id"] == member_id), None)
+            if selected is None:
+                raise SuggestionAdoptionError("suggestion_stale")
+            if (
+                selected.get("role") != suggestion.evidence.member_role
+                or selected.get("kind") != suggestion.evidence.member_kind
+                or assignment_input_hash(project, task, tuple(current_facts))
+                != suggestion_context.input_hash
+            ):
+                raise SuggestionAdoptionError("suggestion_stale")
+            lifecycle.assign_task(project, task_id, member_id)
+            audit_ref = self._append_event(project, "crew.task.assign", {
+                "task_id": task_id,
+                "member_id": member_id,
+                "decision_id": decision_id,
+                "actor_user_id": actor_user_id,
+                "source": suggestion.source,
+                "input_hash": suggestion_context.input_hash,
+                "question_version": suggestion_context.question_version,
+                "decision_record_ref": decision_id,
+            })
+            outcome.update({"audit_ref": audit_ref, "first": True})
+            return True
+
+        updated = self._store.update_project(project_id, mutate)
+        return SuggestionAssignmentCommit(
+            project=updated,
+            first=bool(outcome.get("first")),
+            project_id=project_id,
+            task_id=task_id,
+            member_id=member_id,
+            actor_user_id=actor_user_id,
+            decision_id=decision_id,
+            audit_ref=outcome.get("audit_ref", ""),
+        )
+
+    def assign_from_suggestion(
+        self,
+        project_id: str,
+        task_id: str,
+        member_id: str,
+        decision_id: str,
+        actor_user_id: str,
+        suggestion_context: SuggestionAdoptionContext | None = None,
+        *,
+        workspace_id: str | None = None,
+    ) -> CrewProject:
+        commit = self.commit_from_suggestion(
+            project_id,
+            task_id,
+            member_id,
+            decision_id,
+            actor_user_id,
+            suggestion_context,
+            workspace_id=workspace_id,
+        )
+        if commit.first:
+            self.emit_suggestion_effects(commit)
+        return commit.project
+
+    def emit_suggestion_effects(self, commit: SuggestionAssignmentCommit) -> None:
+        updated = commit.project
+        task_id = commit.task_id
+        member_id = commit.member_id
+        actor_user_id = commit.actor_user_id
+        decision_id = commit.decision_id
+        task = _find_task(updated, task_id)
+        title = task.title if task is not None else task_id
+        audit_ref = commit.audit_ref
+        try:
+            self._emit_channel(
+                updated,
+                kind="event",
+                body=f"“{title}”已派给 @{self._name(member_id)}。",
+                task_id=task_id,
+                mentions=[member_id],
+                audit_ref=audit_ref,
+                message_id=f"{updated.workspace_id}:{updated.id}:{task_id}:{actor_user_id}:{decision_id}",
+            )
+        except Exception:  # pragma: no cover - commit already succeeded
+            logger.warning("suggestion assignment channel effect failed", exc_info=True)
+        try:
+            self._emit_notification(
+                updated,
+                to=member_id,
+                kind="assigned",
+                title=f"“{title}”已派给你。",
+                task_id=task_id,
+                ref=f"assignment:{updated.workspace_id}:{updated.id}:{task_id}:{actor_user_id}:{decision_id}",
+            )
+        except Exception:  # pragma: no cover - effects are independent
+            logger.warning("suggestion assignment notification effect failed", exc_info=True)
+        try:
+            self._autorun(updated, task)
+        except Exception:  # pragma: no cover - dispatch must not undo assignment
+            logger.warning("suggestion assignment dispatch effect failed", exc_info=True)
+        return None
+
+    def assignment_receipt_exists(
+        self, project_id: str, task_id: str, actor_user_id: str, decision_id: str
+    ) -> bool:
+        project = self._load(project_id)
+        return _assignment_receipt(
+            project,
+            task_id=task_id,
+            actor_user_id=actor_user_id,
+            decision_id=decision_id,
+        ) is not None
 
     def start(self, project_id: str, task_id: str) -> CrewProject:
         project = self._load(project_id)
@@ -884,6 +1082,19 @@ class CrewService:
         if project is None:
             raise ValueError(f"Project {project_id!r} not found")
         return project
+
+    def _current_member_facts(self, workspace_id: str) -> list[dict[str, str]]:
+        if self._member_facts is None:
+            return []
+        facts = self._member_facts(workspace_id)
+        return sorted(
+            [
+                {"id": item["id"], "role": item["role"], "kind": item["kind"]}
+                for item in facts
+                if item.get("kind") in {"human", "agent"} and item.get("id") != SYSTEM_ANNA_ACTOR_ID
+            ],
+            key=lambda item: item["id"],
+        )
 
     @staticmethod
     def _blocked_task_ids(project: CrewProject) -> set[str]:

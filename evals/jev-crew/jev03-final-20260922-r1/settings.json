@@ -1,0 +1,60 @@
+{
+  "round_id": "jev03-final-20260922-r1",
+  "synthetic": true,
+  "C": {
+    "model_requested": "deepseek-v4-pro",
+    "model_returned": "deepseek-v4-pro",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "max_tokens": 4096,
+    "response_format": "json_object",
+    "tools": false,
+    "automatic_retries": 0,
+    "timeout_ms": 60000
+  },
+  "D": {
+    "model_requested": "jev-1.13.0",
+    "model_returned": "jev-1.13.0",
+    "question_version": "crew-assignee-v1",
+    "adapter": "production Host assignee-decision",
+    "automatic_retries": 0,
+    "timeout_ms": 4000
+  },
+  "measurement": {
+    "boundary": "Elapsed wall time around one evaluation group request; Host startup excluded; not browser end-to-end latency",
+    "p50_p95": "nearest rank; actual called eligible cases only; n=22 heldout and n=7 development",
+    "candidate_order": "unchanged fixture order",
+    "same_semantic_fields": [
+      "project_goal",
+      "task.title",
+      "task.role_required",
+      "candidate.role",
+      "candidate.kind"
+    ],
+    "description": "empty",
+    "acceptance_criteria": null
+  },
+  "prices": {
+    "currency": "USD",
+    "reference_date": "2026-09-21",
+    "DeepSeek": {
+      "input_per_million": 1.32,
+      "output_per_million": 3.96,
+      "assumption": "peak/cache-miss upper reference for budget accounting",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing/"
+    },
+    "Jev": {
+      "input_per_million": 0.042,
+      "output_per_million": 0,
+      "source": "https://docs.typesafe.ai/models"
+    }
+  },
+  "limitations": [
+    "Synthetic small sample, no production-accuracy claim",
+    "C is one model judgment; B previous full Host/OMP workflow is not measured",
+    "2 heldout and 1 development hard-precheck cases did not call C or D",
+    "One sequential fixed round, no stable population p95 claim",
+    "No invoice verified; time-of-day and cache hits can lower DeepSeek cost",
+    "Different tokenizers; reported token totals do not measure equivalent compute"
+  ]
+}

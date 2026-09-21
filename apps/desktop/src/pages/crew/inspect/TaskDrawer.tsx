@@ -322,6 +322,13 @@ export function TaskDrawer({ task, tasks, channel, actions, onOpenReader, onDown
                   ownerUserId={actions.ownerUserId}
                   currentId={task.assignee_member_id}
                   onPick={ops.confirmReassign}
+                  suggestion={ops.suggestion}
+                  suggestionPending={ops.suggestionPending}
+                  onSuggest={ops.requestSuggestion}
+                  onAdoptSuggestion={ops.adoptSuggestion}
+                  suggestionAdopting={ops.suggestionAdopting}
+                  suggestable={!task.is_gate && ["todo", "blocked"].includes(task.status)}
+                  taskStatus={task.status}
                   onClose={ops.closePicker}
                 />
               )}
@@ -337,6 +344,13 @@ export function TaskDrawer({ task, tasks, channel, actions, onOpenReader, onDown
                   ownerUserId={actions.ownerUserId}
                   currentId={task.assignee_member_id}
                   onPick={ops.confirmReassign}
+                  suggestion={ops.suggestion}
+                  suggestionPending={ops.suggestionPending}
+                  onSuggest={ops.requestSuggestion}
+                  onAdoptSuggestion={ops.adoptSuggestion}
+                  suggestionAdopting={ops.suggestionAdopting}
+                  suggestable={!task.is_gate && ["todo", "blocked"].includes(task.status)}
+                  taskStatus={task.status}
                   onClose={ops.closePicker}
                 />
               )}

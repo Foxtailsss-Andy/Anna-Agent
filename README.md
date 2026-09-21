@@ -8,13 +8,29 @@ Anna is a personal open-source project exploring how an AI agent can carry work 
 
 The aim is to keep the work understandable: what Anna is doing, which tools she can use, what needs your decision, and where the result came from.
 
-**RC2 · Source Developer Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**Jev Crew · Experimental Source Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [中文](README.zh-CN.md) · [Explore Anna](#what-you-can-explore) · [Quick start](#quick-start) · [Current status](#current-status) · [Codex pet](#meet-anna-your-codex-companion) · [Development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
-> **RC2 · Release validation fixes for the shared workbench**
+> **Ask for an assignee suggestion, then decide**
 >
-> RC2 addresses the workdir test timeouts and CI evidence dependencies reported in RC1. Home/Create, Cowork, and Crew retain shared Sessions and Runs, follow-up, capability results, and stopping a selected Run. Anna can answer directly or use available search, URL, Skill, and explicitly selected file capabilities. Existing resource creation and business workflows remain available. See the [RC2 changes, validation, and limitations](docs/releases/rc2-developer-preview.md) and [source prerelease](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2). No new signed application installer is included.
+> Crew can suggest a person or Worker for one unassigned task. Open the existing member picker, request a suggestion, inspect its source, and explicitly accept it or choose manually. A unique exact-role match uses a rule; Jev handles other eligible semantic choices and can abstain. Suggesting someone does not assign or run the task. This source preview adds explicit suggestions; see the [changes, evidence, and limits](docs/releases/jev-crew-preview.md). The [RC2 source release](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) remains a separate release record.
+
+## Measured Jev comparison
+
+On **24 synthetic heldout cases**, 22 were eligible for model judgment; two hard-precheck cases made no C/D call. Both models matched the frozen labels on **22/22**: 12 correct recommendations and 10 correct abstentions, with zero wrong labels, API or format errors. Existing role rules matched 12/22 on the same subset.
+
+| Measure (22 eligible cases) | DeepSeek, one judgment (C) | Jev production adapter (D) |
+| --- | ---: | ---: |
+| Requested → returned model | `deepseek-v4-pro` → same | `jev-1.13.0` → same |
+| Settings / provider requests | Thinking enabled, high; max 4096 / 22 | Typed Choice / 22 |
+| Observed p50 / p95 | 2007.078 / 2692.501 ms | 296.349 / 421.889 ms |
+| Reported input / output tokens | 4,887 / 2,873 | 11,233 / 1,026 |
+| Estimated cost, peak/cache-miss reference | $0.017827920 | $0.000471786 |
+
+Jev had **85.23% lower p50**, **84.33% lower p95** and **97.35% lower reference estimated cost**, with **equal label agreement**. Reported total tokens increased **57.98%**; different tokenizers prevent an equivalent-compute interpretation. The cost figure uses DeepSeek peak/cache-miss prices for budget accounting, not a bill. At this run's off-peak rates with the same cache-miss assumption, estimated cost is **94.71% lower**; cache hits may reduce DeepSeek cost further.
+
+This is one small sequential comparison of model judgments, not production accuracy, browser end-to-end latency or measured speedup of the previous complete Crew/Host/OMP path (B). The **8 development cases are reported separately**. See [full results, denominators and method](evals/jev-crew/jev03-final-20260922-r1/REPORT.md).
 
 ## What you can explore
 
@@ -62,13 +78,14 @@ Anna is in active development. The current source is intended for developers and
 
 | Area | Status |
 | --- | --- |
+| **Jev Crew candidate** | Optional single-task suggestions with explicit adoption. A real browser → Jev → assignment → SQLite readback is verified on synthetic data. The [release record](docs/releases/jev-crew-preview.md) separates measured C/D judgments, accepted assignment behavior and remaining Worker/platform limits. |
 | **RC2 source** | Fixes release validation around workdir identity/scope tests and CI evidence dependencies. Ordinary conversations continue through the shared Node Harness Host and Oh-my-Pi loop. See the [RC2 record](docs/releases/rc2-developer-preview.md); the [RC1 record](docs/releases/rc1-developer-preview.md) preserves the earlier behavior and failures. |
 | **Earlier live validation** | Home document generation, Prompt creation, Stop, and next-turn context; Crew Worker delivery, review/rework, and contextual Anna; Hiker dashboard reads and an Agent capability query. See the [August 31–September 1 validation record](docs/superpowers/handoff/2026-08-31-harness-product-parity.md) for scope and remaining gates. |
 | **External business operations** | The Hiker service used for that validation exposed read tools. Authorized write and read-back acceptance remain blocked on the service exposing the required capability. |
 | **Desktop distribution** | Validation currently targets macOS arm64. The local application build is unsigned and unnotarized; Windows/Linux release acceptance remains open. |
 | **Application releases** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) predates the current Harness execution path. The Codex pet has its own asset release. |
 
-RC2 retains deterministic external transports to verify the real local identity, persistence, Gateway, and OMP execution path. Current live Provider/MCP acceptance remains blocked; earlier live records do not establish RC2 live acceptance. Full workbench scheduling, ask/answer, recovery, Memory, Sandbox, and Windows/Linux acceptance remain pending. Production readiness and benchmark results remain outside the current release claims. CI checks, interface demos, and live external-service runs provide different evidence; the [current acceptance goals](docs/product/anna-harness-product-parity-goal-2026-08-31.md) track those boundaries.
+The historical RC2 validation used deterministic external transports for local identity, persistence, Gateway, and OMP execution. Its full live Provider/MCP gate remained blocked; the Jev judgment measurements above cover the new bounded suggestion scope. Full workbench scheduling, ask/answer, recovery, Memory, Sandbox, and Windows/Linux acceptance remain pending. Production readiness and benchmark results remain outside the current release claims. CI checks, interface demos, and live external-service runs provide different evidence; the [current acceptance goals](docs/product/anna-harness-product-parity-goal-2026-08-31.md) track those boundaries.
 
 ## Quick start
 

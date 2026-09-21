@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
@@ -13,12 +14,19 @@ from pydantic import BaseModel
 from services.crew.app import approvals_projection, inbox as inbox_agg
 from services.crew.app.actors import SYSTEM_ACTOR_IDS
 from services.crew.app.agent_worker import HarnessWorkerExecutor
+from services.crew.app.assignment_suggestions import (
+    AssignmentSuggestionService,
+    SuggestionCanceled,
+    SuggestionConflict,
+    SuggestionExpired,
+    SuggestionStoreFull,
+)
 from services.crew.app.command_drafting import CommandDraftingService
 from services.crew.app.decomposition import CrewDecompositionService
 from services.crew.app.lifecycle import CrewLifecycleError
 from services.crew.app.matching import CrewMatchingService, deterministic_proposals
 from services.crew.app.schemas import TaskDraft
-from services.crew.app.service import CrewPermissionError, CrewService
+from services.crew.app.service import CrewPermissionError, CrewService, SuggestionAdoptionError
 from services.crew.app.showcase import SHOWCASE_SCENARIO_ID
 from services.crew.app.sop_templates import list_templates
 from services.identity.app.schemas import SessionIdentity
@@ -223,6 +231,13 @@ class CreateProjectRequest(BaseModel):
 
 class AssignRequest(BaseModel):
     member_id: str
+    decision_id: UUID | None = None
+
+
+class AssignmentSuggestionRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    request_id: UUID
 
 
 class SubmitRequest(BaseModel):
@@ -305,6 +320,7 @@ def build_router(
     max_queue_depth: int = 500,
     harness_client: HarnessHostClient | None = None,
     product_mode: bool = False,
+    assignment_suggestions: AssignmentSuggestionService | None = None,
 ) -> APIRouter:
     router = APIRouter()
     if execution_kernel is None and execution_store is not None:
@@ -323,6 +339,13 @@ def build_router(
             account = identity.store.get_account(member_id)
             return account.kind if account else None
         crew._member_kind = _member_kind
+    if getattr(crew, "_member_facts", None) is None:
+        def _member_facts(workspace_id: str) -> list[dict[str, str]]:
+            return [
+                {"id": member.id, "role": member.role, "kind": member.kind}
+                for member in identity.list_members(workspace_id)
+            ]
+        crew._member_facts = _member_facts
 
     host_workers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="anna-host-worker") if product_mode and harness_client else None
     host_runs: dict[tuple[str, str], str] = {}
@@ -468,6 +491,11 @@ def build_router(
         if project is None or project.workspace_id != session.workspace_id:
             raise HTTPException(status_code=404, detail="project not found")
         return project
+
+    suggestion_service = assignment_suggestions or AssignmentSuggestionService(
+        identity=identity,
+        host_client=harness_client,
+    )
 
     def _guard_run_ref(run_ref: str, session) -> None:
         """Resolve a Crew run to a project/task before consulting the Host."""
@@ -712,6 +740,69 @@ def build_router(
                     pass
         return data
 
+    @router.post(
+        "/api/crew/projects/{project_id}/tasks/{task_id}/assignment-suggestions"
+    )
+    async def assignment_suggestion(
+        project_id: str,
+        task_id: str,
+        request: AssignmentSuggestionRequest,
+        authorization: str | None = Header(default=None),
+    ) -> dict:
+        session = _session(authorization)
+        project = _guard_project(project_id, session)
+        task = next((item for item in project.tasks if item.id == task_id), None)
+        if task is None:
+            raise HTTPException(status_code=404, detail="task not found")
+        if task.is_gate or task.status not in ("todo", "blocked") or task.assignee_member_id:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "task_not_suggestable",
+                    "task_status": task.status,
+                },
+            )
+        try:
+            result = await suggestion_service.suggest(
+                workspace_id=session.workspace_id,
+                actor_user_id=session.user_id,
+                project=project,
+                task=task,
+                decision_id=str(request.request_id),
+            )
+        except SuggestionStoreFull as exc:
+            raise HTTPException(status_code=503, detail="assignment suggestion store is full") from exc
+        return result.model_dump(mode="json")
+
+    @router.delete(
+        "/api/crew/projects/{project_id}/tasks/{task_id}/assignment-suggestions/{decision_id}"
+    )
+    async def cancel_assignment_suggestion(
+        project_id: str,
+        task_id: str,
+        decision_id: UUID,
+        authorization: str | None = Header(default=None),
+    ) -> dict:
+        session = _session(authorization)
+        project = _guard_project(project_id, session)
+        if not any(item.id == task_id for item in project.tasks):
+            raise HTTPException(status_code=404, detail="task not found")
+        if crew.assignment_receipt_exists(
+            project_id, task_id, session.user_id, str(decision_id)
+        ):
+            return {"decision_id": str(decision_id), "status": "already_applied"}
+        try:
+            status = await suggestion_service.cancel(
+                workspace_id=session.workspace_id,
+                actor_user_id=session.user_id,
+                project_id=project_id,
+                task_id=task_id,
+                decision_id=str(decision_id),
+            )
+        except SuggestionStoreFull as exc:
+            raise HTTPException(status_code=503, detail="assignment suggestion store is full") from exc
+        return {"decision_id": str(decision_id), "status": status}
+
     @router.post("/api/crew/projects/{project_id}/tasks/{task_id}/assign")
     async def assign(
         project_id: str, task_id: str, request: AssignRequest,
@@ -727,6 +818,40 @@ def build_router(
         # lifecycle 的守卫仍是英文 backstop(直调 service 时)。
         if task is None:
             raise HTTPException(status_code=404, detail="task not found")
+        if request.decision_id is not None:
+            try:
+                commit = await asyncio.to_thread(
+                    suggestion_service.adopt,
+                    workspace_id=session.workspace_id,
+                    actor_user_id=session.user_id,
+                    project_id=project_id,
+                    task_id=task_id,
+                    decision_id=str(request.decision_id),
+                    member_id=request.member_id,
+                    receipt_exists=lambda: crew.assignment_receipt_exists(
+                        project_id, task_id, session.user_id, str(request.decision_id)
+                    ),
+                    apply=lambda context: crew.commit_from_suggestion(
+                        project_id,
+                        task_id,
+                        request.member_id,
+                        str(request.decision_id),
+                        session.user_id,
+                        context,
+                        workspace_id=session.workspace_id,
+                    ),
+                )
+            except SuggestionAdoptionError as exc:
+                raise HTTPException(status_code=409, detail={"code": exc.code}) from exc
+            except SuggestionCanceled as exc:
+                raise HTTPException(status_code=409, detail={"code": "suggestion_canceled"}) from exc
+            except SuggestionConflict as exc:
+                raise HTTPException(status_code=409, detail={"code": "suggestion_conflict"}) from exc
+            except SuggestionExpired as exc:
+                raise HTTPException(status_code=409, detail={"code": "suggestion_expired"}) from exc
+            if commit.first:
+                await asyncio.to_thread(crew.emit_suggestion_effects, commit)
+            return commit.project.model_dump(mode="json")
         if task.is_gate:
             raise HTTPException(status_code=409, detail={
                 "detail": f"“{task.title}”是评审门——评审人固定为项目负责人，不接受指派。",

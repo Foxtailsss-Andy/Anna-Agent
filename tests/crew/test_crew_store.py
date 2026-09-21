@@ -120,6 +120,21 @@ def test_transactional_update_project_keeps_parallel_task_mutations(tmp_path: Pa
     assert by_id[task_b.id].blocker == "blocked b"
 
 
+def test_update_project_if_changed_preserves_version_for_duplicate(tmp_path: Path):
+    store = _make_store(tmp_path)
+    project = _make_project("proj_no_change")
+    store.save_project(project)
+    version = project.project_version
+
+    updated = store.update_project(
+        project.id,
+        lambda loaded: False,
+    )
+
+    assert updated.project_version == version
+    assert store.get_project(project.id).project_version == version
+
+
 def test_update_project_rejects_identity_mutation_and_rolls_back(tmp_path: Path):
     store = _make_store(tmp_path)
     project = _make_project("proj_identity")
