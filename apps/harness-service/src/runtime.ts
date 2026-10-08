@@ -135,6 +135,12 @@ export function createDurableHarnessV2Runtime(
         await options.kernel.steer(runId as never, { ...scope, content });
       });
     },
+    settleInterrupted(workspaceId, channelId) {
+      return track(async () => (await runtime.settleInterrupted({
+        workspaceId: workspaceId as ChannelScope["workspaceId"],
+        channelId: channelId as ChannelScope["channelId"],
+      })).map(String));
+    },
     answer(workspaceId, channelId, runId, content) {
       return track(async () => {
         const scope: ChannelScope = {

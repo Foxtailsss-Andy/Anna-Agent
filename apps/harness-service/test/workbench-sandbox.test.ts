@@ -185,6 +185,80 @@ describeSandbox("workbench-sandbox runSandboxedCommand", () => {
     expect(Date.now() - start).toBeLessThan(3_000);
   }, 8_000);
 
+  // R-standards2 P1.3: descendants that leave the process group must not outlive the call.
+  const pidAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const waitGone = async (pid: number, ms = 1_500): Promise<boolean> => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      if (!pidAlive(pid)) return true;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return !pidAlive(pid);
+  };
+
+  test("terminates a setsid() descendant that still holds the output pipe on timeout", async () => {
+    const workdir = await makeWorkdir();
+    const started = Date.now();
+    const result = await run(
+      { command: "perl -e 'use POSIX; setsid(); open(F, \">\", \"daemon.pid\"); print F $$; close(F); sleep 20' & sleep 30", timeout_ms: 1_000 },
+      workdir,
+    );
+    expect(expectOutput(result).timed_out).toBe(true);
+    expect(Date.now() - started).toBeLessThan(4_000);
+    const pid = Number(await readFile(join(workdir, "daemon.pid"), "utf8"));
+    expect(await waitGone(pid)).toBe(true);
+  }, 15_000);
+
+  test("terminates a fully detached descendant once the command returns", async () => {
+    const workdir = await makeWorkdir();
+    const started = Date.now();
+    const result = await run({
+      command: "perl -e 'use POSIX; if (fork() == 0) { setsid(); open(STDOUT, \">\", \"/dev/null\"); open(STDERR, \">\", \"/dev/null\"); open(F, \">\", \"daemon.pid\"); print F $$; close(F); sleep 20; exit 0 } sleep 1; exit 0'; echo returned",
+    }, workdir);
+    const output = expectOutput(result);
+    expect(result.status).toBe("succeeded");
+    expect(output.stdout).toContain("returned");
+    expect(Date.now() - started).toBeLessThan(4_000);
+    const pid = Number(await readFile(join(workdir, "daemon.pid"), "utf8"));
+    expect(await waitGone(pid)).toBe(true);
+  }, 15_000);
+
+  test("terminates background jobs left behind when the command returns", async () => {
+    const workdir = await makeWorkdir();
+    const result = await run({ command: "sleep 30 > /dev/null 2>&1 & echo $! > bg.pid; echo done" }, workdir);
+    expect(result.status).toBe("succeeded");
+    const pid = Number(await readFile(join(workdir, "bg.pid"), "utf8"));
+    expect(await waitGone(pid)).toBe(true);
+  }, 10_000);
+
+  test("denies desktop IPC services (app list, preferences, DNS)", async () => {
+    const workdir = await makeWorkdir();
+    const apps = expectOutput(await run({ command: "lsappinfo front" }, workdir));
+    expect(apps.stdout).not.toMatch(/ASN:/);
+    const prefs = await run({ command: "defaults read -g AppleLocale" }, workdir);
+    expect(prefs.status).toBe("failed");
+    const dns = await run({ command: "/usr/bin/curl -sS --max-time 5 https://example.com -o /dev/null" }, workdir);
+    expect(dns.status).toBe("failed");
+  }, 20_000);
+
+  test("runs ordinary developer tools under the deny-default profile", async () => {
+    const workdir = await makeWorkdir();
+    await writeFile(join(workdir, "a.txt"), "b\na\n", "utf8");
+    const result = await run({
+      command: "sort a.txt | head -1 && wc -l < a.txt | tr -d ' ' && mkdir -p d/e && cp a.txt d/e/ && ls d/e && git --version >/dev/null && echo tools-ok",
+    }, workdir);
+    const output = expectOutput(result);
+    expect(result.status).toBe("succeeded");
+    expect(output.stdout.split("\n")).toEqual(expect.arrayContaining(["a", "2", "a.txt", "tools-ok"]));
+  }, 15_000);
+
   test("marks stdout truncation when output exceeds the byte cap", async () => {
     const workdir = await makeWorkdir();
     const result = await run(

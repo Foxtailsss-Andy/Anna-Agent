@@ -12,6 +12,7 @@ import type {
   StreamId,
 } from "@anna/harness-v2";
 
+import { EventSequenceConflictError, TerminalEventConflictError } from "./errors";
 import { RunManager } from "./run-manager";
 
 const terminalEventTypes = new Set([
@@ -116,6 +117,42 @@ export class DurableRunRuntime {
     }
     controller.abort(reason);
     return active.completion;
+  }
+
+  /**
+   * Settles Runs of one Channel that an earlier process left queued or running.
+   * Such a Run has no controller in this process, so it can never append a
+   * terminal event on its own; it is closed with `run.failed`
+   * (`errorType: "process_restarted"`). Runs active in this process and suspended
+   * Runs (awaiting input/approval, resumable by design) are left untouched.
+   * Returns the ids of the Runs it settled.
+   */
+  async settleInterrupted(scope: ChannelScope): Promise<RunId[]> {
+    if (this.closing) return [];
+    const store = this.eventStore.scope(scope);
+    const settled: RunId[] = [];
+    for (const runId of await store.activeRunIds()) {
+      const runtimeKey = `${scope.workspaceId}\u0000${scope.channelId}\u0000${runId}`;
+      if (this.active.has(runtimeKey) || this.inFlight.has(runtimeKey)) continue;
+      const command = await store.getRunCommand(runId);
+      if (command === undefined) continue;
+      const events = await readEvents(store, runId);
+      const last = events.at(-1);
+      if (last !== undefined && (terminalEventTypes.has(last.type) || isSuspendedEvent(last.type))) continue;
+      try {
+        await store.append(this.event(
+          command,
+          events.length,
+          "run.failed",
+          { errorType: "process_restarted", ...runAttribution(command) },
+        ));
+        settled.push(runId);
+      } catch (error) {
+        if (error instanceof EventSequenceConflictError || error instanceof TerminalEventConflictError) continue;
+        throw error;
+      }
+    }
+    return settled;
   }
 
   close(): Promise<void> {

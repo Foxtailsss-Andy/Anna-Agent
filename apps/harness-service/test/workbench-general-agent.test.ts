@@ -3,9 +3,10 @@
  * the real Python business adapter and the real managed OMP worker. Only the
  * model provider is a deterministic fixture.
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import { afterAll, beforeAll, expect, test } from "vitest";
 
@@ -342,6 +343,93 @@ test("stopping a Goal Run pauses the Goal, and resume starts a continuation", as
   expect((await api(`/api/workbench/sessions/${session}/goal/resume`, { method: "POST", body: {} })).body)
     .toEqual({ code: "goal_not_resumable" });
 }, 90_000);
+
+test("after a Host crash, the interrupted Goal Run is settled at start and the Goal can resume", async () => {
+  // R-standards2 P1.2. A crash leaves the Goal active with its latest Run running;
+  // a consistent copy of the durable state taken while the Run is running is exactly
+  // what the next Host process finds on disk.
+  const session = await createSession();
+  let release!: () => void;
+  const gate = new Promise<void>((resolvePromise) => { release = resolvePromise; });
+  script = async function* (context) {
+    if (JSON.stringify(context.messages).includes("【目标续跑")) {
+      yield text("重启后继续完成。");
+      return;
+    }
+    await gate;
+    yield text("原进程里的这一轮");
+  };
+  const created = await api(`/api/workbench/sessions/${session}/goal`, {
+    method: "POST",
+    body: { objective: "目标：跨重启的长任务", source_event_id: "ga-goal-crash", max_runs: 3 },
+  });
+  const firstRun = (created.body as { run_id: string }).run_id;
+  await waitForStatus(firstRun, ["running"]);
+
+  const crashed = await mkdtemp(join(directory, "crashed-"));
+  const database = new DatabaseSync(join(directory, "events.sqlite"));
+  database.exec(`VACUUM INTO '${join(crashed, "events.sqlite")}'`);
+  database.close();
+  for (const name of await readdir(directory)) {
+    if (name.startsWith("sessions.json")) await copyFile(join(directory, name), join(crashed, name));
+  }
+  release();
+  await waitForStatus(firstRun, ["completed"]);
+
+  const restartedSessions = new ProductSessionStore(join(crashed, "sessions.json"));
+  const restartedLive = await createLiveHarnessV2Runtime({
+    runtimeConfigPath: join(directory, "runtime.json"),
+    eventStorePath: join(crashed, "events.sqlite"),
+    workspaceRoot: join(directory, "workspace"),
+    surfaces: ["chat", "create", "crew"],
+    requireOmp: true,
+    ompRuntimeRoot: materializedRoot,
+    productTaskFor: async (runId) => (await restartedSessions.get(runId))?.task,
+    productTaskPeek: (runId) => restartedSessions.peek(runId)?.task,
+    businessOrigin: business.origin,
+    businessServiceToken: "wb01-business-service-token",
+    protectedPaths: [join(crashed, "events.sqlite"), join(crashed, "sessions.json")],
+    ompModelTransport: (context, _signal, observer) => script(context, observer),
+  });
+  const restarted = await startProductHost({
+    runtime: restartedLive.runtime,
+    eventStore: restartedLive.eventStore,
+    host: "127.0.0.1",
+    port: 0,
+    serviceToken: "general-agent-restart-token",
+    sessionStore: restartedSessions,
+    staticRoot: directory,
+    businessOrigin: business.origin,
+    businessServiceToken: "wb01-business-service-token",
+    goalSupervisorIntervalMs: 100,
+  });
+  try {
+    const at = { origin: restarted.url };
+    const interrupted = (await api(`/api/workbench/runs/${firstRun}`, at)).body as Record<string, any>;
+    expect(interrupted.status).toBe("failed");
+    const failedGoal = await waitFor(async () => {
+      const detail = (await api(`/api/workbench/sessions/${session}`, at)).body as Record<string, any>;
+      return detail.goal?.status === "failed" ? detail.goal : undefined;
+    });
+    expect(failedGoal).toMatchObject({ last_reason: "run_failed:process_restarted", runs_used: 1 });
+
+    const resumed = await api(`/api/workbench/sessions/${session}/goal/resume`, { method: "POST", body: {}, ...at });
+    expect(resumed.status).toBe(200);
+    const resumedBody = resumed.body as { goal: Record<string, any>; run_id: string };
+    expect(resumedBody.goal).toMatchObject({ status: "active", runs_used: 2 });
+    const settled = await waitFor(async () => {
+      const detail = (await api(`/api/workbench/sessions/${session}`, at)).body as Record<string, any>;
+      return detail.goal?.status === "awaiting_review" ? detail : undefined;
+    });
+    expect((settled.runs as Array<Record<string, any>>).map((run) => [run.trigger, run.status])).toEqual([
+      ["user", "failed"],
+      ["goal_continuation", "completed"],
+    ]);
+  } finally {
+    await restarted.close();
+    await restartedLive.close();
+  }
+}, 120_000);
 
 test("a Crew project Run proposes changes through the business adapter and cannot target another project", async () => {
   const project = await api("/api/crew/projects", {

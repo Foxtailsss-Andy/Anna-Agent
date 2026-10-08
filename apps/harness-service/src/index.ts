@@ -80,6 +80,11 @@ export interface HarnessV2Runtime {
   ) => Promise<readonly CanonicalEvent[]>;
   /** Ephemeral text of the model response currently streaming for a Run, if any. */
   readonly liveOutput?: (runId: string) => LiveRunOutput | undefined;
+  /**
+   * Closes Runs of one Channel that an earlier Host process left queued or running
+   * (`run.failed`, `process_restarted`); returns their ids. Called once at Host start.
+   */
+  readonly settleInterrupted?: (workspaceId: string, channelId: string) => Promise<readonly string[]>;
 }
 
 export interface LiveRunOutput {

@@ -133,6 +133,7 @@ function goalActions(goal: WorkbenchGoal): Array<{ action: WorkbenchGoalAction; 
 }
 
 function goalReasonText(reason: string): string {
+  if (reason === "run_failed:process_restarted") return "Anna 重启时上一轮被中断；可以继续";
   if (reason.startsWith("run_failed:")) return `运行失败（${reason.slice("run_failed:".length)}）`;
   return GOAL_REASON_LABEL[reason] ?? reason;
 }

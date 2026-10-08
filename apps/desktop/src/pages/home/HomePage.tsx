@@ -195,10 +195,27 @@ export function HomePage({ displayName }: { displayName: string }) {
   const [mcpWriteTools, setMcpWriteTools] = useState<string[]>([]);
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let refreshes = 0;
     // Best effort: the permission label names external-write MCP tools when the Host has any.
-    getWorkbenchTools().then((tools) => { if (active) setMcpWriteTools(mcpWriteToolNames(tools)); }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
+    // MCP servers connect in the background after the Host starts, so the list is refreshed
+    // while any server is still starting and again whenever the write permission is turned on.
+    const load = () => {
+      getWorkbenchTools().then((tools) => {
+        if (!active) return;
+        setMcpWriteTools(mcpWriteToolNames(tools));
+        if (tools.mcp_servers.some((server) => server.state === "starting") && refreshes < 15) {
+          refreshes += 1;
+          timer = setTimeout(load, 2_000);
+        }
+      }).catch(() => undefined);
+    };
+    load();
+    return () => {
+      active = false;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [allowWrite]);
   /* 目标模式:下一次发送创建会话 Goal(Host 续跑,max_runs 1–8,默认 4)。 */
   const [goalMode, setGoalMode] = useState(false);
   const [goalMaxRuns, setGoalMaxRuns] = useState(4);

@@ -1,17 +1,22 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { statSync } from "node:fs";
-import { chmod, mkdtemp, realpath, rm, stat } from "node:fs/promises";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { closeSync, openSync, statSync } from "node:fs";
+import { chmod, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { TextDecoder } from "node:util";
+import { isWithinPath, parseRelativePathInput } from "./workdir-paths";
 
 const SANDBOX_EXECUTABLE = "/usr/bin/sandbox-exec";
+const LSOF_EXECUTABLE = "/usr/sbin/lsof";
 const SHELL_EXECUTABLE = "/bin/sh";
 const SANDBOX_PATH = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024;
 const SIGKILL_GRACE_MS = 1_000;
+/** After the command returns and leftovers are terminated, how long to wait for pipes to drain. */
+const STREAM_CLOSE_GRACE_MS = 500;
+const MARKER_FILE = ".anna-sandbox-marker";
 
 // User-data roots whose file *contents* are denied unless the access is inside
 // the admitted workdir or the per-call scratch directory.
@@ -132,11 +137,18 @@ export async function runSandboxedCommand(
       protectedPaths,
       readDeniedRoots,
     });
+    const markerPath = join(scratchRoot, MARKER_FILE);
+    try {
+      await writeFile(markerPath, "", { mode: 0o600, flag: "wx" });
+    } catch {
+      return { status: "failed", output: { reason: "sandbox_scratch_unavailable" } };
+    }
     return await executeSandboxed({
       profile,
       command: parsed.command,
       cwd,
       scratchRoot,
+      markerPath,
       timeoutMs: parsed.timeoutMs,
       maxOutputBytes,
       signal: options.signal,
@@ -175,9 +187,7 @@ function parseSandboxInput(input: unknown): ParsedSandboxInput | undefined {
 
 async function resolveCwd(workdirRoot: string, requested: string | undefined): Promise<string> {
   if (requested === undefined) return workdirRoot;
-  if (isAbsolute(requested) || /^[A-Za-z]:[\\/]/.test(requested) || requested.startsWith("\\")) {
-    throw new Error("sandbox_cwd_outside_workdir");
-  }
+  if (parseRelativePathInput(requested) === undefined) throw new Error("sandbox_cwd_outside_workdir");
   const target = resolve(workdirRoot, requested);
   if (!isWithinPath(relative(workdirRoot, target))) throw new Error("sandbox_cwd_outside_workdir");
   const canonical = await realpath(target);
@@ -212,7 +222,7 @@ async function canonicalizeReadDeniedRoots(): Promise<string[]> {
   return uniquePaths(roots);
 }
 
-function buildSandboxProfile(input: {
+export function buildSandboxProfile(input: {
   workdirRoot: string;
   scratchRoot: string;
   protectedPaths: readonly string[];
@@ -228,11 +238,27 @@ function buildSandboxProfile(input: {
   ].join(" ");
   const allowedReads = [subpath(input.workdirRoot), subpath(input.scratchRoot)].join(" ");
   const deniedReadRoots = input.readDeniedRoots.map(subpath).join(" ");
+  // Deny by default, then allow what ordinary command-line tools need. Everything not
+  // listed stays denied: network, Mach/XPC services (LaunchServices, Apple Events,
+  // pasteboard, preferences daemons), IOKit, sysctl writes, and writes outside the
+  // workdir/scratch. Later rules take precedence, so the read denials below narrow the
+  // broad read allowance.
   const lines = [
     "(version 1)",
-    "(allow default)",
+    "(deny default)",
+    "(allow process-exec)",
+    "(allow process-fork)",
+    "(allow signal (target same-sandbox))",
+    "(allow process-info* (target same-sandbox))",
+    "(allow sysctl-read)",
+    "(allow ipc-posix-sem)",
+    "(allow pseudo-tty)",
+    "(allow file-ioctl)",
+    // User/group lookups (getpwuid etc.) used by git, python, whoami.
+    `(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))`,
+    "(allow file-read*)",
+    `(allow file-write* (require-any ${writable}))`,
     "(deny network*)",
-    `(deny file-write* (require-not (require-any ${writable})))`,
     `(deny file-read-data (require-all (require-any ${deniedReadRoots}) (require-not (require-any ${allowedReads}))))`,
   ];
   // Protected paths are always denied for read and write, even inside an allowed root.
@@ -252,6 +278,7 @@ interface ExecuteInput {
   command: string;
   cwd: string;
   scratchRoot: string;
+  markerPath: string;
   timeoutMs: number;
   maxOutputBytes: number;
   signal: AbortSignal;
@@ -264,6 +291,15 @@ function executeSandboxed(
   return new Promise((resolvePromise) => {
     const argv = ["-p", input.profile, SHELL_EXECUTABLE, "-c", input.command];
     const startedAt = Date.now();
+    // Every descendant inherits this descriptor (fd 3) unless it deliberately closes it,
+    // so processes that detach with setsid() can still be found and terminated.
+    let markerFd: number;
+    try {
+      markerFd = openSync(input.markerPath, "r");
+    } catch {
+      resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
+      return;
+    }
     let child: ChildProcess;
     try {
       child = spawn(SANDBOX_EXECUTABLE, argv, {
@@ -271,41 +307,42 @@ function executeSandboxed(
         env: buildEnvironment(input.scratchRoot),
         shell: false,
         detached: true,
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["ignore", "pipe", "pipe", markerFd],
       });
     } catch {
+      closeSync(markerFd);
       resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
       return;
     }
+    // The Host keeps no copy, so only sandboxed processes hold the marker.
+    closeSync(markerFd);
 
     const stdout = createCappedSink(input.maxOutputBytes);
     const stderr = createCappedSink(input.maxOutputBytes);
     child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
     child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
 
+    const rootPid = child.pid;
     let timedOut = false;
     let killSignal: string | undefined;
     let settled = false;
+    let exitResult: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+    let streamsClosed = false;
+    let swept = false;
     let sigkillTimer: ReturnType<typeof setTimeout> | undefined;
+    let closeGraceTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const killGroup = (signalName: "SIGTERM" | "SIGKILL") => {
-      killSignal = signalName;
-      const pid = child.pid;
-      if (pid === undefined) return;
-      try {
-        process.kill(-pid, signalName);
-      } catch {
-        try {
-          child.kill(signalName);
-        } catch {
-          // process already gone
-        }
-      }
-    };
+    const sweep = (signalName: "SIGTERM" | "SIGKILL") => rootPid === undefined
+      ? Promise.resolve()
+      : terminateSandboxProcesses({ rootPid, markerPath: input.markerPath, startedAt, signalName });
 
     const beginTermination = () => {
-      killGroup("SIGTERM");
-      sigkillTimer = setTimeout(() => killGroup("SIGKILL"), SIGKILL_GRACE_MS);
+      killSignal = "SIGTERM";
+      void sweep("SIGTERM");
+      sigkillTimer = setTimeout(() => {
+        killSignal = "SIGKILL";
+        void sweep("SIGKILL");
+      }, SIGKILL_GRACE_MS);
     };
 
     const timeoutTimer = setTimeout(() => {
@@ -319,15 +356,22 @@ function executeSandboxed(
     };
     input.signal.addEventListener("abort", onAbort, { once: true });
 
-    const finish = (exitCode: number | null, exitSignal: NodeJS.Signals | null) => {
-      if (settled) return;
-      settled = true;
+    const cleanupTimers = () => {
       clearTimeout(timeoutTimer);
       if (sigkillTimer !== undefined) clearTimeout(sigkillTimer);
+      if (closeGraceTimer !== undefined) clearTimeout(closeGraceTimer);
       input.signal.removeEventListener("abort", onAbort);
-      const effectiveSignal = exitSignal ?? killSignal;
+    };
+
+    const finish = () => {
+      if (settled || exitResult === undefined) return;
+      settled = true;
+      cleanupTimers();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      const effectiveSignal = exitResult.signal ?? (timedOut ? killSignal : undefined);
       const output: SandboxExecOutput = {
-        exit_code: exitCode,
+        exit_code: exitResult.code,
         ...(effectiveSignal ? { signal: effectiveSignal } : {}),
         timed_out: timedOut,
         duration_ms: Date.now() - startedAt,
@@ -337,19 +381,133 @@ function executeSandboxed(
         stderr_truncated: stderr.truncated(),
         sandbox: input.descriptor,
       };
-      const status = exitCode === 0 && !timedOut ? "succeeded" : "failed";
+      const status = exitResult.code === 0 && !timedOut ? "succeeded" : "failed";
       resolvePromise({ status, output });
     };
 
     child.on("error", () => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutTimer);
-      if (sigkillTimer !== undefined) clearTimeout(sigkillTimer);
-      input.signal.removeEventListener("abort", onAbort);
+      cleanupTimers();
       resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
     });
-    child.on("close", (code, signalName) => finish(code, signalName));
+    child.on("exit", (code, signalName) => {
+      exitResult = { code, signal: signalName };
+      // The command has returned: nothing it started may outlive the call. Background
+      // jobs and detached descendants are terminated before the result is reported.
+      void sweep("SIGKILL").finally(() => {
+        swept = true;
+        if (streamsClosed) finish();
+        else closeGraceTimer = setTimeout(finish, STREAM_CLOSE_GRACE_MS);
+      });
+    });
+    child.on("close", () => {
+      streamsClosed = true;
+      if (swept) finish();
+    });
+  });
+}
+
+interface ProcessRow {
+  pid: number;
+  ppid: number;
+  pgid: number;
+  startedAtMs: number;
+}
+
+/**
+ * Signals everything the sandboxed command started, from one process snapshot:
+ * the root's process group, the ppid closure of the root, and processes that detached
+ * (reparented to launchd after the call began) but still hold the per-call marker
+ * descriptor, together with their own descendants. The Host's pid is never signalled.
+ * A process that both closes every inherited descriptor and detaches is not found; it
+ * stays under the same seatbelt profile.
+ */
+async function terminateSandboxProcesses(input: {
+  rootPid: number;
+  markerPath: string;
+  startedAt: number;
+  signalName: "SIGTERM" | "SIGKILL";
+}): Promise<void> {
+  const rows = await processSnapshot();
+  const detachedCandidates = rows
+    .filter((row) => row.ppid === 1 && row.startedAtMs >= input.startedAt - 2_000)
+    .map((row) => row.pid);
+  const holders = detachedCandidates.length === 0 ? [] : await markerHolderPids(input.markerPath, detachedCandidates);
+  const targets = descendantClosure(rows, [input.rootPid, ...holders], input.rootPid);
+  try {
+    process.kill(-input.rootPid, input.signalName);
+  } catch {
+    // group already gone
+  }
+  for (const pid of targets) {
+    if (pid === process.pid || pid <= 1) continue;
+    try {
+      process.kill(pid, input.signalName);
+    } catch {
+      // already exited
+    }
+  }
+}
+
+function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[], rootGroup: number): Set<number> {
+  const tracked = new Set<number>(seeds);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const row of rows) {
+      if (tracked.has(row.pid)) continue;
+      if (tracked.has(row.ppid) || row.pgid === rootGroup) {
+        tracked.add(row.pid);
+        grew = true;
+      }
+    }
+  }
+  return tracked;
+}
+
+function processSnapshot(): Promise<ProcessRow[]> {
+  return new Promise((resolvePromise) => {
+    execFile("/bin/ps", ["-axo", "pid=,ppid=,pgid=,etime="], { timeout: 5_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        resolvePromise([]);
+        return;
+      }
+      const now = Date.now();
+      const rows: ProcessRow[] = [];
+      for (const line of stdout.split("\n")) {
+        const [pid, ppid, pgid, etime] = line.trim().split(/\s+/);
+        const elapsed = parseElapsedSeconds(etime);
+        const numbers = [Number(pid), Number(ppid), Number(pgid)];
+        if (elapsed === undefined || !numbers.every(Number.isSafeInteger)) continue;
+        rows.push({ pid: numbers[0]!, ppid: numbers[1]!, pgid: numbers[2]!, startedAtMs: now - elapsed * 1_000 });
+      }
+      resolvePromise(rows);
+    });
+  });
+}
+
+/** `ps` etime: `[[dd-]hh:]mm:ss`. */
+function parseElapsedSeconds(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const match = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/.exec(value);
+  if (match === null) return undefined;
+  const [, days = "0", hours = "0", minutes, seconds] = match;
+  return ((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds);
+}
+
+function markerHolderPids(markerPath: string, candidates: readonly number[]): Promise<number[]> {
+  return new Promise((resolvePromise) => {
+    execFile(
+      LSOF_EXECUTABLE,
+      ["-t", "-w", "-a", "-p", candidates.join(","), "--", markerPath],
+      { timeout: 5_000 },
+      (_error, stdout) => {
+        // lsof exits 1 when nothing holds the file; stdout is then empty.
+        resolvePromise(String(stdout ?? "").split("\n").map((line) => Number(line.trim()))
+          .filter((pid) => Number.isSafeInteger(pid) && pid > 1));
+      },
+    );
   });
 }
 
@@ -399,11 +557,6 @@ function createCappedSink(maxBytes: number): CappedSink {
 
 function uniquePaths(paths: readonly string[]): string[] {
   return [...new Set(paths)];
-}
-
-function isWithinPath(relativePath: string): boolean {
-  return relativePath === ""
-    || (!isAbsolute(relativePath) && relativePath !== ".." && !relativePath.startsWith(`..${sep}`));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

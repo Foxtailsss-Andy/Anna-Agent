@@ -34,10 +34,6 @@ const mcp = createMcpManager(await loadMcpConfig(mcpConfigPath).catch((error: un
   process.stderr.write(JSON.stringify({ type: "mcp.config.invalid", error: error instanceof Error ? error.message : "invalid" }) + "\n");
   return {};
 }));
-await mcp.start();
-for (const server of mcp.status()) {
-  process.stderr.write(JSON.stringify({ type: "mcp.server.status", ...server }) + "\n");
-}
 
 let live: Awaited<ReturnType<typeof createLiveHarnessV2Runtime>> | undefined;
 let service!: Awaited<ReturnType<typeof startProductHost>>;
@@ -91,6 +87,15 @@ try {
 }
 
 process.stdout.write(JSON.stringify({ status: "ready", url: service.url, surfaces: [...productSurfaces] }) + "\n");
+
+// MCP servers connect in the background once the Host answers /health, so a slow or
+// misconfigured server degrades to `failed` instead of delaying or blocking launch.
+// Their tools are admitted to Runs that start after they are ready.
+void mcp.start().then(() => {
+  for (const server of mcp.status()) {
+    process.stderr.write(JSON.stringify({ type: "mcp.server.status", ...server }) + "\n");
+  }
+});
 
 const shutdown = async () => {
   await service.close();

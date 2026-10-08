@@ -222,6 +222,9 @@ test("Workbench restores a successfully loaded capability and reads the project 
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
@@ -482,6 +485,9 @@ test("Workbench rejects a loaded receipt whose dispatch points to a different to
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
@@ -710,6 +716,9 @@ test("Workbench rejects a load receipt whose definition disagrees with the load 
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
@@ -1238,6 +1247,9 @@ test("Workbench rejects a model checkpoint that exposes capability A before its 
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
@@ -1454,6 +1466,9 @@ test("Workbench rejects a v2 model checkpoint that omits tool definitions", asyn
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",
@@ -1656,6 +1671,9 @@ test("Workbench rejects a v2 model checkpoint with a tampered tool definition ha
       port: hostPort,
       serviceToken: "wb02-capability-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",

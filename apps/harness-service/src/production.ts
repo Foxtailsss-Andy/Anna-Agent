@@ -1377,7 +1377,7 @@ function workbenchInstructions(surfaceId: V2SurfaceId, task: ProductTask, allowe
   if (has("workdir.write_file")) {
     lines.push("- Modification is authorized for this Run (permission: contained-write): `workdir.write_file` / `workdir.edit_file` change files inside the workdir only.");
     if (has("sandbox.exec")) {
-      lines.push("- `sandbox.exec` runs a shell command in a macOS seatbelt sandbox: cwd is the workdir, no network, writes only inside the workdir and a scratch dir, user data outside is unreadable, timeout ≤ 120 s. Use it to run scripts/tests and check results.");
+      lines.push("- `sandbox.exec` runs a shell command in a macOS seatbelt sandbox: cwd is the workdir, no network, no desktop/system services, writes only inside the workdir and a scratch dir, user data outside is unreadable, timeout ≤ 120 s. Anything the command leaves running in the background is terminated when it returns, so run servers and their checks in one command. Use it to run scripts/tests and check results.");
     }
   } else if (has("workdir.list")) {
     lines.push("- This Run is read-only. If the user wants files changed or commands run, explain that they must enable “允许修改文件并运行命令” for this workdir, and describe the exact changes instead.");

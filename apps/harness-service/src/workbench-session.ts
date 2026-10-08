@@ -227,6 +227,33 @@ export class WorkbenchSessionStore {
     this.pendingAdmissions.delete(runId);
   }
 
+  /**
+   * Distinct Channel scopes that hold admitted Workbench Runs, for Host start. Reads
+   * the sidecar without caching it, so the store's lazy load (and its retry after a
+   * repaired sidecar) is unchanged; an absent or unreadable sidecar yields no scopes.
+   */
+  async peekRunScopes(): Promise<ReadonlyArray<{ workspace_id: string; channel_id: string }>> {
+    let runs: readonly unknown[];
+    if (this.state !== undefined) {
+      runs = this.state.runs;
+    } else if (this.path === undefined) {
+      return [];
+    } else {
+      try {
+        const parsed: unknown = JSON.parse(await readFile(this.path, "utf8"));
+        runs = isRecord(parsed) && Array.isArray(parsed.runs) ? parsed.runs : [];
+      } catch {
+        return [];
+      }
+    }
+    const scopes = new Map<string, { workspace_id: string; channel_id: string }>();
+    for (const run of runs) {
+      if (!isRunRecord(run) || run.admission_status === "failed") continue;
+      scopes.set(`${run.workspace_id}\u0000${run.channel_id}`, { workspace_id: run.workspace_id, channel_id: run.channel_id });
+    }
+    return [...scopes.values()];
+  }
+
   async listRuns(sessionId: string): Promise<readonly WorkbenchRunRecord[]> {
     await this.ensureLoaded();
     return this.state!.runs

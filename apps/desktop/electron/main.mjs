@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
+import { classifyLinkTarget } from "./link-routing.mjs";
 import { runtimeFailureDataUrl } from "./runtime-failure-page.mjs";
 import {
   createDesktopRuntime,
@@ -109,32 +110,22 @@ ipcMain.handle("anna:pick-folder", async () => {
   return result.filePaths[0];
 });
 
-// Links in answers (target=_blank) open in the system browser instead of a
-// new Electron window that would carry the app's preload. In-app origins keep
-// Electron's default handling.
+// See link-routing.mjs: never open a second window; public links go to the system
+// browser; the main window stays on the app origin.
 function routeExternalLinks(window) {
-  const isExternalWeb = (target) => {
-    try {
-      const url = new URL(target);
-      // Read the current runtime origin each time: a runtime restart may move the Host port.
-      const internal = new Set([runtime?.apiBase, process.env.VITE_DEV_SERVER_URL]
-        .filter(Boolean)
-        .map((value) => new URL(value).origin));
-      return (url.protocol === "https:" || url.protocol === "http:") && !internal.has(url.origin)
-        && url.hostname !== "127.0.0.1" && url.hostname !== "localhost";
-    } catch {
-      return false;
-    }
-  };
+  // Read the current runtime origin each time: a runtime restart may move the Host port.
+  const internalOrigins = () => new Set([runtime?.apiBase, process.env.VITE_DEV_SERVER_URL]
+    .filter(Boolean)
+    .map((value) => new URL(value).origin));
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (!isExternalWeb(url)) return { action: "allow" };
-    void shell.openExternal(url);
+    if (classifyLinkTarget(url, internalOrigins()) === "external") void shell.openExternal(url);
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {
-    if (!isExternalWeb(url)) return;
+    const kind = classifyLinkTarget(url, internalOrigins());
+    if (kind === "internal") return;
     event.preventDefault();
-    void shell.openExternal(url);
+    if (kind === "external") void shell.openExternal(url);
   });
 }
 

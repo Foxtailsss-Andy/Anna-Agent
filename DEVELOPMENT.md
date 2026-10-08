@@ -39,10 +39,12 @@ Ordinary Home and Crew requests run as Workbench Runs on the same Host + OMP loo
 
 - **Plan:** the OMP `todo` tool is always admitted; its latest snapshot is shown as the Run's plan (“过程”).
 - **Workdir (read):** after you choose a workdir, `workdir.list`, `workdir.search` and the `workdir.read_file` capability read inside it only. Workdirs that overlap Host/business configuration or state are rejected.
-- **Modify + Sandbox:** turn on “允许 Anna 在此工作目录内修改文件并运行命令（沙箱）” for the Run (`permission_mode: contained-write`). This admits `workdir.write_file`, `workdir.edit_file` and `sandbox.exec`. `sandbox.exec` runs `/bin/sh -c` under `/usr/bin/sandbox-exec` (macOS seatbelt): no network, writes only inside the workdir and a per-call scratch directory, reads of other user data roots denied, scrubbed environment, timeout ≤ 120 s. It is a process sandbox, not a container; on platforms without `sandbox-exec` the tool is not admitted.
+- **Modify + Sandbox:** turn on “允许 Anna 在此工作目录内修改文件并运行命令（沙箱）” for the Run (`permission_mode: contained-write`). This admits `workdir.write_file`, `workdir.edit_file`, `sandbox.exec` and every configured MCP tool that is not marked read-only (the toggle names those MCP tools). File tools resolve each path segment inside the workdir before opening (a symlinked directory cannot lead outside, nothing is created outside) and refuse files with a second hard link.
+- **Sandbox scope:** `sandbox.exec` runs `/bin/sh -c` under `/usr/bin/sandbox-exec` with a deny-default seatbelt profile: no network, no desktop/system services (LaunchServices, Apple Events, pasteboard, preferences daemons; only user/group lookups are allowed), writes only inside the workdir and a per-call scratch directory, reads of other user data roots denied, scrubbed environment, timeout ≤ 120 s. When the command returns, times out or is stopped, the Host terminates its process group, the root's descendants and detached (`setsid`) processes that still hold the per-call marker descriptor. A process that closes every inherited descriptor and detaches is not tracked; it remains under the same profile. It is a process sandbox, not a container; on platforms without `sandbox-exec` the tool is not admitted.
 - **Crew changes:** in a Crew project, Anna proposes graph/assignment changes with `crew.propose_changes`. The proposal card in the Channel changes nothing until the project owner adopts it.
 - **Steer:** while a Run is active, the composer sends “补充说明” to that Run instead of starting another.
-- **Goal mode (目标模式):** a user-authorized objective with a run limit (1–8). The Host starts the next Run only while the todo plan has open items (or a Run ran out of its single-Run budget), and stops at `awaiting_review` for your confirmation. Stop/pause/resume/stop-goal are on the Goal card.
+- **Goal mode (目标模式):** a user-authorized objective with a run limit (1–8). The Host starts the next Run only while the todo plan has open, unblocked items (or a Run ran out of its single-Run budget), pauses when only blocked items remain, and stops at `awaiting_review` for your confirmation. Stop/pause/resume/stop-goal are on the Goal card; at the run limit “再给 1 轮” raises it. Runs that a previous Host process left queued or running are settled as failed (`process_restarted`) when the Host starts, so their Goal can be resumed.
+- **Run budget:** a Workbench Run that can act through tools beyond the plan/catalog gets 24 model turns, 96 tool calls and 5 minutes of wall time; a Goal continues across Runs when one Run's budget is not enough.
 
 ### MCP servers
 
@@ -59,7 +61,7 @@ ANNA_HARNESS_MCP_CONFIG_PATH=/absolute/protected/path/mcp.json npm run desktop:r
 } }
 ```
 
-The Host connects at startup (stdio or Streamable HTTP; loopback `http://` or `https://` only) and admits tools as `mcp.<server>.<tool>`. stdio servers get only `PATH`, `HOME`/`TMPDIR` (scratch) and `LANG` plus their configured `env`; they never inherit the Host environment. Server status is written to the Host diagnostics log. Keep this file outside any workdir; it is a protected path.
+The Host connects in the background once it is ready (servers in parallel; stdio or Streamable HTTP; loopback `http://` or `https://` only), so a slow or broken server becomes `failed` without delaying launch. Tools are admitted as `mcp.<server>.<tool>` to Runs that start after the server is ready. stdio servers get only `PATH`, `HOME`/`TMPDIR` (scratch) and `LANG` plus their configured `env`; they never inherit the Host environment. Server status is written to the Host diagnostics log. Keep this file outside any workdir; it is a protected path.
 
 ### Diagnostics
 

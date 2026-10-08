@@ -190,6 +190,73 @@ test("requires explicit resume for a durable non-terminal Run after restart", as
   });
 });
 
+test("settles Runs an earlier process left queued or running, and leaves the rest alone", async () => {
+  await withDatabase(async (path, stores) => {
+    const first = new SqliteEventStore(path);
+    stores.push(first);
+    const scoped = first.scope(scope);
+    const running = command("run-orphan-running");
+    const queued = command("run-orphan-queued");
+    const suspended = command("run-orphan-suspended");
+    const finished = command("run-finished");
+    for (const run of [running, queued, suspended, finished]) await scoped.claimStart(run);
+    await scoped.append(eventFor(running, 0, "run.queued", {}));
+    await scoped.append(eventFor(running, 1, "run.started", { phase: "started" }));
+    await scoped.append(eventFor(queued, 0, "run.queued", {}));
+    await scoped.append(eventFor(suspended, 0, "run.queued", {}));
+    await scoped.append(eventFor(suspended, 1, "run.started", { phase: "started" }));
+    await scoped.append(eventFor(suspended, 2, "run.awaiting_input", {}));
+    await scoped.append(eventFor(finished, 0, "run.queued", {}));
+    await scoped.append(eventFor(finished, 1, "run.completed", { outcome: "completed" }));
+    first.close();
+    stores.pop();
+
+    const reopened = new SqliteEventStore(path);
+    stores.push(reopened);
+    const runtime = new DurableRunRuntime(reopened, new FakeKernel());
+    const settled = await runtime.settleInterrupted(scope);
+
+    expect([...settled].sort()).toEqual([queued.runId, running.runId].sort());
+    const manager = new RunManager(reopened.scope(scope));
+    expect((await manager.get(running.runId))?.status).toBe("failed");
+    expect((await manager.get(queued.runId))?.status).toBe("failed");
+    expect((await manager.get(suspended.runId))?.status).toBe("awaiting_input");
+    expect((await manager.get(finished.runId))?.status).toBe("completed");
+    expect((await readAll(reopened.scope(scope), running.runId)).at(-1)).toMatchObject({
+      type: "run.failed",
+      seq: 2,
+      payload: { errorType: "process_restarted" },
+    });
+    // Idempotent: a second pass finds nothing left to settle.
+    expect(await runtime.settleInterrupted(scope)).toEqual([]);
+  });
+});
+
+test("does not settle a Run that is active in this process", async () => {
+  await withDatabase(async (path, stores) => {
+    const store = new SqliteEventStore(path);
+    stores.push(store);
+    let release!: () => void;
+    const gate = new Promise<void>((resolvePromise) => { release = resolvePromise; });
+    const kernel: LoopKernel = {
+      async start(run, sink) {
+        await sink.append(eventFor(run, 1, "run.started", { phase: "started" }));
+        await gate;
+        await sink.append(eventFor(run, 2, "run.completed", { outcome: "completed" }));
+        return { status: "completed" };
+      },
+      async steer() {},
+      async answer() {},
+      async abort() {},
+    };
+    const runtime = new DurableRunRuntime(store, kernel);
+    const handle = await runtime.start(command("run-live"));
+    expect(await runtime.settleInterrupted(scope)).toEqual([]);
+    release();
+    await expect(handle.completion).resolves.toEqual({ status: "completed" });
+  });
+});
+
 test("resumes a durable Run after an approval decision across SQLite reopen", async () => {
   await withDatabase(async (path, stores) => {
     const run = command("run-approval-restart");

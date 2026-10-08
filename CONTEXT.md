@@ -153,15 +153,15 @@ _Avoid_: 让 Worker 进程自带 bash/写文件/MCP、绕过 Host 授权的"内�
 _Avoid_: 把"选了工作目录"当作授权写入
 
 **Sandbox**：
-`sandbox.exec` 的 macOS seatbelt（`/usr/bin/sandbox-exec`）进程隔离：禁网络、只可写 workdir 与单次 scratch、读不到 workdir 之外的用户数据根、环境变量清空、超时杀进程组。不是容器或虚拟机；其他平台不准入该工具。
-_Avoid_: 把目录选择或 Docker 不存在时的普通子进程称作沙箱
+`sandbox.exec` 的 macOS seatbelt（`/usr/bin/sandbox-exec`）进程隔离，默认拒绝（deny default）：禁网络、禁桌面/系统服务（LaunchServices、Apple Events、剪贴板、偏好设置等 Mach/XPC 服务，仅放行用户信息查询）、只可写 workdir 与单次 scratch、读不到 workdir 之外的用户数据根、环境变量清空。命令返回、超时或 Stop 时，Host 终止进程组、根进程的后代以及仍持有本次调用标记描述符的脱离进程（setsid）；同时关闭全部继承描述符并脱离的进程不在此保证内，但它仍受同一 seatbelt 约束。不是容器或虚拟机；其他平台不准入该工具。
+_Avoid_: 把目录选择或 Docker 不存在时的普通子进程称作沙箱；把"超时杀进程组"说成杀掉一切后代
 
 **MCP Server**：
-用户在受保护的 Host 配置文件（`ANNA_HARNESS_MCP_CONFIG_PATH`）中声明的外部工具服务器；Host 是 MCP Client，工具以 `mcp.<server>.<tool>` 准入。`readOnlyHint` 工具为读；其余视为外部写，只在 `contained-write` 准入。
+用户在受保护的 Host 配置文件（`ANNA_HARNESS_MCP_CONFIG_PATH`）中声明的外部工具服务器；Host 是 MCP Client，在 Host 就绪后后台并发连接（慢或坏的服务器只会变为 `failed`，不阻塞启动），工具以 `mcp.<server>.<tool>` 准入。`readOnlyHint` 工具为读；其余视为外部写，只在 `contained-write` 准入，且写权限开关会列出这些工具名。
 _Avoid_: 业务连接器内部的 MCP 适配器与此混称（那是 Python 业务侧的 ERP/Hiker 连接实现）
 
 **Session Goal（目标模式）**：
-用户明确授权的、可跨多个普通 Workbench Run 推进的目标，带 `max_runs`（≤ 8）上限。Host 只依据持久化证据（终态 + OMP todo 计划）决定续跑或落定；计划全部完成只进入 `awaiting_review`，由用户确认才 `completed`。Stop 某个目标 Run → 目标 `paused`；可暂停/恢复/停止。
+用户明确授权的、可跨多个普通 Workbench Run 推进的目标，带 `max_runs`（≤ 8）上限。Host 只依据持久化证据（终态 + OMP todo 计划）决定续跑或落定；计划全部完成只进入 `awaiting_review`，由用户确认才 `completed`；剩余项全部 `blocked` 时落定为 `paused`（`plan_blocked`），等用户决定。Stop 某个目标 Run → 目标 `paused`；可暂停/恢复/停止。Host 重启时，上一进程遗留的排队/运行中 Run 以 `run.failed`（`process_restarted`）落定，目标随之 `failed`，用户可继续。
 _Avoid_: 模型自称完成即完成、无上限后台自治
 
 **Steer（补充说明）**：

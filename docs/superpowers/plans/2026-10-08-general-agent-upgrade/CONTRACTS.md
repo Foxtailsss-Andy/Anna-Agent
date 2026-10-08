@@ -61,7 +61,7 @@ interface WorkbenchGoal {
   runs_used: number;
   run_ids: string[];
   permission_mode: "readonly" | "contained-write";
-  last_reason?: string;      // "plan_incomplete" | "run_timed_out" | "plan_complete" | "final_answer_without_plan" | "run_cancelled" | "user_paused" | "user_stopped" | "budget_exhausted" | `run_failed:${code}`
+  last_reason?: string;      // "plan_incomplete" | "run_timed_out" | "plan_complete" | "plan_blocked" | "final_answer_without_plan" | "run_cancelled" | "run_awaiting_input" | "run_awaiting_approval" | "user_paused" | "user_stopped" | "user_resumed" | "user_confirmed" | "budget_exhausted" | `run_failed:${code}` (e.g. `run_failed:process_restarted` after a Host restart)
   plan_progress?: { completed: number; total: number };
   created_at: string;
   updated_at: string;
@@ -126,8 +126,11 @@ Keep `readRegisteredWorkdirFile` behaviour. Add, with the same `WorkbenchWorkdir
 - `searchRegisteredWorkdir(input: {pattern: string; path?: string; max_results?: 1..200; regex?: boolean}, options, signal)` → `{matches:[{path, line, text}], truncated}` (UTF-8 text files ≤ 1 MiB, literal by default).
 - `writeRegisteredWorkdirFile(input: {path: string; content: string; overwrite?: boolean}, options, signal)` → `{path, bytes, created: boolean}`; ≤ 1 MiB; refuses outside-root, symlink escapes, protected paths, existing file unless `overwrite:true`; creates parent dirs inside root.
 - `editRegisteredWorkdirFile(input: {path: string; old_text: string; new_text: string}, options, signal)` → `{path, bytes, replacements: 1}`; requires exactly one occurrence.
+- Containment (review correction): write/edit resolve the path one segment at a time under the canonical root (`workdir-paths.ts`), create missing parents only beneath verified directories, open the final component with `O_NOFOLLOW` and re-verify the opened inode before truncating. read/write/edit/search refuse a file with more than one hard link (`workdir_file_hardlinked`). `path` in results is the canonical in-root path. Search matching runs in a worker thread (soft budget 8 s → `truncated`, hard budget 10 s → `workdir_search_timeout`; pattern ≤ 1000 chars).
 
 ### 3.2 `apps/harness-service/src/workbench-sandbox.ts` (T)
+
+Profile (review correction): `(deny default)` plus process exec/fork, same-sandbox signals/process-info, sysctl reads, POSIX semaphores, pseudo-tty, file ioctl, the `com.apple.system.opendirectoryd.libinfo` lookup, all file reads except user data roots outside the workdir/scratch, and writes only to the workdir/scratch/`/dev/null|zero|tty*|fd`. When the root process exits, times out or is stopped, the Host signals the process group, the root's ppid closure, and launchd-reparented processes started during the call that still hold the per-call marker descriptor (fd 3) — background jobs never outlive the call.
 
 ```ts
 export interface SandboxDescriptor { kind: "macos-seatbelt"; network: "denied"; writable_roots: string[]; read_denied_roots: string[] }
@@ -158,9 +161,9 @@ export interface McpToolDescriptor {
   read_only: boolean;                       // annotations.readOnlyHint === true
 }
 export interface McpManager {
-  start(): Promise<void>;                   // connect + initialize + tools/list for every server, bounded by timeout; failures recorded, never thrown
-  tools(): readonly McpToolDescriptor[];    // synchronous snapshot
-  status(): Array<{ server_id: string; state: "ready" | "failed" | "disabled"; tool_count: number; error?: string }>;
+  start(): Promise<void>;                   // connect + initialize + tools/list for every server concurrently, each bounded by its timeout; failures recorded, never thrown. main.ts calls it in the background after the Host is ready.
+  tools(): readonly McpToolDescriptor[];    // synchronous snapshot (empty until start settles)
+  status(): Array<{ server_id: string; state: "not_started" | "starting" | "ready" | "failed" | "disabled"; tool_count: number; error?: string }>;
   call(capabilityId: string, args: Record<string, unknown>, signal: AbortSignal): Promise<{ status: "succeeded" | "failed"; output: Record<string, unknown> }>;
   close(): Promise<void>;
 }
@@ -176,3 +179,5 @@ export function createMcpManager(servers: Record<string, McpServerConfig>, optio
 - OMP `todo.reminders` is disabled in the worker: OMP would otherwise inject a hidden developer reminder when a turn stops with open todo items, which the Host-owned history rejects (this made any Run that stopped with an open plan fail). Continuation of unfinished plans is the Session Goal's job.
 - `POST /api/workbench/sessions/:id/goal` is idempotent by `source_event_id` (same id → `200` with the existing goal).
 - `/v2/*` on the Product Host returns `404 {code:"review_api_not_served_by_product_host"}`.
+- Host start (review correction): before listening, the Product Host calls `runtime.settleInterrupted(workspace, channel)` for every Workbench Run scope; Runs an earlier process left queued/running get `run.failed {errorType:"process_restarted"}` (suspended Runs untouched). Public `run.failed` events expose `errorType` as `error_code`.
+- `crew.channel.tasks_confirmed` / the confirmation row list only assignments that the normal `assign` path actually applied; raced ones are listed under `skipped` (`状态已变化`), duplicates as `重复指派`.

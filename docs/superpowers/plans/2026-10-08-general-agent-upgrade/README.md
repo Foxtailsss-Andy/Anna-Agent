@@ -21,16 +21,18 @@ The 2026-10-07 independent review ran the real desktop product with DeepSeek and
 9. **Trace:** OMP-aware projection in `@anna/trace`, served for Workbench runs; `/v2/*` is JSON 404 on the Product Host.
 10. **Crew:** structured-mention routing; `crew.propose_changes` → Coordination Proposal card → owner confirm (ordering via `insert_before`, assignments through the normal assign path); legacy @Anna intent path repaired with visible failure rows; @Anna always gets an answer, card or failure row.
 11. **Latency:** runtime manifest verified fully once per Host process, metadata fingerprint per Run.
+12. **Run budget:** a Workbench Run admitted with any direct tool beyond `todo`/the catalog gets 24 turns, 96 tool calls, 300 s wall time (the earlier 12-turn ceiling ended ordinary write→run→verify tasks; live L04 needed 8 model requests, L07 Goal Runs 8–10). Longer work continues through the Session Goal, which counts each Run against `max_runs`.
+13. **Review corrections (two independent reviews, NEEDS_CHANGES → fixed):** workdir write/edit containment is segment-wise with inode re-verification and hard-link refusal; regex search runs in a worker with a time budget; the seatbelt profile is deny-default (no Mach/XPC desktop services) and the Host terminates every tracked descendant when a command returns; interrupted Runs are settled at Host start so Goals cannot stay `active` forever; MCP connects in the background; the desktop shell never opens a second window for a link; only blocked plan items pause a Goal (`plan_blocked`).
 
 ## Work graph (all writers Opus 5.5 / xhigh, one writer per file)
 
 | Ticket | Scope | Result |
 | --- | --- | --- |
-| P | Python Crew repairs, `crew.propose_changes`, ordering, background @Anna answers | done, tests added |
-| F1 | Crew UI routing/restore/steer, template dialog, proposal card, GFM tables, chart blocks | done, tests added |
-| F2 | Home history/streaming/plan/tools/trace/steer/permission/Goal UI | done, tests added |
-| T | workdir list/search/write/edit, seatbelt Sandbox | done, tests added |
-| M | Host MCP client + fixture server | done (owner completed after worker exits) |
-| H (owner) | Host composition: profile/tools/routing, live output, trace, Goal supervisor, steer, manifest cache, diagnostics logs, Electron link routing | done, Host integration tests |
+| P | Python Crew repairs, `crew.propose_changes`, ordering, background @Anna answers | implemented, tests added; pending independent acceptance |
+| F1 | Crew UI routing/restore/steer, template dialog, proposal card, GFM tables, chart blocks | implemented, tests added; pending independent acceptance |
+| F2 | Home history/streaming/plan/tools/trace/steer/permission/Goal UI | implemented, tests added; pending independent acceptance |
+| T | workdir list/search/write/edit, seatbelt Sandbox | implemented (owner hardened after review), tests added; pending independent acceptance |
+| M | Host MCP client + fixture server | implemented (owner completed after worker exits); pending independent acceptance |
+| H (owner) | Host composition: profile/tools/routing, live output, trace, Goal supervisor + restart settlement, steer, manifest cache, diagnostics logs, Electron link routing | implemented, Host integration tests; pending independent acceptance |
 
-Verification and acceptance evidence are recorded in the delivery directory (`STATUS.md`, `HANDOFF.md`).
+Verification evidence and the factual handoff are kept in the private delivery directory (`STATUS.md`, `HANDOFF.md`); release acceptance belongs to the independent reviewer (Codex), not to the authoring agent.

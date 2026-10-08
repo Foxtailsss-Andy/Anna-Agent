@@ -258,6 +258,9 @@ test("Skill restore keeps the captured version while a new Run reads the updated
       port: hostPort,
       serviceToken: "wb02-skill-restore-host-token",
       sessionStore: resumedSessions,
+      // Resumes the interrupted Run explicitly through the harness `/v2` resume
+      // route (kernel restore), so the Product Host must not settle it at start.
+      settleInterruptedRunsOnStart: false,
       staticRoot: directory,
       businessOrigin: business.origin,
       businessServiceToken: "wb01-business-service-token",

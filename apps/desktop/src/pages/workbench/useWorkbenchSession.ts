@@ -37,8 +37,16 @@ function userFacingError(error: unknown): string {
   if (text.includes("goal_budget_exhausted")) return "目标的轮数已用完；可以再给它增加轮数（最多 8 轮）。";
   if (text.includes("goal_not_resumable")) return "这个目标当前不能继续。";
   if (text.includes("goal_not_active")) return "这个目标当前不在进行中。";
+  if (text.includes("process_restarted")) return RUN_FAILURE_TEXT.process_restarted;
+  if (text.includes("runtime_bridge_failed")) return RUN_FAILURE_TEXT.runtime_bridge_failed;
   return text.replace(/^Error:\s*/, "") || "工作台请求失败，请稍后重试。";
 }
+
+/** Readable copy for Run failure codes the Host projects on `run.failed`. */
+export const RUN_FAILURE_TEXT: Record<string, string> = {
+  process_restarted: "Anna 重启时这次运行被中断了；已有的结果仍保留，可以重新发起或继续目标。",
+  runtime_bridge_failed: "运行环境出错，这次运行没有完成。",
+};
 
 function isRunTerminal(run: WorkbenchRun | null): boolean {
   return run !== null && (run.admission_status === "failed" || TERMINAL.has(run.status));
@@ -133,7 +141,10 @@ export function useWorkbenchSession(surface: WorkbenchSurface = "chat", projectI
         cursorRef.current.seq = Math.max(...fresh.map((event) => event.seq));
         setEvents((current) => [...current, ...fresh]);
         const failure = [...fresh].reverse().find((event) => event.type === "run.failed");
-        if (failure) setError(failure.error_code ?? failure.reason ?? "工作台运行失败，请检查当前能力配置。");
+        if (failure) {
+          const code = failure.error_code ?? failure.reason;
+          setError(code === undefined ? "工作台运行失败，请检查当前能力配置。" : RUN_FAILURE_TEXT[code] ?? code);
+        }
       }
       if (isRunTerminal(projected)) cursorRef.current.drained = true;
     }

@@ -95,6 +95,13 @@ export interface ProductHostOptions {
   readonly goalSupervisorIntervalMs?: number;
   /** Host MCP client, reported to the UI so permission prompts can name external write tools. */
   readonly mcp?: McpManager;
+  /**
+   * Default true: at start, Workbench Runs an earlier process left queued/running are
+   * settled as `process_restarted` (the product has no Workbench resume route). Only a
+   * composition that resumes such Runs explicitly through the harness `/v2` resume
+   * route (kernel restore tests) turns this off.
+   */
+  readonly settleInterruptedRunsOnStart?: boolean;
 }
 
 export interface RunningProductHost {
@@ -184,6 +191,11 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       responseJson(response, 500, { code: "product_host_internal_error" });
     });
   });
+
+  // A Run that an earlier Host process left queued/running can never finish on its
+  // own. Settle those before accepting requests (so no new Run can be mistaken for
+  // one), letting their Sessions show a terminal state and their Goals settle.
+  await settleInterruptedWorkbenchRuns();
 
   await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);
@@ -1005,6 +1017,25 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     }
   }
 
+  async function settleInterruptedWorkbenchRuns(): Promise<void> {
+    const settle = options.runtime.settleInterrupted;
+    if (settle === undefined || options.settleInterruptedRunsOnStart === false) return;
+    let settled = 0;
+    for (const scope of await workbenchSessions.peekRunScopes()) {
+      try {
+        settled += (await settle(scope.workspace_id, scope.channel_id)).length;
+      } catch (error) {
+        process.stderr.write(`${JSON.stringify({
+          type: "workbench.interrupted_runs.settle_failed",
+          error: error instanceof Error ? error.message : "unknown",
+        })}\n`);
+      }
+    }
+    if (settled > 0) {
+      process.stderr.write(`${JSON.stringify({ type: "workbench.interrupted_runs.settled", count: settled })}\n`);
+    }
+  }
+
   // ---------------------------------------------------------------- Session Goal
 
   function withGoalLock<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
@@ -1144,7 +1175,9 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     return {
       latest,
       ...(terminal === undefined ? {} : { terminalStatus: terminal.type.slice("run.".length) }),
-      ...(typeof failurePayload?.reason === "string" ? { failureReason: failurePayload.reason } : {}),
+      ...(typeof failurePayload?.reason === "string"
+        ? { failureReason: failurePayload.reason }
+        : typeof failurePayload?.errorType === "string" ? { failureReason: failurePayload.errorType } : {}),
       ...(plan === undefined ? {} : { plan }),
       hasFinalText: messagesForWorkbenchRun(latest, events).some((message) => message.role === "assistant"),
     };
@@ -1842,7 +1875,8 @@ function publicWorkbenchEvent(event: CanonicalEvent): Record<string, unknown> {
     body.status = event.type.slice("run.".length);
     if (event.type === "run.failed" && payload !== undefined) {
       const reason = payload.reason;
-      const errorCode = payload.error_code;
+      // Runtime-level failures (e.g. `process_restarted`) carry `errorType`.
+      const errorCode = payload.error_code ?? payload.errorType;
       if (typeof reason === "string") body.reason = reason;
       if (typeof errorCode === "string") body.error_code = errorCode;
     }

@@ -1380,8 +1380,30 @@ class CrewService:
                 skipped_assign.append(
                     (task.title, member_id, _TASK_STATUS_LABEL.get(task.status, task.status))
                 )
+            elif any(planned_task == task_id for planned_task, _ in planned):
+                skipped_assign.append((task.title, member_id, "重复指派"))
             else:
                 planned.append((task_id, member_id))
+
+        # Persist the grown graph, then apply the assignments through the normal
+        # ``assign`` path (its own channel row, notification, auto-pilot). The
+        # confirmation row and audit below describe what was actually applied; an
+        # assignment that raced a transition is reported as skipped, not claimed.
+        self._store.save_project(project)
+        applied: list[tuple[str, str]] = []
+        for task_id, member_id in planned:
+            try:
+                self.assign(project_id, task_id, member_id)
+                applied.append((task_id, member_id))
+            except lifecycle.CrewLifecycleError:
+                logger.warning(
+                    "confirmed assignment of %s to %s raced a transition; skipped",
+                    task_id,
+                    member_id,
+                )
+                raced = _find_task(self._load(project_id), task_id)
+                skipped_assign.append((raced.title if raced else task_id, member_id, "状态已变化"))
+        project = self._load(project_id)
 
         audit_ref = self._append_event(project, "crew.channel.tasks_confirmed", {
             "count": len(new_tasks),
@@ -1393,7 +1415,7 @@ class CrewService:
                 for target, new_task in reordered
             ],
             "assignments": [
-                {"task_id": task_id, "member_id": member_id} for task_id, member_id in planned
+                {"task_id": task_id, "member_id": member_id} for task_id, member_id in applied
             ],
             "skipped": [
                 {"kind": "insert_before", "title": title, "reason": reason}
@@ -1416,8 +1438,8 @@ class CrewService:
             body += "未调整顺序：" + "、".join(
                 f"“{title}”（{reason}）" for title, reason in skipped_order
             ) + "。"
-        if planned:
-            body += f"按提议指派 {len(planned)} 项。"
+        if applied:
+            body += f"已按提议指派 {len(applied)} 项。"
         if skipped_assign:
             body += "未执行指派：" + "、".join(
                 f"“{title}”→@{self._name(member)}（{reason}）"
@@ -1438,15 +1460,6 @@ class CrewService:
                 task_id=None, ref=audit_ref,
             )
         self._store.save_project(project)
-        for task_id, member_id in planned:
-            try:
-                project = self.assign(project_id, task_id, member_id)
-            except lifecycle.CrewLifecycleError:
-                logger.warning(
-                    "confirmed assignment of %s to %s raced a transition; skipped",
-                    task_id,
-                    member_id,
-                )
         # R4b 采纳即派:意图卡的建议负责人(发言中 @ 指定)下推后立即派给首任务,
         # 走正规 assign 通道(频道事件 / 收件通知 / auto-pilot 全部自然触发——
         # 「采纳并开跑」的开跑就在这里)。幽灵成员静默跳过;状态竞态导致不可派时

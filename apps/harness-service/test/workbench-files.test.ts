@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +7,7 @@ import { afterEach, expect, test } from "vitest";
 import {
   editRegisteredWorkdirFile,
   listRegisteredWorkdir,
+  readRegisteredWorkdirFile,
   searchRegisteredWorkdir,
   writeRegisteredWorkdirFile,
   type WorkbenchWorkdirResolutionOptions,
@@ -320,6 +321,118 @@ test("edit refuses when the old text occurs more than once", async () => {
   );
   expect(result).toEqual({ status: "failed", output: { reason: "workdir_edit_text_not_unique" } });
   expect(await readFile(join(workdir, "config.txt"), "utf8")).toBe("x\nx\n");
+});
+
+// --- containment regressions (R-standards2 P0 / P1.1 / P1.4) ----------------
+
+test("edit refuses a path through a symlinked directory that leads outside the root", async () => {
+  const workdir = await makeWorkdir();
+  const outside = await makeWorkdir();
+  await writeFile(join(outside, "victim.txt"), "line=original\n", "utf8");
+  await symlink(outside, join(workdir, "esc"), "dir");
+
+  const result = await editRegisteredWorkdirFile(
+    { path: "esc/victim.txt", old_text: "original", new_text: "changed" },
+    optionsFor(workdir),
+    signal(),
+  );
+  expect(result).toEqual({ status: "failed", output: { reason: "workdir_path_outside_root" } });
+  expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("line=original\n");
+});
+
+test("write through a symlinked directory leading outside creates nothing outside the root", async () => {
+  const workdir = await makeWorkdir();
+  const outside = await makeWorkdir();
+  await symlink(outside, join(workdir, "link"), "dir");
+
+  const result = await writeRegisteredWorkdirFile(
+    { path: "link/newdir/x.txt", content: "x" },
+    optionsFor(workdir),
+    signal(),
+  );
+  expect(result).toEqual({ status: "failed", output: { reason: "workdir_path_outside_root" } });
+  expect(await readdir(outside)).toEqual([]);
+});
+
+test("write and edit follow a symlinked directory that stays inside the root", async () => {
+  const workdir = await makeWorkdir();
+  await mkdir(join(workdir, "real"), { recursive: true });
+  await symlink(join(workdir, "real"), join(workdir, "alias"), "dir");
+
+  const written = await writeRegisteredWorkdirFile(
+    { path: "alias/sub/note.txt", content: "v1" },
+    optionsFor(workdir),
+    signal(),
+  );
+  expect(written).toEqual({ status: "succeeded", output: { path: join("real", "sub", "note.txt"), bytes: 2, created: true } });
+  const edited = await editRegisteredWorkdirFile(
+    { path: "alias/sub/note.txt", old_text: "v1", new_text: "v2" },
+    optionsFor(workdir),
+    signal(),
+  );
+  expect(edited.status).toBe("succeeded");
+  expect(await readFile(join(workdir, "real", "sub", "note.txt"), "utf8")).toBe("v2");
+});
+
+test("read, edit and overwrite refuse a file with a second hard link", async () => {
+  const workdir = await makeWorkdir();
+  const outside = await makeWorkdir();
+  const outsideFile = join(outside, "shared.txt");
+  await writeFile(outsideFile, "OUTSIDE_CONTENT\n", "utf8");
+  await link(outsideFile, join(workdir, "shared.txt"));
+
+  expect(await readRegisteredWorkdirFile({ path: "shared.txt" }, optionsFor(workdir), signal())).toEqual({
+    status: "failed",
+    output: { reason: "workdir_file_hardlinked" },
+  });
+  expect(await editRegisteredWorkdirFile(
+    { path: "shared.txt", old_text: "OUTSIDE", new_text: "CHANGED" },
+    optionsFor(workdir),
+    signal(),
+  )).toEqual({ status: "failed", output: { reason: "workdir_file_hardlinked" } });
+  expect(await writeRegisteredWorkdirFile(
+    { path: "shared.txt", content: "CHANGED", overwrite: true },
+    optionsFor(workdir),
+    signal(),
+  )).toEqual({ status: "failed", output: { reason: "workdir_file_hardlinked" } });
+  const search = await searchRegisteredWorkdir({ pattern: "OUTSIDE" }, optionsFor(workdir), signal());
+  expect(search.output.matches).toEqual([]);
+  expect(await readFile(outsideFile, "utf8")).toBe("OUTSIDE_CONTENT\n");
+});
+
+test("a catastrophic regular expression is bounded and never blocks the Host event loop", async () => {
+  const workdir = await makeWorkdir();
+  await writeFile(join(workdir, "f.txt"), `${"a".repeat(48)}!\n`, "utf8");
+  let ticks = 0;
+  const ticker = setInterval(() => { ticks += 1; }, 50);
+  const started = Date.now();
+  try {
+    const result = await searchRegisteredWorkdir({ pattern: "^(a+)+$", regex: true }, optionsFor(workdir), signal());
+    expect(result).toEqual({ status: "failed", output: { reason: "workdir_search_timeout" } });
+  } finally {
+    clearInterval(ticker);
+  }
+  const elapsed = Date.now() - started;
+  expect(elapsed).toBeLessThan(13_000);
+  // The loop kept running while the worker was stuck (≥ half of the expected 50 ms ticks).
+  expect(ticks).toBeGreaterThan(elapsed / 100);
+}, 20_000);
+
+test("search is cancelled promptly when the Run is stopped", async () => {
+  const workdir = await makeWorkdir();
+  await writeFile(join(workdir, "f.txt"), `${"a".repeat(48)}!\n`, "utf8");
+  const controller = new AbortController();
+  const started = Date.now();
+  setTimeout(() => controller.abort(), 200);
+  const result = await searchRegisteredWorkdir({ pattern: "^(a+)+$", regex: true }, optionsFor(workdir), controller.signal);
+  expect(result).toEqual({ status: "failed", output: { reason: "cancelled" } });
+  expect(Date.now() - started).toBeLessThan(2_000);
+});
+
+test("search rejects an over-long pattern", async () => {
+  const workdir = await makeWorkdir();
+  const result = await searchRegisteredWorkdir({ pattern: "x".repeat(1_001) }, optionsFor(workdir), signal());
+  expect(result).toEqual({ status: "failed", output: { reason: "invalid_workdir_search_request" } });
 });
 
 test("file tools report workdir_not_bound when no workdir resource is provided", async () => {

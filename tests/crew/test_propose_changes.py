@@ -101,3 +101,44 @@ def test_assignment_only_confirm_uses_assign_path_once(tmp_path):
     assert len(second.audit_events) == len(first.audit_events)
     andy_notes = svc.list_notifications("ws_crew_demo", "acc_andy")
     assert [n.title for n in andy_notes] == ["“营销 Brief”已派给你。"]
+
+
+def test_confirmation_row_reports_only_assignments_that_were_applied(tmp_path, monkeypatch):
+    """R-standards2 P2.7: an assignment that races a transition is named as skipped,
+    and the confirmation row/audit never claim it was applied."""
+    from services.crew.app import lifecycle
+
+    svc = _svc(tmp_path, {"acc_boss", "acc_andy"})
+    project = _marketing(svc)
+    brief = _task(project, "营销 Brief")
+    copy = _task(project, "文案撰写")
+    card = _propose(
+        svc,
+        project,
+        assignments=[
+            {"task_id": brief.id, "member_id": "acc_andy"},
+            {"task_id": copy.id, "member_id": "acc_andy"},
+        ],
+    )
+    proposals = [AssignmentProposal.model_validate(a) for a in card.payload["assignments"]]
+    real_assign = svc.assign
+
+    def racing_assign(project_id, task_id, member_id):
+        if task_id == copy.id:
+            raise lifecycle.CrewLifecycleError("task moved on concurrently")
+        return real_assign(project_id, task_id, member_id)
+
+    monkeypatch.setattr(svc, "assign", racing_assign)
+    updated = svc.confirm_drafts(
+        project.id, [], confirmed_by="acc_boss", source_message_id=card.id, assignments=proposals
+    )
+
+    assert _task(updated, "营销 Brief").assignee_member_id == "acc_andy"
+    assert _task(updated, "文案撰写").assignee_member_id is None
+    confirmation = svc.list_channel(project.id)[-1]
+    assert confirmation.kind == "event"
+    assert "已按提议指派 1 项。" in confirmation.body
+    assert "未执行指派：“文案撰写”→@" in confirmation.body and "（状态已变化）" in confirmation.body
+    audit = next(e for e in updated.audit_events if e["type"] == "crew.channel.tasks_confirmed")
+    assert audit["payload"]["assignments"] == [{"task_id": brief.id, "member_id": "acc_andy"}]
+    assert {"kind": "assignment", "title": "文案撰写", "member_id": "acc_andy", "reason": "状态已变化"} in audit["payload"]["skipped"]

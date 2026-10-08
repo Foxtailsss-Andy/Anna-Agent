@@ -53,7 +53,8 @@ export interface McpToolDescriptor {
 
 export interface McpServerStatus {
   readonly server_id: string;
-  readonly state: "ready" | "failed" | "disabled";
+  /** `starting` until the background connect settles; `not_started` before start(). */
+  readonly state: "starting" | "ready" | "failed" | "disabled" | "not_started";
   readonly tool_count: number;
   readonly transport: "stdio" | "http" | "unknown";
   readonly error?: string;
@@ -133,11 +134,13 @@ export function createMcpManager(
   const statuses = new Map<string, McpServerStatus>();
   let descriptors: McpToolDescriptor[] = [];
   let started: Promise<void> | undefined;
+  let closed = false;
 
   async function connect(serverId: string, config: McpServerConfig): Promise<McpToolDescriptor[]> {
     const timeoutMs = boundedTimeout(config.timeout_ms);
     const transport = config.url !== undefined ? createHttpTransport(config.url, config.headers ?? {}) : await createStdioTransport(config);
     connections.set(serverId, { transport, timeoutMs });
+    if (closed) throw new Error("mcp_manager_closed");
     const init = await transport.request("initialize", {
       protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: {},
@@ -190,15 +193,24 @@ export function createMcpManager(
 
   return {
     start() {
+      // Servers connect concurrently, so one slow server neither delays the others nor
+      // (when the caller does not await) the Host. Tools appear once all have settled.
       started ??= (async () => {
-        const collected: McpToolDescriptor[] = [];
-        for (const [serverId, config] of Object.entries(servers)) {
-          if (config.disabled === true) {
-            statuses.set(serverId, { server_id: serverId, state: "disabled", tool_count: 0, transport: transportKind(config) });
-            continue;
-          }
+        const entries = Object.entries(servers);
+        for (const [serverId, config] of entries) {
+          statuses.set(serverId, {
+            server_id: serverId,
+            state: config.disabled === true ? "disabled" : "starting",
+            tool_count: 0,
+            transport: transportKind(config),
+          });
+        }
+        const results = await Promise.all(entries.map(async ([serverId, config]) => {
+          if (config.disabled === true) return [];
           try {
-            collected.push(...await connect(serverId, config));
+            const accepted = await connect(serverId, config);
+            if (closed) throw new Error("mcp_manager_closed");
+            return accepted;
           } catch (error) {
             await connections.get(serverId)?.transport.close().catch(() => undefined);
             connections.delete(serverId);
@@ -209,15 +221,16 @@ export function createMcpManager(
               transport: transportKind(config),
               error: error instanceof McpError ? `${error.reason}: ${error.message}` : safeMessage(error),
             });
+            return [];
           }
-        }
-        descriptors = assignCapabilityIds(collected);
+        }));
+        if (!closed) descriptors = assignCapabilityIds(results.flat());
       })();
       return started;
     },
     tools: () => descriptors,
     status: () => Object.keys(servers).map((serverId) => statuses.get(serverId)
-      ?? { server_id: serverId, state: "failed", tool_count: 0, transport: transportKind(servers[serverId]!), error: "not_started" }),
+      ?? { server_id: serverId, state: "not_started", tool_count: 0, transport: transportKind(servers[serverId]!) }),
     async call(capabilityId, args, signal) {
       const descriptor = descriptors.find((item) => item.capability_id === capabilityId);
       if (descriptor === undefined) return failed("mcp_server_unavailable", { capability_id: capabilityId });
@@ -246,8 +259,11 @@ export function createMcpManager(
       }
     },
     async close() {
+      closed = true;
+      descriptors = [];
       await Promise.all([...connections.values()].map((connection) => connection.transport.close().catch(() => undefined)));
       connections.clear();
+      // A connect still in flight closes its own transport once it observes `closed`.
     },
   };
 }
@@ -633,7 +649,7 @@ async function readSseReply(response: Response, id: number): Promise<unknown> {
   throw new McpError("mcp_transport_failed", "stream ended without a reply");
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

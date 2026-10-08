@@ -170,6 +170,34 @@ test("broken servers are recorded as failed without failing start, and a crash m
   });
 }, 20_000);
 
+test("servers connect concurrently and report starting until they settle (R-standards2 P2.5)", async () => {
+  const manager = track(createMcpManager({
+    silent: stdioFixture(["--never-initialize"], { timeout_ms: 2_000 }),
+    fixture: stdioFixture(),
+  }));
+  expect(manager.status().map((item) => item.state)).toEqual(["not_started", "not_started"]);
+  const started = Date.now();
+  const pending = manager.start();
+  expect(manager.status().map((item) => item.state)).toEqual(["starting", "starting"]);
+  await pending;
+  // Bounded by the slow server's own timeout, not by the sum of both servers.
+  expect(Date.now() - started).toBeLessThan(4_000);
+  const byId = Object.fromEntries(manager.status().map((item) => [item.server_id, item.state]));
+  expect(byId).toEqual({ silent: "failed", fixture: "ready" });
+  expect(manager.tools().some((tool) => tool.capability_id === "mcp.fixture.echo")).toBe(true);
+}, 20_000);
+
+test("close during a pending start leaves no tools and no live connection", async () => {
+  const manager = createMcpManager({ silent: stdioFixture(["--never-initialize"], { timeout_ms: 5_000 }) });
+  const pending = manager.start();
+  const closedAt = Date.now();
+  await manager.close();
+  expect(Date.now() - closedAt).toBeLessThan(2_000);
+  await pending;
+  expect(manager.tools()).toEqual([]);
+  expect(manager.status()[0]).toMatchObject({ state: "failed" });
+}, 20_000);
+
 test("stdio servers never inherit the Host environment", async () => {
   process.env.ANNA_TEST_MCP_SECRET = "must-not-leak-7731";
   try {
