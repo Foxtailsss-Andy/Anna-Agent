@@ -18,3 +18,14 @@
 - Shared ledger: Jev39, generation model30; estimated$0.027494142, reserved0, unknown=false. Original evidence and private history are archived; fixed fixtures and labels unchanged.
 
 Do not restart B/Worker/OMP expansion under this ticket. Follow the published release's documented limits.
+
+## Display fixes authorized 2026-09-22
+
+- Status: `demo_fixes_in_progress`; owner unchanged. Baseline `f8f5f825eccd83cbcfa28d362c16192b0fec48ad`. No quota/tool block observed.
+- Sole Luna high writer `/root/jev03_coding` is implementing bounded A history and C Markdown fixes through pre-approved public seams. B safe action paths are under independent Astra read-only investigation. Existing Jev fixtures, measurements and budgets remain unchanged; no paid model call is authorized for these regressions.
+- Ranked hypotheses: current-run-only rendering hides earlier conversation messages; a late poll may replace newer state; v2 Crew catalog omits prior protected proposal/action paths; bare ReactMarkdown lost the existing safe table/overflow renderer. Backend persistence must be checked, not assumed broken.
+- Planned A red loop: `node --test --test-name-pattern='history|poll' tests/frontend/crew_demo_regression.test.mjs`; backend exclusion/regression: `.venv/bin/python -m pytest -q tests/api/test_crew_api.py -k history`.
+- Planned B public profile/catalog regression: `npm run test --workspace=@anna/harness-service -- --run test/product-profile.test.ts` plus the existing scoped capability test selected after path inspection; do not invent an unsafe write tool merely to satisfy an assertion.
+- Planned C red loop: `node --test --test-name-pattern='markdown|table|overflow' tests/frontend/crew_demo_regression.test.mjs`.
+- These commands are planned, not yet recorded as RED or PASS. Preserve the first actual failure and GREEN evidence in the private demo-fix archive. Backend tests that already pass exclude a hypothesis; do not fabricate a red state.
+- The operator-provided external demo launcher is outside Git; validate syntax, executable mode and Host-only key references without printing secrets.

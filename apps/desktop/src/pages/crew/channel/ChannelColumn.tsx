@@ -12,7 +12,6 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
 
 import { IrisPetal } from "../../../components/anna/IrisPetal";
 import { StateNote } from "../../../components/anna/StateNote";
@@ -31,6 +30,7 @@ import { messageFamily, type MentionMeta } from "./channelModel";
 import { intentOriginMessageId, isIntentCommand } from "./intentCard";
 import { SYSTEM_ANNA_MENTION_ID } from "./pickerModel";
 import { useWorkbenchSession } from "../../workbench/useWorkbenchSession";
+import { CrewMarkdown } from "../CrewMarkdown";
 import "./channel.css";
 
 function timeOf(iso: string): string {
@@ -138,8 +138,7 @@ export function ChannelColumn({
   const askAnna = async (text: string) => {
     return workbench.start(text);
   };
-  const currentMessages = (workbench.session?.messages ?? []).filter((message) => message.run_id === workbench.runId);
-  const currentAnswer = [...currentMessages].reverse().find((message) => message.role === "assistant")?.content;
+  const currentMessages = workbench.session?.messages ?? [];
   const workbenchStatus = workbench.starting ? "正在建立会话" : workbench.status;
 
   const renderMessage = (msg: ChannelMessage) => {
@@ -282,7 +281,15 @@ export function ChannelColumn({
                 {workbench.capabilities.map((capability) => <span key={capability}>{capability}</span>)}
               </div>
             )}
-            {currentAnswer && <div className="ir-crew-workbench__answer"><ReactMarkdown>{currentAnswer}</ReactMarkdown></div>}
+            {currentMessages.length > 0 && (
+              <div className="ir-crew-workbench__history" aria-label="Anna 会话历史">
+                {currentMessages.map((message, index) => (
+                  <div key={`${message.event_id ?? message.run_id ?? "message"}-${index}`} className={`ir-crew-workbench__message ir-crew-workbench__message--${message.role}${message.run_id === workbench.runId ? " ir-crew-workbench__message--current" : ""}`}>
+                    {message.role === "assistant" ? <CrewMarkdown source={message.content} /> : <div>{message.content}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
             {workbench.error && <div className="ir-crew-workbench__error">{workbench.error}</div>}
             {workbench.running && (
               <button type="button" className="ir-crew-workbench__stop" onClick={() => void workbench.stop("Stopped by user")}>

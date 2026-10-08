@@ -1,6 +1,5 @@
-import ReactMarkdown from "react-markdown";
-
 import type { WorkbenchEvent, WorkbenchSession } from "../../lib/api/workbench";
+import { CrewMarkdown } from "../crew/CrewMarkdown";
 import "./WorkbenchChatPanel.css";
 
 interface WorkbenchChatPanelProps {
@@ -35,8 +34,7 @@ export function WorkbenchChatPanel({
   onStop,
   composer,
 }: WorkbenchChatPanelProps) {
-  const messages = (session?.messages ?? []).filter((message) => runId === null || message.run_id === runId);
-  const answer = [...messages].reverse().find((message) => message.role === "assistant")?.content;
+  const messages = session?.messages ?? [];
   const isRunning = status === "queued" || status === "running" || status === "not_started";
   const effectivePrompt = prompt || messages.find((message) => message.role === "user")?.content || "";
 
@@ -66,9 +64,13 @@ export function WorkbenchChatPanel({
                 {capabilities.map((capability) => <span key={capability} className="ir-workbench-chat__capability">{capability}</span>)}
               </div>
             )}
-            {answer && (
-              <div className="ir-workbench-chat__answer">
-                <ReactMarkdown>{answer}</ReactMarkdown>
+            {messages.length > 0 && (
+              <div className="ir-workbench-chat__history" aria-label="会话历史">
+                {messages.map((message, index) => (
+                  <div key={`${message.event_id ?? message.run_id ?? "message"}-${index}`} className={`ir-workbench-chat__message ir-workbench-chat__message--${message.role}${message.run_id === runId ? " ir-workbench-chat__message--current" : ""}`}>
+                    {message.role === "assistant" ? <CrewMarkdown source={message.content} /> : <div>{message.content}</div>}
+                  </div>
+                ))}
               </div>
             )}
             {error && <div className="ir-workbench-chat__error"><strong>未能完成：</strong>{error}</div>}

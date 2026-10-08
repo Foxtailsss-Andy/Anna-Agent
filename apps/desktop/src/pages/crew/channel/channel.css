@@ -1535,6 +1535,38 @@
   font-size: 9px;
 }
 
+.ir-crew-workbench__history {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.ir-crew-workbench__message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.ir-crew-workbench__message--user {
+  color: var(--ink-2);
+}
+
+.ir-crew-workbench__message--assistant {
+  border-radius: 8px;
+  background: rgb(255 255 255 / 54%);
+  padding: 8px;
+}
+
+[data-theme="dark"] .ir-crew-workbench__message--assistant {
+  background: rgb(255 255 255 / 6%);
+}
+
+.ir-crew-workbench__message--current {
+  outline: 1px solid rgb(87 91 196 / 18%);
+  outline-offset: 1px;
+}
+
 .ir-crew-workbench__answer {
   margin-top: 8px;
   color: var(--ink);
