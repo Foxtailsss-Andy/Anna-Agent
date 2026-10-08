@@ -25,6 +25,7 @@ import {
 import { expect, test } from "vitest";
 
 import { createLiveProfile } from "../src/production";
+import { createOmpModelTransport } from "../src/omp-model-transport";
 import { OmpLoopKernel } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
@@ -257,6 +258,104 @@ test("reopen accepts a consumed steer before the next model checkpoint", async (
     resumedStore?.close();
     await firstKernel?.close().catch(() => undefined);
     firstStore?.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+}, 120_000);
+
+test.each([false, true])("malformed provider arguments fail only their calls and preserve native Todo and Host checkpoints (reopen=%s)", async (reopen) => {
+  const directory = await mkdtemp(join(tmpdir(), "anna-omp-invalid-arguments-"));
+  const runtimeRoot = join(directory, "runtime");
+  const workspaceRoot = join(directory, "workspace");
+  let store = new SqliteEventStore(join(directory, "events.sqlite"));
+  let kernel: OmpLoopKernel | undefined;
+  let gatewayCalls = 0;
+  let modelCalls = 0;
+  try {
+    const manifestDigest = await materializeRuntime(runtimeRoot);
+    await mkdir(workspaceRoot, { recursive: true });
+    const baseProfile = await createLiveProfile("fixture-model", undefined, false, "general", "none");
+    const profile = withBudget({ ...baseProfile, skills: baseProfile.skills.map((skill) => ({ ...skill, allowedTools: ["todo", "mcp.fixture.write", "strict_write"] })) }, { wallTimeMs: 60_000, turns: 4, toolCalls: 5 }, ["todo", "mcp.fixture.write", "strict_write"]);
+    const command = commandFor(profile, "invalid-arguments");
+    const durable = store.scope(command);
+    await durable.claimStart(command);
+    await durable.append(event(command, 0, "run.queued", { phase: "queued" }));
+    const transport = createOmpModelTransport({
+      endpoint: "https://provider.invalid/v1/chat/completions", apiKey: "fixture-only", modelName: "fixture-model",
+      fetchImpl: async (_url, init) => {
+        modelCalls += 1;
+        const request = JSON.parse(String(init?.body));
+        expect(JSON.stringify(request.tools)).not.toContain("_anna_tool_argument_error");
+        const call = (id: string, name: string, args: string) => ({ id, type: "function", function: { name, arguments: args } });
+        let calls;
+        if (modelCalls === 1) calls = [call("init-plan", "todo", '{"op":"init","list":[{"phase":"阶段3","items":["Preserve this pending task"]}]}')];
+        else if (modelCalls === 2) calls = [
+          call("invalid-todo", "todo", '{"op": done, "phase": "阶段3"}'),
+          call("invalid-write", "mcp__fixture__write", '{"value": invalid}'),
+          call("invalid-strict", "strict_write", '{"path": invalid}'),
+        ];
+        else if (modelCalls === 3) {
+          expect(request.messages.slice(-3)).toMatchObject([
+            { role: "tool", tool_call_id: "invalid-todo", content: expect.stringContaining("invalid_tool_arguments") },
+            { role: "tool", tool_call_id: "invalid-write", content: expect.stringContaining("invalid_tool_arguments") },
+            { role: "tool", tool_call_id: "invalid-strict", content: expect.stringContaining("invalid_tool_arguments") },
+          ]);
+          calls = [call("view-plan", "todo", '{"op":"view"}')];
+        } else {
+          expect(modelCalls).toBe(4);
+          expect(request.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "view-plan" });
+        }
+        const payload = {
+          choices: [{ finish_reason: calls ? "tool_calls" : "stop", message: {
+            role: "assistant", reasoning_content: "Continue after the tool result.",
+            ...(calls ? { tool_calls: calls } : { content: "The failed calls made no changes." }),
+          } }],
+          usage: { prompt_tokens: 11, completion_tokens: 7 },
+        };
+        return new Response(`data: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const createKernel = () => new OmpLoopKernel({
+      runtimeRoot, expectedManifestDigest: `sha256:${manifestDigest}`, workspaceRoot,
+      toolDefinitionsFor: () => [todoDefinition(), { name: "mcp.fixture.write", description: "Optional-argument mutation", parameters: { type: "object", properties: {}, additionalProperties: true } }, { name: "strict_write", description: "Required-argument mutation", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false } }],
+      modelTransport: transport,
+      createToolGateway: () => ({ execute: async () => { gatewayCalls += 1; return { status: "succeeded", output: "unexpected mutation" }; } }),
+    });
+    kernel = createKernel();
+    if (reopen) {
+      const failingSink: EventSink & { read: (streamId: StreamId, afterSeq?: number) => AsyncIterable<CanonicalEvent> } = {
+        append: async (value) => {
+          await durable.append(value);
+          if (value.type === "omp.transcript.message" && messagePayload(value)?.toolCallId === "invalid-strict") {
+            throw new Error("simulated loss after failed argument results");
+          }
+        },
+        read: (streamId, afterSeq) => durable.read(streamId, afterSeq),
+      };
+      await expect(kernel.start(command, failingSink, new AbortController().signal)).rejects.toThrow("simulated loss after failed argument results");
+      expect(modelCalls).toBe(2);
+      await kernel.close();
+      store.close();
+      store = new SqliteEventStore(join(directory, "events.sqlite"));
+      kernel = createKernel();
+    }
+    await expect(kernel.start(command, store.scope(command), new AbortController().signal)).resolves.toEqual({ status: "completed" });
+    expect(modelCalls).toBe(4);
+    expect(gatewayCalls).toBe(0);
+    const history = await readEvents(store, command);
+    const messages = history.filter((value) => value.type === "omp.transcript.message").map(messagePayload);
+    const failed = messages.filter((message) => message?.status === "failed");
+    expect(failed).toHaveLength(3);
+    expect(failed[0]).not.toHaveProperty("details.phases");
+    expect(messages.find((message) => message?.toolCallId === "view-plan")?.details).toMatchObject({
+      phases: [{ name: "阶段3", tasks: [{ content: "Preserve this pending task", status: "in_progress" }] }],
+    });
+    expect(history.filter((value) => value.type === "omp.tool.dispatch")).toHaveLength(2);
+    expect(history.filter((value) => value.type === "omp.tool.response")).toHaveLength(2);
+    expect(history.filter((value) => value.type === "omp.model.response")).toHaveLength(4);
+    expect(history.filter((value) => value.type === "run.usage.updated").at(-1)?.payload).toMatchObject({ cumulative: { input: 44, output: 28 } });
+  } finally {
+    await kernel?.close().catch(() => undefined);
+    store.close();
     await rm(directory, { recursive: true, force: true });
   }
 }, 120_000);

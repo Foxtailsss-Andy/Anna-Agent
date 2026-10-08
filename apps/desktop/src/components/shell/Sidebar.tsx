@@ -20,6 +20,7 @@ import { getRuntimeStatus } from "../../lib/api/admin";
 import { listProjects } from "../../lib/api/crew";
 import type { CrewProject } from "../../lib/api/crew";
 import { listWorkbenchSessions, type WorkbenchSession } from "../../lib/api/workbench";
+import { v2ApiBase } from "../../lib/runtime";
 import { deriveUnreadBadge, projectProgress } from "../../pages/crew/crewModel";
 import { IrisPetal } from "../anna/IrisPetal";
 import type { CoworkItem, CrewItem, HomeMode, ShellSection, SidebarSegment } from "./AnnaShell";
@@ -391,7 +392,7 @@ export function Sidebar({
     <>
       {item({ icon: "skill", label: "技能", stub: true })}
       {item({ icon: "hub", label: "产物中心", on: hubOn, onClick: () => onNavigate("hub") })}
-      {item({ icon: "hub", label: "Review Inspector", on: section === "review", onClick: () => onNavigate("review") })}
+      {v2ApiBase() && item({ icon: "hub", label: "Review Inspector", on: section === "review", onClick: () => onNavigate("review") })}
     </>,
   );
 
@@ -503,7 +504,7 @@ export function Sidebar({
         : [
             { key: "new", icon: "plus", label: "新建任务", onClick: () => bus.newChat() },
             { key: "hub", icon: "hub", label: "产物中心", active: section === "hub", onClick: () => onNavigate("hub") },
-            { key: "review", icon: "hub", label: "Review Inspector", active: section === "review", onClick: () => onNavigate("review") },
+            ...(v2ApiBase() ? [{ key: "review", icon: "hub" as const, label: "Review Inspector", active: section === "review", onClick: () => onNavigate("review") }] : []),
           ];
 
   if (collapsed) {

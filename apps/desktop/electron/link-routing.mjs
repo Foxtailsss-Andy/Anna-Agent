@@ -19,11 +19,15 @@ export function classifyLinkTarget(target, internalOrigins) {
   }
   if (internalOrigins.has(url.origin)) return "internal";
   if (url.protocol !== "https:" && url.protocol !== "http:") return "deny";
-  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const host = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
+  // WHATWG URL canonicalizes IPv4-mapped IPv6 to hexadecimal groups.
+  const mappedLocal = /^::ffff:7f[0-9a-f]{2}:[0-9a-f]+$/.test(host) || host === "::ffff:0:0";
   if (
     host === "localhost"
     || host.endsWith(".localhost")
     || host === "::1"
+    || host === "::"
+    || mappedLocal
     || host === "0.0.0.0"
     || /^127\./.test(host)
   ) {

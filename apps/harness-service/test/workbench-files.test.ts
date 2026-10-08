@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -70,6 +72,17 @@ test("list returns immediate children at depth 1 and skips .git, node_modules an
     ],
     truncated: false,
   });
+});
+
+test("list and search treat an empty or '.' path as the workdir root (observed live model input)", async () => {
+  const workdir = await makeWorkdir();
+  await writeFile(join(workdir, "a.txt"), "needle\n", "utf8");
+  for (const path of ["", "."]) {
+    const listed = await listRegisteredWorkdir({ path, depth: 2 }, optionsFor(workdir), signal());
+    expect(listed).toEqual({ status: "succeeded", output: { entries: [{ path: "a.txt", type: "file", bytes: 7 }], truncated: false } });
+    const found = await searchRegisteredWorkdir({ pattern: "needle", path }, optionsFor(workdir), signal());
+    expect(found.output.matches).toEqual([{ path: "a.txt", line: 1, text: "needle" }]);
+  }
 });
 
 test("list descends into subdirectories up to the requested depth", async () => {
@@ -446,4 +459,68 @@ test("file tools report workdir_not_bound when no workdir resource is provided",
     status: "failed",
     output: { reason: "workdir_not_bound" },
   });
+});
+
+// A separate process changes the real filesystem concurrently with public file-tool calls.
+test.skipIf(process.platform !== "darwin")("file tools never cross a concurrently swapped directory", async () => {
+  const workdir = await makeWorkdir();
+  const outside = await makeWorkdir();
+  await mkdir(join(workdir, "d"));
+  await writeFile(join(workdir, "d", "victim.txt"), "line=INSIDE");
+  await writeFile(join(outside, "victim.txt"), "line=OUTSIDE_SECRET");
+  await writeFile(join(outside, "outside-name.txt"), "OUTSIDE_SECRET");
+  await symlink(outside, join(workdir, "swap"));
+  const mutator = spawn("python3", ["-u", "-c", `
+import ctypes, os, sys
+libc = ctypes.CDLL(None, use_errno=True)
+a = os.fsencode(os.path.join(sys.argv[1], "d"))
+b = os.fsencode(os.path.join(sys.argv[1], "swap"))
+print("ready", flush=True)
+while True:
+    if libc.renamex_np(a, b, 2) != 0:
+        raise OSError(ctypes.get_errno(), "renamex_np exchange")
+`, workdir], { stdio: ["ignore", "pipe", "pipe"] });
+  const exited = once(mutator, "exit");
+  await Promise.race([once(mutator.stdout!, "data"), exited.then(() => { throw new Error("directory mutator failed to start"); })]);
+  const leaked: string[] = [];
+  try {
+    for (let batch = 0; batch < 24; batch += 1) {
+      const results = await Promise.all(Array.from({ length: 8 }, async (_, index) => {
+        const suffix = batch * 8 + index;
+        const opts = optionsFor(workdir);
+        const read = await readRegisteredWorkdirFile({ path: "d/victim.txt" }, opts, signal());
+        const write = await writeRegisteredWorkdirFile({ path: `d/new-${suffix}.txt`, content: "NEW" }, opts, signal());
+        const nested = await writeRegisteredWorkdirFile({ path: `d/nested-${suffix}/file.txt`, content: "NEW" }, opts, signal());
+        const edit = await editRegisteredWorkdirFile({ path: "d/victim.txt", old_text: "line=", new_text: "changed=" }, opts, signal());
+        return [read, write, nested, edit];
+      }));
+      for (const result of results.flat()) if (JSON.stringify(result.output).includes("OUTSIDE_SECRET")) leaked.push("read");
+      if (batch % 5 === 0) {
+        const search = await searchRegisteredWorkdir({ path: "d", pattern: "OUTSIDE_SECRET" }, optionsFor(workdir), signal());
+        if (JSON.stringify(search.output).includes("OUTSIDE_SECRET")) leaked.push("search");
+        const list = await listRegisteredWorkdir({ path: "d" }, optionsFor(workdir), signal());
+        if (JSON.stringify(list.output).includes("outside-name")) leaked.push("list");
+      }
+    }
+  } finally {
+    mutator.kill("SIGTERM");
+    const [exitCode, exitSignal] = await exited;
+    expect({ exitCode, exitSignal }).toEqual({ exitCode: null, exitSignal: "SIGTERM" });
+  }
+  expect({ leaked, outsideEntries: await readdir(outside), outsideContent: await readFile(join(outside, "victim.txt"), "utf8") }).toEqual({
+    leaked: [], outsideEntries: ["outside-name.txt", "victim.txt"], outsideContent: "line=OUTSIDE_SECRET",
+  });
+}, 30_000);
+
+test.skipIf(process.platform !== "darwin")("write and edit accept filesystem-equivalent directory spelling", async () => {
+  const workdir = await makeWorkdir();
+  await mkdir(join(workdir, "Docs"));
+  await mkdir(join(workdir, "cafe\u0301"));
+  for (const path of ["docs/file.txt", "caf\u00e9/file.txt"]) {
+    const written = await writeRegisteredWorkdirFile({ path, content: "before" }, optionsFor(workdir), signal());
+    expect(written.status).toBe("succeeded");
+    const edited = await editRegisteredWorkdirFile({ path, old_text: "before", new_text: "after" }, optionsFor(workdir), signal());
+    expect(edited.status).toBe("succeeded");
+    expect((await readRegisteredWorkdirFile({ path }, optionsFor(workdir), signal())).output.content).toBe("after");
+  }
 });

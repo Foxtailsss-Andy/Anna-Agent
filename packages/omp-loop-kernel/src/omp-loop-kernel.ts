@@ -24,7 +24,7 @@ import {
   type HostModelResponse,
   type ManagedOmpWorkerControl,
 } from "./worker-client";
-import { parseAssistant } from "./protocol";
+import { hasInvalidToolArguments, invalidToolArgumentsResult, parseAssistant } from "./protocol";
 import type { AssistantMessage, Content, Message, ModelContext, ModelDelta, Observation, ToolDefinition, Usage } from "./protocol";
 
 export type OmpContextPreparation = (
@@ -540,7 +540,7 @@ export class OmpLoopKernel implements LoopKernel {
         const remainingAfterDispatch = remainingWallTime(command, budgetStartedAt);
         if (remainingAfterDispatch === 0) throw new OmpBudgetExceededError("OMP tool dispatch wall budget exhausted");
         if (signal.aborted || toolSignal.aborted) throw new OmpAttemptCancelledError();
-        let toolResult = await gateway.execute({
+        let toolResult = hasInvalidToolArguments(input) ? invalidToolArgumentsResult() : await gateway.execute({
           workspaceId: command.workspaceId,
           channelId: command.channelId,
           runId: command.runId,
@@ -1595,7 +1595,14 @@ function validateToolCheckpoints(
       // no Host Gateway dispatch/response pair; the persisted assistant call
       // plus its phased tool result is the durable checkpoint instead.
       if (dispatch !== undefined || response !== undefined) throw new OmpToolCheckpointMismatchError();
-      if (observed !== undefined && (!hasTodoPhases(observed) || messages.findIndex((message) => message === observed) !== call.resultTranscriptIndex)) {
+      const validResult = hasInvalidToolArguments(call.arguments)
+        ? observed?.role === "toolResult"
+          && observed.toolName === "todo"
+          && observed.status === "failed"
+          && observed.content === JSON.stringify(invalidToolArgumentsResult().output)
+          && stableJson(observed.details) === stableJson(invalidToolArgumentsResult())
+        : observed !== undefined && hasTodoPhases(observed);
+      if (observed !== undefined && (!validResult || messages.findIndex((message) => message === observed) !== call.resultTranscriptIndex)) {
         throw new OmpToolCheckpointMismatchError();
       }
       continue;

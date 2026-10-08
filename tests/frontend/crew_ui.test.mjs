@@ -40,18 +40,17 @@ async function bundleHarness() {
         function ChannelHarness() {
           const [mounted, setMounted] = useState(true);
           const [tasks, setTasks] = useState(window.__CREW_TASKS__ ?? []);
-          const channel = window.__CREW_CHANNEL__ ?? [];
+          const [channel, setChannel] = useState(window.__CREW_CHANNEL__ ?? []);
           return React.createElement("div", null,
             React.createElement("button", { id: "toggle", onClick: () => setMounted((m) => !m) }, "toggle"),
             React.createElement("div", { style: { width: 328, height: 720, display: "flex" } },
               mounted && React.createElement(ChannelColumn, {
                 key: "p1", projectId: "p1", project: { ...project, tasks }, channel, members, isOwner: true,
-                onRefresh: (next) => { if (next) setTasks(next.tasks ?? []); },
+                onRefresh: (next) => { if (next) setTasks(next.tasks ?? []); setChannel([...(window.__CREW_CHANNEL__ ?? [])]); },
               })));
         }
 
-        // Composer alone with a running Anna Run and a steer handler (ChannelColumn leaves onSteerAnna
-        // unwired until the owner connects the hook's steer).
+        // Composer alone with a running Anna Run and a steer handler.
         function ComposerHarness() {
           const [steered, setSteered] = useState([]);
           const [asked, setAsked] = useState([]);
@@ -61,7 +60,7 @@ async function bundleHarness() {
               onAskAnna: async (text) => { setAsked((a) => [...a, text]); return { ok: true }; },
               onSteerAnna: async (text) => {
                 setSteered((s) => [...s, text]);
-                return window.__STEER_FAIL__ ? { ok: false, error: "这次运行已经结束，补充说明没能进入。" } : { ok: true };
+                return window.__STEER_FAIL__ ? { ok: false, error: "这次运行已经结束，补充说明没能进入。" } : { ok: true, queued: window.__STEER_QUEUED__ };
               },
             }),
             React.createElement("output", { id: "steered" }, JSON.stringify(steered)),
@@ -260,9 +259,44 @@ test("Enter with a picked @Andy posts to the Channel with Andy's id and starts n
   }
 });
 
+test("picking a member then immediately pressing Enter sends the completed mention once", async () => {
+  const host = workbenchHost();
+  const { page, calls, errors } = await openHarness("channel", async (call) => {
+    if (call.method === "POST" && call.path === "/api/crew/projects/p1/channel") {
+      return { status: 201, body: { id: "msg_fast", project_id: "p1", kind: "say", ...call.body } };
+    }
+    return host.handle(call);
+  });
+  try {
+    const input = page.locator(".ir-chan-composer__input");
+    await input.fill("@And");
+    await page.getByRole("listbox", { name: "选择协调者或成员" }).waitFor();
+    // A busy/background renderer can delay the caret-restoring animation frame.
+    await page.evaluate(() => {
+      const nextFrame = window.requestAnimationFrame;
+      window.requestAnimationFrame = (callback) => nextFrame((time) => setTimeout(() => callback(time), 250));
+    });
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await until(() => channelPosts(calls).length === 1, "immediate channel post");
+    assert.deepEqual(channelPosts(calls)[0].body, { body: "@Andy", mentions: ["acc_andy"] });
+    assert.deepEqual(workbenchPosts(calls), []);
+    await sleep(300);
+    assert.equal(await input.inputValue(), "");
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});
+
 test("Enter without a member mention asks Anna; a second Enter while it runs does not start a parallel run", async () => {
   const host = workbenchHost();
-  const { page, calls, errors } = await openHarness("channel", host.handle);
+  const { page, calls, errors } = await openHarness("channel", (call) => {
+    if (call.method === "POST" && call.path === "/api/workbench/runs/r1/steer") {
+      return { status: 202, body: { accepted: true, consumed: true } };
+    }
+    return host.handle(call);
+  });
   try {
     const input = page.locator(".ir-chan-composer__input");
     await input.fill("这个项目现在卡在哪？");
@@ -278,10 +312,11 @@ test("Enter without a member mention asks Anna; a second Enter while it runs doe
 
     await input.fill("再补充一句");
     await input.press("Enter");
-    await page.locator(".ir-chan-composer__notice").getByText("Anna 正在处理上一条").waitFor();
+    await until(() => calls.some((call) => call.path === "/api/workbench/runs/r1/steer"), "steer submission");
+    await page.waitForFunction(() => document.querySelector(".ir-chan-composer__input")?.value === "");
     await sleep(150);
     assert.equal(calls.filter((call) => call.method === "POST" && /\/runs$/.test(call.path)).length, 1);
-    assert.equal(await input.inputValue(), "再补充一句");
+    assert.deepEqual(calls.find((call) => call.path === "/api/workbench/runs/r1/steer").body, { text: "再补充一句" });
 
     host.complete("r1", "卡在设计评审。");
     await page.locator(".ir-crew-workbench").getByText("卡在设计评审。").waitFor();
@@ -315,6 +350,12 @@ test("while Anna runs, a plain Enter is steered into the run ('补充给 Anna');
     await until(() => channelPosts(calls).length === 1, "channel post");
     assert.deepEqual(channelPosts(calls)[0].body, { body: "@Andy 文案你来改", mentions: ["acc_andy"] });
     assert.equal(await page.locator("#steered").textContent(), JSON.stringify(["先看文案部分"]));
+
+    await page.evaluate(() => { window.__STEER_QUEUED__ = true; });
+    await input.fill("等待下一轮补充");
+    await input.press("Enter");
+    await page.locator(".ir-chan-composer__notice").getByText("补充说明已排队", { exact: false }).waitFor();
+    assert.equal(await input.inputValue(), "");
 
     await page.evaluate(() => { window.__STEER_FAIL__ = true; });
     await input.fill("再补一句");
@@ -358,6 +399,61 @@ test("remounting the channel restores the latest Crew Anna session card with its
     assert.ok(lists.every((call) => call.search === "?project_id=p1"));
     assert.ok(calls.some((call) => call.method === "GET" && call.path === "/api/workbench/sessions/s1"));
     assert.ok(!calls.some((call) => call.path === "/api/workbench/sessions/chat-9" || call.path === "/api/workbench/sessions/crew-other"));
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+  }
+});
+
+test("posting a picked mention and starting another Anna Run retain channel and session history", async () => {
+  const host = workbenchHost();
+  host.state.sessions.push({
+    session_id: "s1", surface: "crew", project_id: "p1", created_at: "2026-10-08T01:00:00Z", updated_at: "2026-10-08T01:10:00Z",
+    runs: [{ run_id: "r1", session_id: "s1", surface: "crew", prompt: "之前的问题", status: "completed" }],
+    messages: [
+      { run_id: "r1", event_id: "e1", seq: 0, role: "user", content: "之前的问题" },
+      { run_id: "r1", event_id: "e2", seq: 1, role: "assistant", content: "之前的回答" },
+    ],
+  });
+  const earlier = {
+    id: "msg_old", project_id: "p1", workspace_id: "ws1", seq: 1, author_kind: "human", author_member_id: "acc_andy",
+    kind: "say", body: "之前的频道消息", task_id: null, run_ref: null, mentions: [], audit_ref: "", created_at: "2026-10-08T01:00:00Z",
+  };
+  const harness = await openHarness("channel", async (call) => {
+    if (call.method === "POST" && call.path === "/api/crew/projects/p1/channel") {
+      const posted = { ...earlier, id: "msg_new", seq: 2, ...call.body };
+      await harness.page.evaluate((message) => window.__CREW_CHANNEL__.push(message), posted);
+      return { status: 201, body: posted };
+    }
+    return host.handle(call);
+  }, { __CREW_CHANNEL__: [earlier] });
+  const { page, calls, errors } = harness;
+  try {
+    await page.getByText("之前的回答", { exact: true }).waitFor();
+    const input = page.locator(".ir-chan-composer__input");
+    await input.fill("@And");
+    await page.getByRole("listbox", { name: "选择协调者或成员" }).waitFor();
+    await page.keyboard.press("Enter");
+    await page.keyboard.insertText("请你查看新消息");
+    await page.keyboard.press("Enter");
+    await until(() => channelPosts(calls).length === 1, "member message");
+    assert.deepEqual(channelPosts(calls)[0].body, { body: "@Andy 请你查看新消息", mentions: ["acc_andy"] });
+    await page.locator(".ir-chan-say__body").getByText("请你查看新消息", { exact: false }).waitFor();
+    assert.equal(await page.getByText("之前的频道消息", { exact: true }).count(), 1);
+    assert.equal(await page.getByText("之前的回答", { exact: true }).count(), 1);
+
+    await input.fill("继续分析");
+    await input.press("Enter");
+    await until(() => calls.some((call) => call.method === "POST" && /\/runs$/.test(call.path)), "new Anna run");
+    host.complete("r2", "新的回答");
+    await page.getByText("新的回答", { exact: true }).waitFor();
+    await page.locator("#toggle").click();
+    await page.locator("#toggle").click();
+    await page.getByText("新的回答", { exact: true }).waitFor();
+    const history = await page.locator(".ir-crew-workbench__message").allInnerTexts();
+    assert.deepEqual(history, ["之前的问题", "之前的回答", "继续分析", "新的回答"]);
+    assert.equal(await page.getByText("之前的频道消息", { exact: true }).count(), 1);
+    assert.equal(await page.locator(".ir-chan-say__body").filter({ hasText: "请你查看新消息" }).count(), 1);
     assert.deepEqual(errors, []);
   } finally {
     await page.close();

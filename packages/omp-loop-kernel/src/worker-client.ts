@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { launchManagedWorker, type ManagedWorkerLaunchSpec } from "./managed-launcher";
 import {
   OMP_PROTOCOL, MAX_FRAME_BYTES, byteLength, encodeFrame, parseWorkerFrame,
-  projectRestoreTranscript,
+  projectRestoreTranscript, hasInvalidToolArguments, invalidToolArgumentsResult,
   type AssistantMessage, type HostFrame, type JsonValue, type ModelContext,
   type Message, type ModelDelta, type Observation, type StartInput, type WorkerBinding, type WorkerFrame,
 } from "./protocol";
@@ -216,8 +216,12 @@ export async function runManagedOmpWorker(options: ManagedOmpWorkerOptions) {
           if (!expected && observation.message.role === "toolResult" && observation.message.toolName === "todo") {
             const pending = pendingCalls.get(observation.message.toolCallId);
             if (pending?.name === "todo") {
-              expectedMessages.push(observation.message);
-              expected = observation.message;
+              expected = hasInvalidToolArguments(pending.arguments) ? {
+                role: "toolResult", toolCallId: observation.message.toolCallId, toolName: "todo",
+                content: JSON.stringify(invalidToolArgumentsResult().output),
+                status: "failed", details: invalidToolArgumentsResult(),
+              } : observation.message;
+              expectedMessages.push(expected);
             }
           }
           if (!expected || !sameMessages([observation.message], [expected])) throw new Error("OMP observation differs from Host history");

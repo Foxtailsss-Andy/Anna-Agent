@@ -1,9 +1,11 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import childProcess from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
+import { syncBuiltinESMExports } from "node:module";
 import { join, resolve } from "node:path";
 
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { runSandboxedCommand, sandboxSupport, type SandboxExecOutput } from "../src/workbench-sandbox";
 
@@ -237,6 +239,73 @@ describeSandbox("workbench-sandbox runSandboxedCommand", () => {
     const pid = Number(await readFile(join(workdir, "bg.pid"), "utf8"));
     expect(await waitGone(pid)).toBe(true);
   }, 10_000);
+
+  test.each(["exit", "timeout", "abort"] as const)("terminates an unlinked marker holder on %s", async (ending) => {
+    const workdir = await makeWorkdir();
+    let pid: number | undefined;
+    const controller = new AbortController();
+    const abortTimer = ending === "abort" ? setTimeout(() => controller.abort(), 1_000) : undefined;
+    try {
+      const result = await run({
+        command: `perl -e 'use POSIX; unlink "$ENV{HOME}/.anna-sandbox-marker" or die $!; if (fork() == 0) { setsid(); open(STDOUT, ">", "/dev/null"); open(STDERR, ">", "/dev/null"); open(F, ">", "daemon.pid"); print F $$; close(F); sleep 20; exit 0 } sleep ${ending === "exit" ? 1 : 30}; exit 0'`,
+        ...(ending === "timeout" ? { timeout_ms: 1_000 } : {}),
+      }, workdir, { signal: controller.signal });
+      expect(result.status).toBe(ending === "exit" ? "succeeded" : "failed");
+      expect(expectOutput(result).timed_out).toBe(ending !== "exit");
+      pid = Number(await readFile(join(workdir, "daemon.pid"), "utf8"));
+      expect(await waitGone(pid)).toBe(true);
+    } finally {
+      if (abortTimer !== undefined) clearTimeout(abortTimer);
+      if (pid !== undefined && pidAlive(pid)) {
+        process.kill(pid, "SIGKILL");
+        await waitGone(pid);
+      }
+    }
+  }, 15_000);
+
+  test("does not terminate another sandbox call or an unrelated process during cleanup", async () => {
+    const workdir = await makeWorkdir();
+    const unrelated = spawn("/bin/sleep", ["30"], { stdio: "ignore" });
+    try {
+      const [first, second] = await Promise.all([
+        run({ command: "sleep 30", timeout_ms: 200 }, workdir),
+        run({ command: "sleep 1; echo concurrent-call-survived" }, workdir),
+      ]);
+      expect(expectOutput(first).timed_out).toBe(true);
+      expect(second.status).toBe("succeeded");
+      expect(expectOutput(second).stdout).toContain("concurrent-call-survived");
+      expect(pidAlive(unrelated.pid!)).toBe(true);
+    } finally {
+      unrelated.kill("SIGKILL");
+      await waitGone(unrelated.pid!);
+    }
+  }, 10_000);
+
+  test("does not signal a snapshot PID after the OS reports a different process start identity", async () => {
+    const workdir = await makeWorkdir();
+    const originalExecFileSync = childProcess.execFileSync;
+    let initialIdentityRead = false;
+    const identitySpy = vi.spyOn(childProcess, "execFileSync").mockImplementation(((...args: Parameters<typeof execFileSync>) => {
+      if (args[0] === "/bin/ps" && Array.isArray(args[1]) && args[1].includes("lstart=")) {
+        if (initialIdentityRead) return "Thu Jan  1 00:00:00 1970\n";
+        initialIdentityRead = true;
+      }
+      return Reflect.apply(originalExecFileSync, childProcess, args);
+    }) as typeof execFileSync);
+    syncBuiltinESMExports();
+    const killSpy = vi.spyOn(process, "kill");
+    try {
+      // A real short-lived command exits on its own. Only the OS identity response
+      // is replaced to deterministically exercise a PID changing between checks.
+      const result = await run({ command: "exec /bin/sleep 0.3", timeout_ms: 100 }, workdir);
+      expect(expectOutput(result).timed_out).toBe(true);
+      expect(killSpy).not.toHaveBeenCalled();
+    } finally {
+      identitySpy.mockRestore();
+      syncBuiltinESMExports();
+      killSpy.mockRestore();
+    }
+  }, 5_000);
 
   test("denies desktop IPC services (app list, preferences, DNS)", async () => {
     const workdir = await makeWorkdir();

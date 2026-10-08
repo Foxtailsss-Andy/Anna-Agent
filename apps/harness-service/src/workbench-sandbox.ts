@@ -1,5 +1,5 @@
-import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { closeSync, openSync, statSync } from "node:fs";
+import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { closeSync, fstatSync, openSync, statSync } from "node:fs";
 import { chmod, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -294,9 +294,18 @@ function executeSandboxed(
     // Every descendant inherits this descriptor (fd 3) unless it deliberately closes it,
     // so processes that detach with setsid() can still be found and terminated.
     let markerFd: number;
+    let marker: { device: bigint; inode: bigint };
     try {
       markerFd = openSync(input.markerPath, "r");
     } catch {
+      resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
+      return;
+    }
+    try {
+      const info = fstatSync(markerFd, { bigint: true });
+      marker = { device: info.dev, inode: info.ino };
+    } catch {
+      closeSync(markerFd);
       resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
       return;
     }
@@ -314,8 +323,8 @@ function executeSandboxed(
       resolvePromise({ status: "failed", output: { reason: "sandbox_launch_failed" } });
       return;
     }
-    // The Host keeps no copy, so only sandboxed processes hold the marker.
-    closeSync(markerFd);
+    // Retain the inode until all sweeps finish. Unlinking the pathname in the
+    // writable scratch must neither hide holders nor permit inode reuse.
 
     const stdout = createCappedSink(input.maxOutputBytes);
     const stderr = createCappedSink(input.maxOutputBytes);
@@ -323,6 +332,7 @@ function executeSandboxed(
     child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
 
     const rootPid = child.pid;
+    const rootStartIdentity = rootPid === undefined ? undefined : processStartIdentity(rootPid);
     let timedOut = false;
     let killSignal: string | undefined;
     let settled = false;
@@ -331,27 +341,38 @@ function executeSandboxed(
     let swept = false;
     let sigkillTimer: ReturnType<typeof setTimeout> | undefined;
     let closeGraceTimer: ReturnType<typeof setTimeout> | undefined;
+    let sweepQueue = Promise.resolve();
+    let terminationStarted = false;
 
-    const sweep = (signalName: "SIGTERM" | "SIGKILL") => rootPid === undefined
-      ? Promise.resolve()
-      : terminateSandboxProcesses({ rootPid, markerPath: input.markerPath, startedAt, signalName });
+    const sweep = (signalName: "SIGTERM" | "SIGKILL") => {
+      sweepQueue = sweepQueue.then(() => rootPid === undefined ? undefined : terminateSandboxProcesses({
+        rootPid,
+        rootStartIdentity: exitResult === undefined ? rootStartIdentity : undefined,
+        marker,
+        startedAt,
+        signalName,
+      }));
+      return sweepQueue;
+    };
 
     const beginTermination = () => {
+      if (terminationStarted || exitResult !== undefined || settled) return;
+      terminationStarted = true;
+      timedOut = true;
       killSignal = "SIGTERM";
       void sweep("SIGTERM");
       sigkillTimer = setTimeout(() => {
+        if (exitResult !== undefined || settled) return;
         killSignal = "SIGKILL";
         void sweep("SIGKILL");
       }, SIGKILL_GRACE_MS);
     };
 
     const timeoutTimer = setTimeout(() => {
-      timedOut = true;
       beginTermination();
     }, input.timeoutMs);
 
     const onAbort = () => {
-      timedOut = true;
       beginTermination();
     };
     input.signal.addEventListener("abort", onAbort, { once: true });
@@ -361,6 +382,7 @@ function executeSandboxed(
       if (sigkillTimer !== undefined) clearTimeout(sigkillTimer);
       if (closeGraceTimer !== undefined) clearTimeout(closeGraceTimer);
       input.signal.removeEventListener("abort", onAbort);
+      closeSync(markerFd);
     };
 
     const finish = () => {
@@ -393,8 +415,8 @@ function executeSandboxed(
     });
     child.on("exit", (code, signalName) => {
       exitResult = { code, signal: signalName };
-      // The command has returned: nothing it started may outlive the call. Background
-      // jobs and detached descendants are terminated before the result is reported.
+      // Sweep tracked jobs before reporting the result. A process that closes all
+      // inherited descriptors and detaches before discovery remains untracked.
       void sweep("SIGKILL").finally(() => {
         swept = true;
         if (streamsClosed) finish();
@@ -413,44 +435,48 @@ interface ProcessRow {
   ppid: number;
   pgid: number;
   startedAtMs: number;
+  startIdentity: string;
 }
 
 /**
- * Signals everything the sandboxed command started, from one process snapshot:
- * the root's process group, the ppid closure of the root, and processes that detached
- * (reparented to launchd after the call began) but still hold the per-call marker
- * descriptor, together with their own descendants. The Host's pid is never signalled.
+ * Signals the observed process tree: the live root's process group and ppid closure,
+ * plus detached holders of the per-call marker inode and their descendants.
+ * The Host's pid is never signalled.
  * A process that both closes every inherited descriptor and detaches is not found; it
  * stays under the same seatbelt profile.
  */
 async function terminateSandboxProcesses(input: {
   rootPid: number;
-  markerPath: string;
+  rootStartIdentity: string | undefined;
+  marker: { device: bigint; inode: bigint };
   startedAt: number;
   signalName: "SIGTERM" | "SIGKILL";
 }): Promise<void> {
   const rows = await processSnapshot();
   const detachedCandidates = rows
-    .filter((row) => row.ppid === 1 && row.startedAtMs >= input.startedAt - 2_000)
+    .filter((row) => row.pid !== process.pid && row.startedAtMs >= input.startedAt - 2_000)
     .map((row) => row.pid);
-  const holders = detachedCandidates.length === 0 ? [] : await markerHolderPids(input.markerPath, detachedCandidates);
-  const targets = descendantClosure(rows, [input.rootPid, ...holders], input.rootPid);
-  try {
-    process.kill(-input.rootPid, input.signalName);
-  } catch {
-    // group already gone
-  }
-  for (const pid of targets) {
-    if (pid === process.pid || pid <= 1) continue;
+  const holders = detachedCandidates.length === 0 ? [] : await markerHolderPids(input.marker, detachedCandidates);
+  const rootStillOwned = input.rootStartIdentity !== undefined
+    && rows.some((row) => row.pid === input.rootPid && row.startIdentity === input.rootStartIdentity);
+  const targets = descendantClosure(rows, rootStillOwned ? [input.rootPid, ...holders] : holders,
+    rootStillOwned ? input.rootPid : undefined);
+  for (const row of rows) {
+    if (!targets.has(row.pid) || row.pid === process.pid || row.pid <= 1) continue;
     try {
-      process.kill(pid, input.signalName);
+      // Never signal an unverified stale snapshot PID or an already-reaped root's
+      // numeric process group. macOS lacks a Node pidfd equivalent; this narrows,
+      // but cannot atomically eliminate, the check-to-signal reuse window.
+      const current = processStartIdentity(row.pid);
+      if (current !== row.startIdentity) continue;
+      process.kill(row.pid, input.signalName);
     } catch {
       // already exited
     }
   }
 }
 
-function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[], rootGroup: number): Set<number> {
+function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[], rootGroup: number | undefined): Set<number> {
   const tracked = new Set<number>(seeds);
   let grew = true;
   while (grew) {
@@ -466,9 +492,19 @@ function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[]
   return tracked;
 }
 
+function processStartIdentity(pid: number): string | undefined {
+  try {
+    return execFileSync("/bin/ps", ["-p", String(pid), "-o", "lstart="], {
+      encoding: "utf8", timeout: 1_000, stdio: ["ignore", "pipe", "ignore"],
+    }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function processSnapshot(): Promise<ProcessRow[]> {
   return new Promise((resolvePromise) => {
-    execFile("/bin/ps", ["-axo", "pid=,ppid=,pgid=,etime="], { timeout: 5_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+    execFile("/bin/ps", ["-axo", "pid=,ppid=,pgid=,etime=,lstart="], { timeout: 5_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
       if (error) {
         resolvePromise([]);
         return;
@@ -476,11 +512,13 @@ function processSnapshot(): Promise<ProcessRow[]> {
       const now = Date.now();
       const rows: ProcessRow[] = [];
       for (const line of stdout.split("\n")) {
-        const [pid, ppid, pgid, etime] = line.trim().split(/\s+/);
+        const fields = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$/.exec(line);
+        if (fields === null) continue;
+        const [, pid, ppid, pgid, etime, startIdentity] = fields;
         const elapsed = parseElapsedSeconds(etime);
         const numbers = [Number(pid), Number(ppid), Number(pgid)];
         if (elapsed === undefined || !numbers.every(Number.isSafeInteger)) continue;
-        rows.push({ pid: numbers[0]!, ppid: numbers[1]!, pgid: numbers[2]!, startedAtMs: now - elapsed * 1_000 });
+        rows.push({ pid: numbers[0]!, ppid: numbers[1]!, pgid: numbers[2]!, startedAtMs: now - elapsed * 1_000, startIdentity: startIdentity! });
       }
       resolvePromise(rows);
     });
@@ -496,16 +534,25 @@ function parseElapsedSeconds(value: string | undefined): number | undefined {
   return ((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds);
 }
 
-function markerHolderPids(markerPath: string, candidates: readonly number[]): Promise<number[]> {
+function markerHolderPids(marker: { device: bigint; inode: bigint }, candidates: readonly number[]): Promise<number[]> {
   return new Promise((resolvePromise) => {
     execFile(
       LSOF_EXECUTABLE,
-      ["-t", "-w", "-a", "-p", candidates.join(","), "--", markerPath],
-      { timeout: 5_000 },
+      ["-w", "-a", "-p", candidates.join(","), "-F", "pDfi"],
+      { timeout: 5_000, maxBuffer: 4 * 1024 * 1024 },
       (_error, stdout) => {
-        // lsof exits 1 when nothing holds the file; stdout is then empty.
-        resolvePromise(String(stdout ?? "").split("\n").map((line) => Number(line.trim()))
-          .filter((pid) => Number.isSafeInteger(pid) && pid > 1));
+        const holders = new Set<number>();
+        let pid = 0;
+        let device: bigint | undefined;
+        for (const line of String(stdout ?? "").split("\n")) {
+          if (/^p\d+$/.test(line)) pid = Number(line.slice(1));
+          else if (line.startsWith("f")) device = undefined;
+          else if (/^D0x[\da-f]+$/i.test(line)) device = BigInt(line.slice(1));
+          else if (/^i\d+$/.test(line) && device === marker.device && BigInt(line.slice(1)) === marker.inode) {
+            if (Number.isSafeInteger(pid) && pid > 1) holders.add(pid);
+          }
+        }
+        resolvePromise([...holders]);
       },
     );
   });

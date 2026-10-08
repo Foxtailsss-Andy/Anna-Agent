@@ -153,7 +153,7 @@ _Avoid_: 让 Worker 进程自带 bash/写文件/MCP、绕过 Host 授权的"内�
 _Avoid_: 把"选了工作目录"当作授权写入
 
 **Sandbox**：
-`sandbox.exec` 的 macOS seatbelt（`/usr/bin/sandbox-exec`）进程隔离，默认拒绝（deny default）：禁网络、禁桌面/系统服务（LaunchServices、Apple Events、剪贴板、偏好设置等 Mach/XPC 服务，仅放行用户信息查询）、只可写 workdir 与单次 scratch、读不到 workdir 之外的用户数据根、环境变量清空。命令返回、超时或 Stop 时，Host 终止进程组、根进程的后代以及仍持有本次调用标记描述符的脱离进程（setsid）；同时关闭全部继承描述符并脱离的进程不在此保证内，但它仍受同一 seatbelt 约束。不是容器或虚拟机；其他平台不准入该工具。
+`sandbox.exec` 的 macOS seatbelt（`/usr/bin/sandbox-exec`）进程隔离，默认拒绝（deny default）：禁网络、禁桌面/系统服务（LaunchServices、Apple Events、剪贴板、偏好设置等 Mach/XPC 服务，仅放行用户信息查询）、只可写 workdir 与单次 scratch、读不到 workdir 之外的用户数据根、环境变量清空。命令返回、超时或 Stop 时，Host 清理观测到的进程组/后代，以及仍持有本次调用标记 inode 的脱离进程（setsid），删除标记路径不能隐藏持有者。发送信号前会复核 PID 启动身份，但 macOS 上仍存在很窄的非原子复用窗口。同时关闭全部继承描述符并在发现前脱离的进程不在回收保证内，它仍受同一 seatbelt 约束。不是容器或虚拟机；其他平台不准入该工具。
 _Avoid_: 把目录选择或 Docker 不存在时的普通子进程称作沙箱；把"超时杀进程组"说成杀掉一切后代
 
 **MCP Server**：

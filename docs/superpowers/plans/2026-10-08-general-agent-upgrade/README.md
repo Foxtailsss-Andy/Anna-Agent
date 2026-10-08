@@ -1,8 +1,8 @@
 # General-Agent upgrade (2026-10-08)
 
-Owner: Kiro · Claude Opus 5.5 / xhigh (user mandate 2026-10-08). Independent final acceptance: Codex.
+Owner: Codex, following the user’s 2026-10-08 takeover instruction. Kiro’s Opus implementation and independent reviews form the input baseline; Codex integrates fixes, validates the final candidate and publishes it.
 Baseline: `4697d5c` (= `f8f5f82` + the candidate reviewed on 2026-10-07). Contracts: [CONTRACTS.md](CONTRACTS.md).
-Private delivery records (status, worker sessions, logs, live evidence): `/Users/foxtailsss/Desktop/Anna/Anna-Opus-Delivery-20261008/` — not part of the repository.
+Private session records, credentials and raw live-provider captures remain outside the repository. Public verification is recorded in the release notes.
 
 ## Problem
 
@@ -10,7 +10,7 @@ The 2026-10-07 independent review ran the real desktop product with DeepSeek and
 
 ## Decisions
 
-1. **Keep OMP 18.0.11, use it more.** The required capabilities live on the Host side of the `anna-omp/1` protocol. OMP keeps the loop, native `todo` plan state and the steer queue; Host proxies every other tool. The worker change is limited to disabling `todo.reminders` (see the OMP assessment addendum).
+1. **Keep OMP 18.0.11, use it more.** The required capabilities live on the Host side of the `anna-omp/1` protocol. OMP keeps the loop, native `todo` plan state and the steer queue; Host proxies every other tool. The worker disables `todo.reminders`; the Host owns continuation and handles malformed tool arguments as explicit failures before any effect.
 2. **One loop, one authority.** All new capability is reachable through ordinary Workbench Runs from Home/Crew; no second model loop.
 3. **Permission modes:** `readonly` (default) and `contained-write` (requires one bound workdir) — see `CONTEXT.md` §6.
 4. **Sandbox:** macOS seatbelt via `/usr/bin/sandbox-exec` per command (no network, writable workdir + scratch only, user data roots unreadable, scrubbed env, process-group timeout). Not a container; not admitted where unavailable.
@@ -22,9 +22,9 @@ The 2026-10-07 independent review ran the real desktop product with DeepSeek and
 10. **Crew:** structured-mention routing; `crew.propose_changes` → Coordination Proposal card → owner confirm (ordering via `insert_before`, assignments through the normal assign path); legacy @Anna intent path repaired with visible failure rows; @Anna always gets an answer, card or failure row.
 11. **Latency:** runtime manifest verified fully once per Host process, metadata fingerprint per Run.
 12. **Run budget:** a Workbench Run admitted with any direct tool beyond `todo`/the catalog gets 24 turns, 96 tool calls, 300 s wall time (the earlier 12-turn ceiling ended ordinary write→run→verify tasks; live L04 needed 8 model requests, L07 Goal Runs 8–10). Longer work continues through the Session Goal, which counts each Run against `max_runs`.
-13. **Review corrections (two independent reviews, NEEDS_CHANGES → fixed):** workdir write/edit containment is segment-wise with inode re-verification and hard-link refusal; regex search runs in a worker with a time budget; the seatbelt profile is deny-default (no Mach/XPC desktop services) and the Host terminates every tracked descendant when a command returns; interrupted Runs are settled at Host start so Goals cannot stay `active` forever; MCP connects in the background; the desktop shell never opens a second window for a link; only blocked plan items pause a Goal (`plan_blocked`).
+13. **Review corrections:** workdir write/edit containment is segment-wise with inode re-verification and hard-link refusal; regex search runs in a worker with a time budget; the seatbelt profile is deny-default (no Mach/XPC desktop services) and the Host sweeps observed descendants and marker-inode holders on return, timeout or Stop, subject to the limits in CONTRACTS §3.2; interrupted Runs are settled at Host start so Goals cannot stay `active` forever; MCP connects in the background; the desktop shell never opens a second window for a link; only blocked plan items pause a Goal (`plan_blocked`).
 
-## Work graph (all writers Opus 5.5 / xhigh, one writer per file)
+## Work graph (Opus baseline; Codex fixes and independent release review)
 
 | Ticket | Scope | Result |
 | --- | --- | --- |

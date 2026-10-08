@@ -167,3 +167,46 @@ test("Host transport aliases dotted tools on the provider wire and restores them
   expect((secondMessages[2]?.reasoning_content)).toBe("inspect the dashboard");
   expect(second[0]?.message.content).toEqual([{ type: "text", text: "done" }]);
 });
+
+test.each(["stream", "json"])("Host transport preserves malformed tool arguments as a failed invocation candidate (%s)", async (format) => {
+  const rawArguments = '{"op": done, "phase": "阶段3"}';
+  const message = { role: "assistant", reasoning_content: "Mark the phase complete.", tool_calls: [
+    { id: "invalid-todo", type: "function", function: { name: "todo", arguments: rawArguments } },
+  ] };
+  const payload = { choices: [{ finish_reason: "tool_calls", message }], usage: { prompt_tokens: 11, completion_tokens: 7 } };
+  const transport = createOmpModelTransport({
+    endpoint: "https://provider.invalid/v1/chat/completions", apiKey: "fixture-only", modelName: "fixture-model",
+    fetchImpl: async () => format === "stream"
+      ? new Response([
+        { choices: [{ delta: { role: "assistant", reasoning_content: message.reasoning_content, tool_calls: [{ index: 0, id: "invalid-todo", type: "function", function: { name: "todo", arguments: rawArguments.slice(0, 8) } }] } }] },
+        { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: rawArguments.slice(8) } }] }, finish_reason: "tool_calls" }], usage: payload.usage },
+      ].map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
+      : new Response(JSON.stringify(payload)),
+  });
+  const responses = [];
+  for await (const response of transport({ systemPrompt: "Anna", messages: [] }, new AbortController().signal)) responses.push(response);
+  expect(responses).toHaveLength(1);
+  const call = responses[0]!.message.content[0];
+  expect(call).toEqual({ type: "toolCall", id: "invalid-todo", name: "todo", arguments: {
+    _anna_tool_argument_error: { code: "invalid_tool_arguments", raw: rawArguments },
+  } });
+  expect(responses[0]!.message).toMatchObject({ reasoningContent: "Mark the phase complete.", usage: { input: 11, output: 7 } });
+  expect(responses[0]!.deltas).toEqual([
+    ...(format === "stream" ? [{ type: "reasoning", text: message.reasoning_content }] : []),
+    { type: "toolCall", contentIndex: 0, id: "invalid-todo", name: "todo", argumentsDelta: JSON.stringify((call as { arguments: unknown }).arguments) },
+  ]);
+});
+
+test.each(["null", "[]", '{"_anna_tool_argument_error":null}', '{"_anna_tool_argument_error":{"code":"unknown"},"op":"done"}'])("Host transport rejects non-object or reserved provider arguments without inventing parameters: %s", async (rawArguments) => {
+  const transport = createOmpModelTransport({
+    endpoint: "https://provider.invalid/v1/chat/completions", apiKey: "fixture-only", modelName: "fixture-model",
+    fetchImpl: async () => new Response(JSON.stringify({ choices: [{ finish_reason: "tool_calls", message: {
+      role: "assistant", tool_calls: [{ id: "invalid-call", type: "function", function: { name: "todo", arguments: rawArguments } }],
+    } }] })),
+  });
+  for await (const response of transport({ systemPrompt: "Anna", messages: [] }, new AbortController().signal)) {
+    expect(response.message.content).toEqual([{ type: "toolCall", id: "invalid-call", name: "todo", arguments: {
+      _anna_tool_argument_error: { code: "invalid_tool_arguments", raw: rawArguments },
+    } }]);
+  }
+});

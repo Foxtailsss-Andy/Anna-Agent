@@ -11,6 +11,9 @@ import type { TodoPhase } from "@oh-my-pi/pi-coding-agent/tools/todo";
 
 import {
   OMP_PROTOCOL,
+  TOOL_ARGUMENT_ERROR_KEY,
+  hasInvalidToolArguments,
+  invalidToolArgumentsResult,
   encodeFrame,
   parseHostFrame,
   type AssistantMessage,
@@ -291,6 +294,17 @@ class WorkerRuntime {
     const admittedToolNames = new Set(this.activeTools.map((tool) => tool.name));
     const serializedTools: AgentTool[] = created.session.agent.state.tools.map((tool): AgentTool => {
       if (!admittedToolNames.has(tool.name)) return tool;
+      if (tool.name === "todo") {
+        return {
+          ...tool,
+          parameters: toolParametersWithArgumentError(tool.parameters),
+          execute: async (...args) => {
+            if (!hasInvalidToolArguments(args[1])) return tool.execute(...args);
+            const result = invalidToolArgumentsResult();
+            return { content: [{ type: "text", text: renderJson(result.output) }], details: result, isError: true };
+          },
+        };
+      }
       if (tool.concurrency === "exclusive") return tool;
       return { ...tool, concurrency: "exclusive" as const };
     });
@@ -304,7 +318,7 @@ class WorkerRuntime {
       name: tool.name,
       label: tool.name,
       description: tool.description,
-      parameters: Type.Unsafe(tool.parameters),
+      parameters: toolParametersWithArgumentError(tool.parameters),
       strict: true,
       loadMode: "essential" as const,
       approval: { tier: "read" as const, policy: "allow" as const },
@@ -829,6 +843,13 @@ function sameBinding(left: WorkerBinding, right: WorkerBinding): boolean {
     && left.attemptId === right.attemptId
     && left.commandId === right.commandId
     && left.profileHash === right.profileHash;
+}
+
+function toolParametersWithArgumentError(parameters: ToolDefinition["parameters"]) {
+  return Type.Union([
+    Type.Unsafe(parameters),
+    Type.Object({ [TOOL_ARGUMENT_ERROR_KEY]: Type.Unknown() }, { additionalProperties: true }),
+  ]);
 }
 
 function toNeutralContext(context: OmpContext): ModelContext {

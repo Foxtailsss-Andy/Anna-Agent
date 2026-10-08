@@ -1,5 +1,6 @@
-import { lstat, mkdir, realpath, stat } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { mkdirContained } from "./workdir-io";
 
 // Shared path-containment rules for the Host-side workdir tools and the Sandbox.
 // Every tool resolves a caller path against a canonical (realpath) workdir root.
@@ -24,7 +25,7 @@ export function parseRelativePathInput(value: unknown): string | undefined {
 export interface ContainedTarget {
   /** Canonical directory that holds the target; verified to be inside the root. */
   readonly parent: string;
-  /** Final path component (never resolved; callers open it with O_NOFOLLOW). */
+  /** Final path component (never resolved; callers open it with O_NOFOLLOW_ANY). */
   readonly name: string;
   /** Path of the target relative to the root, built from the canonical parent. */
   readonly relativePath: string;
@@ -36,12 +37,13 @@ export interface ContainedTarget {
  * segment is looked at, so an intermediate symlinked directory cannot lead outside.
  * With `createParents`, a missing segment is created (non-recursively) only beneath a
  * directory that has already been verified, so nothing is created outside the root.
- * The kernel never sees the caller's original string, only verified canonical parents.
+ * Directory creation uses a pinned-cwd helper with OS write confinement; file opens
+ * must additionally use O_NOFOLLOW_ANY because canonical path strings can be replaced.
  */
 export async function locateContainedTarget(
   root: string,
   requested: string,
-  options: { createParents: boolean },
+  options: { createParents: boolean; signal?: AbortSignal },
 ): Promise<ContainedTarget | { reason: string }> {
   const requestedRelative = relative(root, resolve(root, requested));
   if (requestedRelative === "" || !isWithinPath(requestedRelative)) return { reason: "workdir_path_outside_root" };
@@ -58,7 +60,7 @@ export async function locateContainedTarget(
       if (errorCode(error) !== "ENOENT") return { reason: "workdir_path_unavailable" };
       if (!options.createParents) return { reason: "workdir_file_unavailable" };
       try {
-        await mkdir(next);
+        await mkdirContained(root, current, segment, options.signal);
       } catch (mkdirError) {
         if (errorCode(mkdirError) !== "EEXIST") return { reason: "workdir_write_failed" };
       }
@@ -83,7 +85,12 @@ export async function locateContainedTarget(
       }
       current = canonical;
     } else if (info.isDirectory()) {
-      current = next;
+      try {
+        current = await realpath(next);
+      } catch {
+        return { reason: "workdir_path_unavailable" };
+      }
+      if (!containsPath(root, current)) return { reason: "workdir_path_outside_root" };
     } else {
       return { reason: "workdir_path_not_directory" };
     }
@@ -93,7 +100,7 @@ export async function locateContainedTarget(
 
 /**
  * Confirms, after `open`, that the opened inode is still the one at the verified location:
- * the parent still canonicalises to itself inside the root and the path names the same file.
+ * the parent still canonicalises inside the root and the path names the same file.
  */
 export async function openedTargetStillContained(
   root: string,
@@ -102,7 +109,7 @@ export async function openedTargetStillContained(
 ): Promise<boolean> {
   try {
     const parent = await realpath(target.parent);
-    if (parent !== target.parent || !containsPath(root, parent)) return false;
+    if (!containsPath(root, parent)) return false;
     const current = await lstat(join(target.parent, target.name));
     return current.isFile() && current.dev === opened.dev && current.ino === opened.ino;
   } catch {

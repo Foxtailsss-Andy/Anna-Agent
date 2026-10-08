@@ -2,16 +2,15 @@ import { constants } from "node:fs";
 import {
   lstat,
   open,
-  readdir,
   realpath,
   stat,
-  unlink,
   type FileHandle,
 } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { TextDecoder } from "node:util";
 import { Worker } from "node:worker_threads";
 import type { JsonValue } from "@anna/harness-v2";
+import { containedOpenFlags, readContainedDirectory } from "./workdir-io";
 import {
   containsPath,
   isWithinPath,
@@ -35,7 +34,6 @@ export const WORKDIR_SEARCH_MAX_PATTERN_CHARS = 1_000;
 /** Matching stops early (truncated) after this long; the worker is terminated at the hard budget. */
 export const WORKDIR_SEARCH_SOFT_BUDGET_MS = 8_000;
 export const WORKDIR_SEARCH_HARD_BUDGET_MS = 10_000;
-const WORKDIR_LIST_SKIP_DIRECTORIES = new Set([".git", "node_modules"]);
 type WorkbenchFileOutput = Record<string, JsonValue>;
 
 export interface WorkbenchWorkdirResolutionOptions {
@@ -114,6 +112,7 @@ export async function readRegisteredWorkdirFile(
   signal: AbortSignal,
 ): Promise<{ status: "succeeded" | "failed"; output: WorkbenchFileOutput }> {
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
+  if (process.platform !== "darwin") return { status: "failed", output: { reason: "workdir_containment_unavailable" } };
   const parsed = parseReadInput(input);
   if (parsed === undefined) return { status: "failed", output: { reason: "invalid_workdir_read_request" } };
   let root: string | undefined;
@@ -140,7 +139,7 @@ export async function readRegisteredWorkdirFile(
     }
     const candidate = await stat(resolvedTarget);
     if (!candidate.isFile()) return { status: "failed", output: { reason: "workdir_file_not_bounded" } };
-    handle = await open(resolvedTarget, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
+    handle = await open(resolvedTarget, containedOpenFlags(constants.O_RDONLY | constants.O_NONBLOCK));
     const metadata = await handle.stat();
     if (!metadata.isFile()) return { status: "failed", output: { reason: "workdir_file_not_bounded" } };
     // A second hard link may name a file outside the workdir; the Host does not follow it.
@@ -199,6 +198,7 @@ export async function listRegisteredWorkdir(
   signal: AbortSignal,
 ): Promise<{ status: "succeeded" | "failed"; output: WorkbenchFileOutput }> {
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
+  if (process.platform !== "darwin") return { status: "failed", output: { reason: "workdir_containment_unavailable" } };
   const parsed = parseListInput(input);
   if (parsed === undefined) return { status: "failed", output: { reason: "invalid_workdir_list_request" } };
   const resolved = await resolveToolRoot(options);
@@ -223,33 +223,28 @@ export async function listRegisteredWorkdir(
     const current = queue.shift()!;
     let dirents;
     try {
-      dirents = await readdir(current.absolute, { withFileTypes: true });
+      const listing = await readContainedDirectory(resolved.root, current.absolute, WORKDIR_LIST_MAX_ENTRIES + 1, signal);
+      dirents = listing.entries;
+      truncated ||= listing.truncated;
     } catch {
       continue;
     }
     for (const dirent of dirents.sort((a, b) => a.name.localeCompare(b.name))) {
       const childAbsolute = join(current.absolute, dirent.name);
       const childRelative = relative(resolved.root, childAbsolute);
-      let info;
-      try {
-        info = await lstat(childAbsolute);
-      } catch {
-        continue;
-      }
-      if (info.isDirectory()) {
-        if (isSkippedDirectory(dirent.name)) continue;
+      if (dirent.type === "dir") {
         if (entries.length >= WORKDIR_LIST_MAX_ENTRIES) {
           truncated = true;
           break;
         }
         entries.push({ path: childRelative, type: "dir" });
         if (current.depth < parsed.depth) queue.push({ absolute: childAbsolute, depth: current.depth + 1 });
-      } else if (info.isFile()) {
+      } else if (dirent.type === "file") {
         if (entries.length >= WORKDIR_LIST_MAX_ENTRIES) {
           truncated = true;
           break;
         }
-        entries.push({ path: childRelative, type: "file", bytes: info.size });
+        entries.push({ path: childRelative, type: "file", bytes: dirent.bytes });
       }
     }
     if (truncated) break;
@@ -264,6 +259,7 @@ export async function searchRegisteredWorkdir(
   signal: AbortSignal,
 ): Promise<{ status: "succeeded" | "failed"; output: WorkbenchFileOutput }> {
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
+  if (process.platform !== "darwin") return { status: "failed", output: { reason: "workdir_containment_unavailable" } };
   const parsed = parseSearchInput(input);
   if (parsed === undefined) return { status: "failed", output: { reason: "invalid_workdir_search_request" } };
   const resolved = await resolveToolRoot(options);
@@ -282,7 +278,7 @@ export async function searchRegisteredWorkdir(
   try {
     const info = await lstat(start.canonical);
     if (info.isFile()) files.push(start.canonical);
-    else if (info.isDirectory()) capped = await collectSearchFiles(start.canonical, files, signal);
+    else if (info.isDirectory()) capped = await collectSearchFiles(resolved.root, start.canonical, files, signal);
     else return { status: "failed", output: { reason: "workdir_path_unavailable" } };
   } catch {
     return { status: "failed", output: { reason: "workdir_path_unavailable" } };
@@ -293,6 +289,7 @@ export async function searchRegisteredWorkdir(
   // expression can only stall that worker, which is terminated, never the Host loop.
   const result = await runSearchWorker({
     files: files.map((absolute) => ({ absolute, relative: relative(resolved.root, absolute) })),
+    openFlags: containedOpenFlags(constants.O_RDONLY | constants.O_NONBLOCK),
     pattern: parsed.pattern,
     regex: parsed.regex,
     maxResults: parsed.maxResults,
@@ -310,6 +307,7 @@ export async function writeRegisteredWorkdirFile(
   signal: AbortSignal,
 ): Promise<{ status: "succeeded" | "failed"; output: WorkbenchFileOutput }> {
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
+  if (process.platform !== "darwin") return { status: "failed", output: { reason: "workdir_containment_unavailable" } };
   const parsed = parseWriteInput(input);
   if (parsed === undefined) return { status: "failed", output: { reason: "invalid_workdir_write_request" } };
   const contentBytes = Buffer.byteLength(parsed.content, "utf8");
@@ -323,7 +321,7 @@ export async function writeRegisteredWorkdirFile(
   // Parents are verified (and created) segment by segment inside the root before any
   // file is opened, so a symlinked directory can neither redirect the write nor cause
   // directories to be created outside the workdir.
-  const located = await locateContainedTarget(resolved.root, parsed.path, { createParents: true });
+  const located = await locateContainedTarget(resolved.root, parsed.path, { createParents: true, signal });
   if ("reason" in located) return { status: "failed", output: { reason: located.reason } };
   const target = join(located.parent, located.name);
 
@@ -343,13 +341,14 @@ export async function writeRegisteredWorkdirFile(
   }
 
   // No O_TRUNC at open: the file is only truncated after the opened inode is re-verified.
-  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | (created ? constants.O_EXCL : 0);
+  const flags = containedOpenFlags(constants.O_WRONLY | constants.O_CREAT | (created ? constants.O_EXCL : 0));
   let handle: FileHandle | undefined;
   try {
     handle = await open(target, flags, 0o644);
     const opened = await handle.stat();
     if (!(await verifyOpenedFile(resolved.root, located, opened))) {
-      if (created) await removeIfSameInode(target, opened);
+      // A raced create may leave an empty in-root file; never unlink by a path
+      // that another process can now redirect to an unrelated inode.
       return { status: "failed", output: { reason: "workdir_path_outside_root" } };
     }
     const bytes = Buffer.from(parsed.content, "utf8");
@@ -372,13 +371,14 @@ export async function editRegisteredWorkdirFile(
   signal: AbortSignal,
 ): Promise<{ status: "succeeded" | "failed"; output: WorkbenchFileOutput }> {
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
+  if (process.platform !== "darwin") return { status: "failed", output: { reason: "workdir_containment_unavailable" } };
   const parsed = parseEditInput(input);
   if (parsed === undefined) return { status: "failed", output: { reason: "invalid_workdir_edit_request" } };
   const resolved = await resolveToolRoot(options);
   if ("reason" in resolved) return { status: "failed", output: { reason: resolved.reason } };
   if (signal.aborted) return { status: "failed", output: { reason: "cancelled" } };
 
-  const located = await locateContainedTarget(resolved.root, parsed.path, { createParents: false });
+  const located = await locateContainedTarget(resolved.root, parsed.path, { createParents: false, signal });
   if ("reason" in located) return { status: "failed", output: { reason: located.reason } };
   const target = join(located.parent, located.name);
 
@@ -386,7 +386,7 @@ export async function editRegisteredWorkdirFile(
   // path is resolved exactly once.
   let handle: FileHandle | undefined;
   try {
-    handle = await open(target, constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    handle = await open(target, containedOpenFlags(constants.O_RDWR | constants.O_NONBLOCK));
     const info = await handle.stat();
     if (!info.isFile()) return { status: "failed", output: { reason: "workdir_file_unavailable" } };
     if (!(await verifyOpenedFile(resolved.root, located, info))) {
@@ -427,15 +427,6 @@ async function verifyOpenedFile(
   return openedTargetStillContained(root, located, opened);
 }
 
-async function removeIfSameInode(target: string, opened: { dev: number; ino: number }): Promise<void> {
-  try {
-    const current = await lstat(target);
-    if (current.dev === opened.dev && current.ino === opened.ino) await unlink(target);
-  } catch {
-    // nothing to clean up
-  }
-}
-
 async function resolveToolRoot(
   options: WorkbenchWorkdirResolutionOptions,
 ): Promise<{ root: string } | { reason: string }> {
@@ -466,39 +457,34 @@ async function resolveToolTarget(
   return { canonical };
 }
 
-function isSkippedDirectory(name: string): boolean {
-  return WORKDIR_LIST_SKIP_DIRECTORIES.has(name) || name.startsWith(".");
-}
-
 /** Breadth-first regular files under `startDir`; returns true when the file cap cut the walk short. */
-async function collectSearchFiles(startDir: string, files: string[], signal: AbortSignal): Promise<boolean> {
+async function collectSearchFiles(root: string, startDir: string, files: string[], signal: AbortSignal): Promise<boolean> {
   const queue: string[] = [startDir];
+  const deadline = Date.now() + WORKDIR_SEARCH_SOFT_BUDGET_MS;
+  let truncated = false;
   while (queue.length > 0) {
     if (signal.aborted) return false;
+    if (Date.now() > deadline) return true;
     const current = queue.shift()!;
     let dirents;
     try {
-      dirents = await readdir(current, { withFileTypes: true });
+      const listing = await readContainedDirectory(root, current, WORKDIR_SEARCH_MAX_FILES_SCANNED + 1, signal);
+      dirents = listing.entries;
+      truncated ||= listing.truncated;
     } catch {
       continue;
     }
     for (const dirent of dirents.sort((a, b) => a.name.localeCompare(b.name))) {
       const childAbsolute = join(current, dirent.name);
-      let info;
-      try {
-        info = await lstat(childAbsolute);
-      } catch {
-        continue;
-      }
-      if (info.isDirectory()) {
-        if (!isSkippedDirectory(dirent.name)) queue.push(childAbsolute);
-      } else if (info.isFile()) {
+      if (dirent.type === "dir") {
+        queue.push(childAbsolute);
+      } else if (dirent.type === "file") {
         if (files.length >= WORKDIR_SEARCH_MAX_FILES_SCANNED) return true;
         files.push(childAbsolute);
       }
     }
   }
-  return false;
+  return truncated;
 }
 
 function isValidRegex(pattern: string): boolean {
@@ -511,6 +497,7 @@ function isValidRegex(pattern: string): boolean {
 }
 
 interface SearchWorkerInput {
+  readonly openFlags: number;
   readonly files: ReadonlyArray<{ absolute: string; relative: string }>;
   readonly pattern: string;
   readonly regex: boolean;
@@ -541,7 +528,7 @@ outer: for (const file of input.files) {
   let text;
   let fd;
   try {
-    fd = fs.openSync(file.absolute, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+    fd = fs.openSync(file.absolute, input.openFlags);
     const info = fs.fstatSync(fd);
     if (!info.isFile() || info.nlink > 1 || info.size > input.maxFileBytes) continue;
     const buffer = fs.readFileSync(fd);
@@ -664,9 +651,10 @@ function parseEditInput(input: unknown): { path: string; oldText: string; newTex
 
 const parseRequiredRelativePath = parseRelativePathInput;
 
-// Returns undefined when absent, the path when valid, or null when present but invalid.
+// Returns undefined when absent (or "" / "." — models use both for the root), the path
+// when valid, or null when present but invalid.
 function parseOptionalRelativePath(value: unknown): string | undefined | null {
-  if (value === undefined) return undefined;
+  if (value === undefined || value === "" || value === ".") return undefined;
   const parsed = parseRequiredRelativePath(value);
   return parsed === undefined ? null : parsed;
 }

@@ -1,3 +1,4 @@
+import { hasInvalidToolArguments, invalidToolArguments } from "../../../packages/omp-loop-kernel/src/protocol";
 import type { OmpHostModelTransport, OmpModelStreamObserver } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 import type { AssistantMessage, Content, Message, ModelDelta, ModelContext, ToolDefinition, Usage } from "../../../packages/omp-loop-kernel/src/protocol";
 
@@ -394,17 +395,26 @@ function finishAccumulator(accumulator: CompletionAccumulator): HostModelRespons
   if (accumulator.finishReason === undefined) throw new Error("OMP provider stop reason is invalid");
   const content: Content[] = accumulator.blocks.map((block) => {
     if (block.type === "text") return { type: "text", text: block.text };
-    let argumentsValue: unknown;
+    let argumentsValue: { readonly [key: string]: import("../../../packages/omp-loop-kernel/src/protocol").JsonValue };
     try {
-      argumentsValue = JSON.parse(block.argumentsText);
+      argumentsValue = jsonObject(JSON.parse(block.argumentsText));
+      if (hasInvalidToolArguments(argumentsValue)) throw new Error("reserved Host argument field");
     } catch {
-      throw new Error("OMP provider tool arguments are invalid JSON");
+      argumentsValue = invalidToolArguments(block.argumentsText);
     }
-    return { type: "toolCall", id: block.id, name: block.name, arguments: jsonObject(argumentsValue) };
+    return { type: "toolCall", id: block.id, name: block.name, arguments: argumentsValue };
   });
   if (content.length === 0) throw new Error("OMP provider returned no assistant content");
   return {
-    deltas: accumulator.deltas,
+    deltas: accumulator.deltas.flatMap<ModelDelta>((delta) => {
+      if (delta.type !== "toolCall") return [delta];
+      const block = content[delta.contentIndex];
+      if (block?.type !== "toolCall" || !hasInvalidToolArguments(block.arguments)) return [delta];
+      // Partial JSON cannot represent a failed parse. Emit the canonical error
+      // envelope once so worker delta validation still matches the checkpoint.
+      if (accumulator.deltas.find((item) => item.type === "toolCall" && item.contentIndex === delta.contentIndex) !== delta) return [];
+      return [{ ...delta, argumentsDelta: JSON.stringify(block.arguments) }];
+    }),
     message: {
       role: "assistant",
       content,

@@ -32,3 +32,18 @@ test("local files, loopback services and other schemes are refused", () => {
     assert.equal(classifyLinkTarget(target, internal), "deny", target);
   }
 });
+
+test("normalized local host aliases cannot leave the app via the system browser", () => {
+  for (const target of [
+    "http://[::ffff:127.0.0.1]:3000/",
+    "http://[::ffff:7f02:abcd]:3000/",
+    "http://[::ffff:0.0.0.0]:3000/",
+    "http://[0:0:0:0:0:0:0:0]:3000/",
+    "http://LOCALHOST.:3000/",
+    "http://app.localhost.:3000/",
+  ]) {
+    assert.equal(classifyLinkTarget(target, internal), "deny", target);
+  }
+  assert.equal(classifyLinkTarget("https://example.com./report", internal), "external");
+  assert.equal(classifyLinkTarget("https://[::ffff:192.0.2.1]/report", internal), "external");
+});

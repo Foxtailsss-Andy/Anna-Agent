@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { v2ApiBase } from "../../lib/runtime";
 import { getChannelEvents, getRunTraceCursor, type ChannelEventsResponse, type TraceCursorResponse } from "./reviewApi";
 import "./ReviewChannelInspector.css";
 
@@ -40,6 +41,20 @@ export function ReviewChannelInspector({ workspaceId }: ReviewChannelInspectorPr
     } finally {
       setBusy(null);
     }
+  }
+
+  if (!v2ApiBase()) {
+    return (
+      <section className="review-inspector" aria-labelledby="review-inspector-title">
+        <header className="review-inspector__header">
+          <div>
+            <h1 id="review-inspector-title">执行过程</h1>
+            <p className="review-inspector__lede">当前桌面请从 Home 或 Crew 对话中的“执行过程”查看本次运行的 Trace。</p>
+            <p className="review-inspector__lede">Review Inspector 需要单独连接 Review Host，当前未配置。</p>
+          </div>
+        </header>
+      </section>
+    );
   }
 
   return (

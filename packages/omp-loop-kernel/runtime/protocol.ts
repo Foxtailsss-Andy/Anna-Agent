@@ -4,6 +4,27 @@ export const MAX_FRAME_BYTES = 1024 * 1024;
 export type JsonPrimitive = null | boolean | number | string;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
+// Reserved Host-to-worker envelope; never exposed in model tool schemas.
+export const TOOL_ARGUMENT_ERROR_KEY = "_anna_tool_argument_error";
+
+export function invalidToolArguments(raw: string): { [key: string]: JsonValue } {
+  return { [TOOL_ARGUMENT_ERROR_KEY]: { code: "invalid_tool_arguments", raw } };
+}
+
+export function hasInvalidToolArguments(input: unknown): boolean {
+  return typeof input === "object" && input !== null && Object.hasOwn(input, TOOL_ARGUMENT_ERROR_KEY);
+}
+
+export function invalidToolArgumentsResult() {
+  return {
+    status: "failed" as const,
+    output: {
+      error: "invalid_tool_arguments",
+      message: "Tool was not executed: arguments must be a valid JSON object without reserved Host fields. Correct the arguments before calling again.",
+    },
+  };
+}
+
 export interface WorkerBinding {
   readonly workspaceId: string;
   readonly channelId: string;

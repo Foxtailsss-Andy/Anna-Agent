@@ -53,7 +53,7 @@ export interface ComposerProps {
   /** 当前 Crew Anna Run 是否仍在运行(运行中不再起并行 Run)。 */
   annaRunning?: boolean;
   /** 运行中把这句话补充给当前 Run(steer);未提供时运行中只给提示。 */
-  onSteerAnna?: (text: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onSteerAnna?: (text: string) => Promise<{ ok: true; queued?: boolean } | { ok: false; error: string }>;
 }
 
 export function Composer({ projectId, members, onRefresh, onAskAnna, annaRunning = false, onSteerAnna }: ComposerProps) {
@@ -167,6 +167,7 @@ export function Composer({ projectId, members, onRefresh, onAskAnna, annaRunning
         const result = await onSteerAnna(text.trim());
         if (result.ok === false) throw new Error(result.error);
         clearInput();
+        if (result.queued) setNotice("补充说明已排队，Anna 会在下一步采纳（若这次运行先结束则不会采纳）。");
       } catch (e) {
         setError(e instanceof ApiError ? e.body || String(e) : String(e));
       } finally {
