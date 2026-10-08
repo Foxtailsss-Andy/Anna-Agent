@@ -137,6 +137,6 @@ test("Product smoke contract names the original app and both runtime preparation
   assert.match(packageJson.scripts["desktop:package"], /harness:omp:prepare/);
   assert.equal(
     packageJson.scripts["frontend:product-smoke"],
-    "node --test tests/frontend/app_shell_smoke.mjs tests/frontend/product_runtime.test.mjs",
+    "node --test tests/frontend/app_shell_smoke.mjs tests/frontend/product_runtime.test.mjs tests/frontend/omp_runtime_preparation.test.mjs",
   );
 });

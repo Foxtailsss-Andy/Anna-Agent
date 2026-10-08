@@ -1,8 +1,6 @@
 # Anna
 
-> **Experimental source preview · CI was in progress at the initial source push (2026-09-22).** [Current main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain) · [reviewed-candidate CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/35640135163). Local checks and independent review passed; use the linked current CI record for the live outcome.
->
-> Measured scope: 24 synthetic heldout cases, 22 model inputs and 2 hard prechecks. C is one `deepseek-v4-pro` judgment with thinking enabled/high; D is `jev-1.13.0`. Both match 22/22 labels (12 recommendations + 10 abstentions). Jev p50 is 85.23% lower; at this run's off-peak/cache-miss prices estimated cost is 94.71% lower (peak reference 97.35%; not invoices). Reported total tokens are 57.98% higher. This does not establish production accuracy, Worker completion or whole-workflow acceleration.
+> **Experimental general-Agent source preview · macOS arm64 · October 8, 2026.** Workdir tools, Sandbox, MCP, bounded goals and Crew coordination use the same Harness. See [fixes, verification and limits](docs/releases/general-agent-20261008.md) and [current main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain).
 
 ![Anna. Chat, Workflows, Associate. A Governed AI Agent for Enterprise Work.](docs/public/assets/anna-readme-banner-v2.png)
 
@@ -12,13 +10,21 @@ Anna is a personal open-source project exploring how an AI agent can carry work 
 
 The aim is to keep the work understandable: what Anna is doing, which tools she can use, what needs your decision, and where the result came from.
 
-**Jev Crew · Experimental Source Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**General Agent + Jev Crew · Experimental Source Preview** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [中文](README.zh-CN.md) · [Explore Anna](#what-you-can-explore) · [Quick start](#quick-start) · [Current status](#current-status) · [Codex pet](#meet-anna-your-codex-companion) · [Development diary](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
 > **Ask for an assignee suggestion, then decide**
 >
 > Crew can suggest a person or Worker for one unassigned task. Open the existing member picker, request a suggestion, inspect its source, and explicitly accept it or choose manually. A unique exact-role match uses a rule; Jev handles other eligible semantic choices and can abstain. Suggesting someone does not assign or run the task. This source preview adds explicit suggestions; see the [changes, evidence, and limits](docs/releases/jev-crew-preview.md). The [RC2 source release](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2) remains a separate release record.
+
+## This update
+
+- **Read and act on files:** select a workdir to inspect it; explicitly enable write permission to edit files and run commands in the macOS process sandbox. Configure MCP tools through protected Host settings.
+- **Continue a bounded goal:** keep a plan across Runs, pause, resume or stop, then review the result. Malformed tool-argument JSON produces recoverable failed-tool feedback instead of aborting the whole Run.
+- **Keep collaboration usable:** Crew retains channel and Anna history, offers confirmed graph/assignment proposals, readable tables/charts, streaming activity and Trace. Queued steering is distinguished from a message the model has consumed.
+
+Jev remains a bounded assignee judgment. The historical comparison below reports **85.23% lower p50, 94.71% lower off-peak estimated cost and equal 22/22 label agreement**. Total reported tokens increased 57.98%; this is not a whole-Agent-task speedup claim.
 
 ## Measured Jev comparison
 
@@ -82,6 +88,7 @@ Anna is in active development. The current source is intended for developers and
 
 | Area | Status |
 | --- | --- |
+| **General-Agent repair preview** | Workdir tools, Sandbox, MCP, bounded Goals and Crew coordination share the Host/OMP loop. Local suites and scoped desktop Goal/Crew checks passed; [verification and remaining limits](docs/releases/general-agent-20261008.md). |
 | **Jev Crew candidate** | Optional single-task suggestions with explicit adoption. A real browser → Jev → assignment → SQLite readback is verified on synthetic data. The [release record](docs/releases/jev-crew-preview.md) separates measured C/D judgments, accepted assignment behavior and remaining Worker/platform limits. |
 | **RC2 source** | Fixes release validation around workdir identity/scope tests and CI evidence dependencies. Ordinary conversations continue through the shared Node Harness Host and Oh-my-Pi loop. See the [RC2 record](docs/releases/rc2-developer-preview.md); the [RC1 record](docs/releases/rc1-developer-preview.md) preserves the earlier behavior and failures. |
 | **Earlier live validation** | Home document generation, Prompt creation, Stop, and next-turn context; Crew Worker delivery, review/rework, and contextual Anna; Hiker dashboard reads and an Agent capability query. See the [August 31–September 1 validation record](docs/superpowers/handoff/2026-08-31-harness-product-parity.md) for scope and remaining gates. |

@@ -29,6 +29,8 @@ Home Chat/Create, Cowork and Crew are retained product requirements. See the [cu
 
 Use `npm run desktop:run` for the RC1 product flow. `npm run dev` alone starts Vite and does not start the Product Host or its business peer. Ordinary conversations use the Host's `/api/workbench` Session/Run API; they require the same authenticated identity and protected state as the desktop product.
 
+When updating an existing checkout, the OMP preparation check compares its worker/protocol/lock files with the current sources. If it reports a stale runtime, stop Anna, move `build/omp-runtime/darwin-arm64` aside, and rerun `npm run harness:omp:prepare` with `ANNA_OMP_BUN_ARCHIVE_URL` configured as above. Prepared runtimes are kept immutable while bound to an app; the script does not silently overwrite one.
+
 After launch, start an ordinary question in Home/Create, continue the same conversation, and use session history to reopen it. Choose a workdir explicitly before asking Anna to read its files. Cowork dashboards and existing business actions remain available independently of ordinary conversation; Crew conversation is scoped to the selected project. Stop targets the selected Run. A missing provider configuration is an explicit failure, not a generated answer.
 
 The [RC1 release record](docs/releases/rc1-developer-preview.md) separates deterministic external transports, real local OMP execution, and outstanding live/provider and platform checks. RC1 added no installer or broad recovery guarantee; the Sandbox scope is described under General-Agent capabilities below.

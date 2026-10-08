@@ -28,11 +28,11 @@ The 2026-10-07 independent review ran the real desktop product with DeepSeek and
 
 | Ticket | Scope | Result |
 | --- | --- | --- |
-| P | Python Crew repairs, `crew.propose_changes`, ordering, background @Anna answers | implemented, tests added; pending independent acceptance |
-| F1 | Crew UI routing/restore/steer, template dialog, proposal card, GFM tables, chart blocks | implemented, tests added; pending independent acceptance |
-| F2 | Home history/streaming/plan/tools/trace/steer/permission/Goal UI | implemented, tests added; pending independent acceptance |
-| T | workdir list/search/write/edit, seatbelt Sandbox | implemented (owner hardened after review), tests added; pending independent acceptance |
-| M | Host MCP client + fixture server | implemented (owner completed after worker exits); pending independent acceptance |
-| H (owner) | Host composition: profile/tools/routing, live output, trace, Goal supervisor + restart settlement, steer, manifest cache, diagnostics logs, Electron link routing | implemented, Host integration tests; pending independent acceptance |
+| P | Python Crew repairs, `crew.propose_changes`, ordering, background @Anna answers | implemented; source-preview gates and scoped product checks passed |
+| F1 | Crew UI routing/restore/steer, template dialog, proposal card, GFM tables, chart blocks | implemented; source-preview gates and scoped product checks passed |
+| F2 | Home history/streaming/plan/tools/trace/steer/permission/Goal UI | implemented; source-preview gates and scoped product checks passed |
+| T | workdir list/search/write/edit, seatbelt Sandbox | implemented; concurrency/cleanup regressions and independent review passed |
+| M | Host MCP client + fixture server | implemented; local fixture/integration tests passed |
+| H (owner) | Host composition: profile/tools/routing, live output, trace, Goal supervisor + restart settlement, steer, manifest cache, diagnostics logs, Electron link routing | implemented; Host gates and real Goal recovery passed |
 
-Verification evidence and the factual handoff are kept in the private delivery directory (`STATUS.md`, `HANDOFF.md`); release acceptance belongs to the independent reviewer (Codex), not to the authoring agent.
+Final source-preview verification and its limits are recorded in [the release note](../../../releases/general-agent-20261008.md). Private session logs and raw provider captures remain outside Git. Independent Standards/Spec reviews and the local gates are complete; packaged and cross-platform distribution remain outside this handoff.

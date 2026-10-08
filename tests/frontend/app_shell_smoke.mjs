@@ -65,12 +65,12 @@ test("current Anna shell exposes the supported navigation surfaces", async () =>
       "Cowork",
       "Crew",
       "产物中心",
-      "Review Inspector",
       "设置",
       "Agent 中心",
     ]) {
       assert.ok(html.includes(label), `Expected shell to include: ${label}`);
     }
+    assert.ok(!html.includes("Review Inspector"), "An unconfigured Review Host must not offer a broken navigation entry");
   });
 });
 

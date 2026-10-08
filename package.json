@@ -26,7 +26,7 @@
     "desktop:package": "npm run build && npm run harness:v2:build && npm run desktop:prepare-python && npm run harness:omp:prepare && electron-builder --dir",
     "desktop:smoke-asar": "electron scripts/smoke-packaged-asar.mjs",
     "frontend:smoke": "node --test tests/frontend/app_shell_smoke.mjs",
-    "frontend:product-smoke": "node --test tests/frontend/app_shell_smoke.mjs tests/frontend/product_runtime.test.mjs",
+    "frontend:product-smoke": "node --test tests/frontend/app_shell_smoke.mjs tests/frontend/product_runtime.test.mjs tests/frontend/omp_runtime_preparation.test.mjs",
     "frontend:preview-smoke": "node --test tests/frontend/electron_runtime.test.mjs tests/frontend/preview_desktop.test.mjs tests/frontend/preview_ui.test.mjs",
     "preview:smoke": "node --test tests/frontend/electron_runtime.test.mjs tests/frontend/preview_desktop.test.mjs tests/frontend/preview_ui.test.mjs",
     "release:verify": "node scripts/verify-public-preview.mjs",

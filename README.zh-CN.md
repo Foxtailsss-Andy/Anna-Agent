@@ -1,8 +1,6 @@
 # Anna
 
-> **实验性源码预览 · 首次源码推送时 CI 仍在进行（2026-09-22）。** [当前 main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain) · [已审候选 CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/runs/35640135163)。本地检查与独立审查已通过；远程 CI 的当前结果以链接中的实际记录为准。
->
-> 实测范围：24 个合成 heldout，22 个模型输入、2 个硬预检。C 为 `deepseek-v4-pro` thinking enabled/high 单次判断，D 为 `jev-1.13.0`；两者均 22/22 符合标签（12 次推荐＋10 次弃权），质量持平。Jev p50 低 85.23%，按本轮非高峰、缓存未命中价估算费用低 94.71%（高峰参考低 97.35%，非账单），总 tokens 增加 57.98%。结果不证明生产正确率、Worker 完成或整工作流加速。
+> **通用 Agent 实验源码预览 · macOS arm64 · 2026-10-08 更新。** 工作目录工具、沙箱、MCP、目标续跑和 Crew 协作已接入同一 Harness。查看[修复、验证与边界](docs/releases/general-agent-20261008.md)及[当前 main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain)。
 
 ![Anna。Chat、Workflows、Associate。A Governed AI Agent for Enterprise Work。](docs/public/assets/anna-readme-banner-v2.png)
 
@@ -12,13 +10,21 @@ Anna 是一个个人开源项目，探索如何让 AI Agent 从一次对话出�
 
 我们希望工作过程始终清楚：Anna 正在做什么、可以使用哪些工具、哪里需要你作决定，以及结果是如何产生的。
 
-**Jev Crew · 实验源码预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
+**通用 Agent + Jev Crew · 实验源码预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
 [English](README.md) · [可以体验什么](#可以体验什么) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
 > **先看建议，再决定指派给谁**
 >
 > Crew 可以为一个未指派任务建议一位成员或 Worker。在现有选人浮层中点击「建议人选」，查看来源后采纳，也可以直接手动选择。唯一精确角色匹配走规则，其余符合条件的情况由 Jev 做有界语义选择；资料不足时可以待定。生成建议不会指派或执行任务。本源码预览提供明确采纳的建议，详见[变化、证据与限制](docs/releases/jev-crew-preview.md)；[RC2 源码发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)保留为独立历史记录。
+
+## 本次更新
+
+- **从读取到执行**：选择工作目录后，Anna 可分析文件；明确开启写入权限后，可修改文件并在 macOS 沙箱中运行命令。MCP 工具由受保护配置接入。
+- **持续推进目标**：目标模式保留计划，按轮次上限自动续跑，支持暂停、继续、停止及最终确认。工具参数 JSON 格式错误会返回失败反馈供模型纠正，避免直接中断整个 Run。
+- **恢复协作体验**：Crew 保留频道与 Anna 对话历史，支持图和指派提案的确认执行、宽表格/图表、流式过程与 Trace。排队的补充说明会明确显示尚未消费。
+
+Jev 继续负责有界的成员建议判断。下面保留的历史实测为 **p50 低 85.23%、非高峰估算费用低 94.71%、22/22 标签符合率持平**；总 tokens 增加 57.98%，没有把该结果外推为完整 Agent 任务提速。
 
 ## Jev 实测对照
 
@@ -82,6 +88,7 @@ Anna 正在持续开发中，当前源码面向希望体验项目、参与改进
 
 | 范围 | 当前状态 |
 | --- | --- |
+| **通用 Agent 修复预览** | 工作目录工具、沙箱、MCP、目标模式与 Crew 协作共用 Host/OMP 循环。本地门禁及限定场景的桌面 Goal/Crew 验证通过；详见[结果与剩余边界](docs/releases/general-agent-20261008.md)。 |
 | **Jev Crew 候选** | 可选的单任务建议与明确采纳。合成数据上的真实浏览器 → Jev → 指派 → SQLite 回读已验证。本轮 C/D 判断实测、已验指派行为与 Worker/平台限制见[发布记录](docs/releases/jev-crew-preview.md)。 |
 | **RC2 源码** | 修复工作目录身份/范围测试与 CI 证据依赖；普通对话继续通过共享 Node Harness Host 与 Oh-my-Pi 循环执行。结果见 [RC2 记录](docs/releases/rc2-developer-preview.md)；[RC1 记录](docs/releases/rc1-developer-preview.md) 保留此前行为与失败事实。 |
 | **此前的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |

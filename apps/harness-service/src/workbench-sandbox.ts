@@ -347,7 +347,8 @@ function executeSandboxed(
     const sweep = (signalName: "SIGTERM" | "SIGKILL") => {
       sweepQueue = sweepQueue.then(() => rootPid === undefined ? undefined : terminateSandboxProcesses({
         rootPid,
-        rootStartIdentity: exitResult === undefined ? rootStartIdentity : undefined,
+        rootStartIdentity,
+        rootExited: exitResult !== undefined,
         marker,
         startedAt,
         signalName,
@@ -439,7 +440,7 @@ interface ProcessRow {
 }
 
 /**
- * Signals the observed process tree: the live root's process group and ppid closure,
+ * Signals the observed process tree: the original process group and live root's ppid closure,
  * plus detached holders of the per-call marker inode and their descendants.
  * The Host's pid is never signalled.
  * A process that both closes every inherited descriptor and detaches is not found; it
@@ -448,6 +449,7 @@ interface ProcessRow {
 async function terminateSandboxProcesses(input: {
   rootPid: number;
   rootStartIdentity: string | undefined;
+  rootExited: boolean;
   marker: { device: bigint; inode: bigint };
   startedAt: number;
   signalName: "SIGTERM" | "SIGKILL";
@@ -457,10 +459,19 @@ async function terminateSandboxProcesses(input: {
     .filter((row) => row.pid !== process.pid && row.startedAtMs >= input.startedAt - 2_000)
     .map((row) => row.pid);
   const holders = detachedCandidates.length === 0 ? [] : await markerHolderPids(input.marker, detachedCandidates);
-  const rootStillOwned = input.rootStartIdentity !== undefined
+  const rootStillOwned = !input.rootExited && input.rootStartIdentity !== undefined
     && rows.some((row) => row.pid === input.rootPid && row.startIdentity === input.rootStartIdentity);
-  const targets = descendantClosure(rows, rootStillOwned ? [input.rootPid, ...holders] : holders,
-    rootStillOwned ? input.rootPid : undefined);
+  // A process group survives its leader. Ordinary background commands can close
+  // fd 3 without leaving that group, so retain its observed members after root
+  // exit. If the leader PID now belongs to a new process, distrust the numeric
+  // group entirely. Every selected member is identity-checked again below.
+  const rootReplaced = rows.some((row) => row.pid === input.rootPid
+    && (input.rootExited || row.startIdentity !== input.rootStartIdentity));
+  const groupMembers = rootReplaced ? [] : rows.filter((row) => row.pgid === input.rootPid
+    && row.startedAtMs >= input.startedAt - 2_000).map((row) => row.pid);
+  const targets = descendantClosure(rows, [
+    ...(rootStillOwned ? [input.rootPid] : []), ...holders, ...groupMembers,
+  ]);
   for (const row of rows) {
     if (!targets.has(row.pid) || row.pid === process.pid || row.pid <= 1) continue;
     try {
@@ -476,14 +487,14 @@ async function terminateSandboxProcesses(input: {
   }
 }
 
-function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[], rootGroup: number | undefined): Set<number> {
+function descendantClosure(rows: readonly ProcessRow[], seeds: readonly number[]): Set<number> {
   const tracked = new Set<number>(seeds);
   let grew = true;
   while (grew) {
     grew = false;
     for (const row of rows) {
       if (tracked.has(row.pid)) continue;
-      if (tracked.has(row.ppid) || row.pgid === rootGroup) {
+      if (tracked.has(row.ppid)) {
         tracked.add(row.pid);
         grew = true;
       }

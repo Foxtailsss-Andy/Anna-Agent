@@ -240,6 +240,23 @@ describeSandbox("workbench-sandbox runSandboxedCommand", () => {
     expect(await waitGone(pid)).toBe(true);
   }, 10_000);
 
+  test("terminates ordinary background group members that close the marker before the root exits", async () => {
+    const workdir = await makeWorkdir();
+    let pid: number | undefined;
+    try {
+      const result = await run({ command: "/bin/sleep 20 3<&- >/dev/null 2>&1 & echo $!" }, workdir);
+      expect(result.status).toBe("succeeded");
+      pid = Number(expectOutput(result).stdout.trim());
+      expect(Number.isSafeInteger(pid) && pid > 1).toBe(true);
+      expect(await waitGone(pid)).toBe(true);
+    } finally {
+      if (pid !== undefined && pid > 1 && pidAlive(pid)) {
+        process.kill(pid, "SIGKILL");
+        await waitGone(pid);
+      }
+    }
+  }, 10_000);
+
   test.each(["exit", "timeout", "abort"] as const)("terminates an unlinked marker holder on %s", async (ending) => {
     const workdir = await makeWorkdir();
     let pid: number | undefined;
