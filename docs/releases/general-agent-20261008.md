@@ -9,6 +9,7 @@ Anna remains one Agent on the Node Harness Host + Oh-my-Pi loop. This source pre
 - Sandbox cleanup follows marker device/inode identity even after unlink, checks process identity before signalling, and reaps ordinary background members of the original process group after the leader exits.
 - Crew history, graph/assignment proposals, tables/charts, live output and Trace are retained. Queued steering is visibly distinguished from consumption. Unconfigured Review Inspector navigation is hidden; actual Run traces remain available.
 - Loopback/unspecified URL aliases cannot create an app window or be opened as public links. Runtime preparation rejects stale worker/protocol caches instead of silently running older code.
+- The Python lockfile now uses urllib3 2.8.0, resolving the three advisories reported by the release dependency audit. See the [upstream security fixes](https://github.com/urllib3/urllib3/releases/tag/2.8.0).
 
 ## Verification
 
@@ -18,6 +19,7 @@ Local final verification on macOS arm64:
 | --- | --- |
 | JavaScript, Host and kernel suites (`npm test -- --reporter=dot`) | **1,426 passed, 7 skipped**, exit 0 |
 | Python suite | **1,138 passed**, exit 0 |
+| Python dependency audit (`pip-audit`) | No known vulnerabilities after the lockfile update |
 | Product shell/runtime smoke | **10 passed**, exit 0 |
 | Focused Crew browser + link regressions | **14 passed** |
 | Typecheck, frontend build, Host build, public-boundary scan | Passed |
