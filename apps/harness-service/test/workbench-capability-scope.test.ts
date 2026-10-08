@@ -8,7 +8,7 @@ import { expect, test } from "vitest";
 import { createLiveHarnessV2Runtime, createOmpKernelDescriptor } from "../src/production";
 import { startProductHost } from "../src/product-facade";
 import { ProductSessionStore } from "../src/product-session";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { findFreePort, startBusinessFixture, catalogTools } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -175,7 +175,7 @@ test("Workbench keeps the same admitted project capability reachable across chat
       .filter((context) => context.surface === "chat")
       .map((context) => context.tools)
       .find((tools) => tools.includes("crew.project.read"));
-    expect(baselineModelRequest).toEqual([
+    expect(catalogTools(baselineModelRequest ?? [])).toEqual([
       "capabilities.search",
       "capabilities.load",
       "crew.project.read",

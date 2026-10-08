@@ -127,6 +127,7 @@ export function CommandDraftCard({ author, time, message, tasks, projectId, isOw
                           ? [
                               d.role ? `建议：${d.role}` : "",
                               d.depends_on.length ? `依赖：${d.depends_on.map((x) => `“${x}”`).join("、")}` : "",
+                              d.insert_before?.length ? `放在${d.insert_before.map((x) => `“${x}”`).join("、")}之前` : "",
                               d.acceptance ? `验收：${d.acceptance}` : "",
                             ]
                               .filter(Boolean)

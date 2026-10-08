@@ -12,6 +12,13 @@ import { chromium } from "playwright";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const python = join(repositoryRoot, ".venv/bin/python");
 const ompRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
+/* Home Workbench markup (F2): the session history renders every message once as a bubble;
+   the current Run's persisted assistant answer carries the --current modifier. */
+const CURRENT_ANSWER = ".ir-workbench-chat__message--assistant.ir-workbench-chat__message--current:not(.ir-workbench-chat__message--live)";
+const ASSISTANT_MESSAGE = ".ir-workbench-chat__message--assistant:not(.ir-workbench-chat__message--live)";
+const USER_MESSAGE = ".ir-workbench-chat__message--user";
+/* Crew Anna card: every message renders in the history; the answer is the last assistant message. */
+const CREW_ANSWER = ".ir-crew-workbench__message--assistant";
 const businessScript = String.raw`
 import os
 import uvicorn
@@ -103,21 +110,27 @@ test("RC1 Workbench UI uses the real Host/OMP fixture for answer, continuation a
     await page.locator(".hcp__input").fill("请回答一个普通问题");
     await page.locator(".hcp__input").press("Enter");
     try {
-      await page.locator(".ir-workbench-chat__answer").waitFor({ timeout: 30_000 });
+      await page.locator(CURRENT_ANSWER).waitFor({ timeout: 30_000 });
     } catch (error) {
       const workbenchSnapshot = await fetch(`http://127.0.0.1:${hostPort}/api/workbench/sessions`, { headers: { authorization: `Bearer ${token}` } }).then((response) => response.text()).catch((cause) => String(cause));
       const runId = (await page.locator("body").innerText()).match(/run ([0-9a-f-]{36})/)?.[1];
       const workbenchEvents = runId === undefined ? "" : await fetch(`http://127.0.0.1:${hostPort}/api/workbench/runs/${runId}/events`, { headers: { authorization: `Bearer ${token}` } }).then((response) => response.text()).catch((cause) => String(cause));
       throw new Error(`Workbench answer did not render: ${(await page.locator("body").innerText()).slice(0, 1200)}; provider requests=${provider.requestCount()}; snapshot=${workbenchSnapshot.slice(0, 2000)}; events=${workbenchEvents.slice(0, 2000)}; host stderr=${host.__rc1Stderr ?? ""}; ${error}`);
     }
-    assert.match(await page.locator(".ir-workbench-chat__answer").textContent(), /UI fixture answer/);
+    assert.match(await page.locator(CURRENT_ANSWER).textContent(), /UI fixture answer/);
     await page.locator(".ir-workbench-chat__capability").first().waitFor({ timeout: 10_000 });
 
     await page.locator(".hcp__input").fill("继续补充一个限制");
     await page.locator(".hcp__input").press("Enter");
-    await page.waitForFunction(() => document.querySelector(".ir-workbench-chat__answer")?.textContent?.includes("UI fixture second answer"), undefined, { timeout: 30_000 });
-    assert.equal(await page.locator(".ir-workbench-chat__answer").count(), 1);
-    assert.match(await page.locator(".ir-workbench-chat__answer").textContent(), /UI fixture second answer/);
+    await page.waitForFunction((selector) => document.querySelector(selector)?.textContent?.includes("UI fixture second answer"), CURRENT_ANSWER, { timeout: 30_000 });
+    assert.equal(await page.locator(CURRENT_ANSWER).count(), 1);
+    assert.match(await page.locator(CURRENT_ANSWER).textContent(), /UI fixture second answer/);
+    // History keeps both turns, each prompt and answer exactly once and in order.
+    assert.deepEqual(await page.locator(USER_MESSAGE).allTextContents(), ["请回答一个普通问题", "继续补充一个限制"]);
+    const answers = await page.locator(ASSISTANT_MESSAGE).allTextContents();
+    assert.equal(answers.length, 2);
+    assert.match(answers[0], /UI fixture answer/);
+    assert.match(answers[1], /UI fixture second answer/);
     assert.ok(provider.requestBodies().slice(1).some((body) => JSON.stringify(body.messages ?? []).includes("请回答一个普通问题")));
 
     await page.locator(".hcp__input").fill("UI target long run");
@@ -143,7 +156,7 @@ test("RC1 Workbench UI uses the real Host/OMP fixture for answer, continuation a
     await page.getByRole("tab", { name: "Create" }).click();
     await page.locator(".hcp__input").fill("普通 Create 问题");
     await page.locator(".hcp__input").press("Enter");
-    await page.locator(".ir-workbench-chat__answer").waitFor({ timeout: 30_000 });
+    await page.locator(CURRENT_ANSWER).waitFor({ timeout: 30_000 });
 
     await page.getByRole("button", { name: "新建任务" }).click();
     await page.getByRole("tab", { name: "Create" }).click();
@@ -175,7 +188,7 @@ test("RC1 Workbench UI uses the real Host/OMP fixture for answer, continuation a
     await crewInput.fill("请结合当前项目和频道事实回答一个普通问题");
     await crewInput.press("Enter");
     try {
-      await page.locator(".ir-crew-workbench__answer").waitFor({ timeout: 30_000 });
+      await page.locator(CREW_ANSWER).last().waitFor({ timeout: 30_000 });
     } catch (error) {
       throw new Error(`Crew Workbench answer did not render: ${(await page.locator("body").innerText()).slice(0, 1600)}; provider=${JSON.stringify(provider.requestBodies().map((body) => ({ last: [...(body.messages ?? [])].reverse().find((message) => message.role === "user")?.content?.slice(0, 80), tools: (body.tools ?? []).map((tool) => tool.function?.name), roles: (body.messages ?? []).map((message) => message.role).slice(-5) }))).slice(0, 5000)}; ${error}`);
     }
@@ -209,7 +222,7 @@ test("RC1 Workbench UI uses the real Host/OMP fixture for answer, continuation a
     const seededChannelMessage = channelFact.channel_messages.find((message) => String(message.body ?? "").includes("周会行动项闭环案例"));
     assert.ok(seededChannelMessage?.body);
     const crewMarker = `UI crew facts answer: ${projectFact.project.id} · ${projectFact.project.goal_text} · ${seededChannelMessage.body}`;
-    assert.match(await page.locator(".ir-crew-workbench__answer").textContent(), new RegExp(escapeRegExp(crewMarker)));
+    assert.match(await page.locator(CREW_ANSWER).last().textContent(), new RegExp(escapeRegExp(crewMarker)));
     const crewSessions = await fetch(`http://127.0.0.1:${hostPort}/api/workbench/sessions?project_id=${encodeURIComponent(crewProjectId)}`, { headers: { authorization: `Bearer ${token}` } }).then((response) => response.json());
     assert.ok(crewSessions.sessions.some((session) => session.project_id === crewProjectId));
     await page.getByText("Cowork", { exact: true }).click();

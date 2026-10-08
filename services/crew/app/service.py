@@ -18,6 +18,7 @@ from services.crew.app.actors import (
 )
 from services.crew.app.agent_worker import CrewAgentError, CrewRunSkipped
 from services.crew.app.schemas import (
+    AssignmentProposal,
     ChannelMessage,
     CrewProject,
     CrewTask,
@@ -66,9 +67,34 @@ MemberFacts = Callable[[str], list[dict[str, str]]]
 _INTENT_PATTERN = re.compile(
     r"新任务|新增任务|加个任务|加一个任务|建个任务|需要你|请你|麻烦你|帮我|"
     r"负责|去做|做一下|测试|回归|验收|"
-    r"new mission|need you|please|task|test all",
+    r"新增.{0,4}任务|加.{0,4}任务|指派|派给|安排给|放在.{1,16}(?:之前|前面|之后|后面)|"
+    r"new mission|need you|please|task|test all|assign",
     re.IGNORECASE,
 )
+# A question asks Anna for facts unless it explicitly asks to create work:
+# "谁在负责哪些任务？" must be answered, "能帮我新增一个任务吗？" is still a draft.
+_QUESTION_PATTERN = re.compile(r"[?？]|吗|如何|怎么|怎样|什么|哪些|哪个|谁|多少|进展|状态", re.IGNORECASE)
+_EXPLICIT_CREATE_PATTERN = re.compile(
+    r"新任务|新增|新建|创建|加个任务|加一个任务|建个任务|添加.{0,6}任务|拆成|拆分|指派给|派给|"
+    r"new (?:mission|task)|add (?:a )?task|create",
+    re.IGNORECASE,
+)
+
+# Visible Anna failure rows (never silence): one row per (stage, source say).
+# Only a short machine reason code reaches the channel — exception text may
+# carry upstream detail and stays in the server log.
+_ANNA_FAILURE_COPY = {
+    "intent": "Anna 未能整理协调提案：{code}",
+    "answer": "Anna 暂时无法回答：{code}",
+}
+_SAFE_REASON_CODE = re.compile(r"[a-z][a-z0-9_.:-]{0,63}")
+
+
+def safe_reason_code(value: Any, default: str) -> str:
+    """A channel-safe reason code: a short lowercase token, else ``default``."""
+    if isinstance(value, str) and _SAFE_REASON_CODE.fullmatch(value):
+        return value
+    return default
 
 
 class CrewPermissionError(Exception):
@@ -83,6 +109,23 @@ class SuggestionAdoptionError(RuntimeError):
     def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
+
+
+class CrewProposalError(ValueError):
+    """``crew.propose_changes`` arguments failed validation; ``code`` is public."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
+# crew.propose_changes bounds (CONTRACTS.md §2).
+_MAX_PROPOSED_TASKS = 5
+_MAX_PROPOSED_ASSIGNMENTS = 5
+_MAX_PROPOSAL_TEXT = 500
+_DEFAULT_PROPOSED_ROLE = "产品"
+# Statuses the normal ``assign`` path accepts for a non-gate task.
+_ASSIGNABLE_STATUSES = frozenset({"todo", "blocked", "assigned"})
 
 
 @dataclass(frozen=True)
@@ -103,6 +146,70 @@ def _now() -> str:
 
 def _find_task(project: CrewProject, task_id: str) -> CrewTask | None:
     return next((t for t in project.tasks if t.id == task_id), None)
+
+
+# ``insert_before`` may only re-order work that has not started yet.
+_INSERT_BEFORE_STATUSES = frozenset({"todo", "blocked"})
+# Short labels for why a proposed change was skipped at confirm time.
+_TASK_STATUS_LABEL = {
+    "todo": "待办", "assigned": "已指派", "running": "执行中", "submitted": "待审",
+    "in_review": "评审中", "rework": "返工中", "done": "已完成", "blocked": "受阻",
+}
+
+
+def _depends_transitively(project: CrewProject, start_id: str, target_id: str) -> bool:
+    """Whether ``start_id`` (directly or transitively) depends on ``target_id``."""
+    depends_on = {t.id: t.depends_on for t in project.tasks}
+    stack, seen = [start_id], set()
+    while stack:
+        current = stack.pop()
+        if current == target_id:
+            return True
+        if current in seen:
+            continue
+        seen.add(current)
+        stack.extend(depends_on.get(current, []))
+    return False
+
+
+def _title_list(raw: Any) -> list[str] | None:
+    """A proposal title list (stripped, deduped); None when malformed."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        return None
+    values: list[str] = []
+    for item in raw:
+        text = item.strip()
+        if text and text not in values:
+            values.append(text)
+    return values
+
+
+def _proposal_cycle(project: CrewProject, drafts: list[TaskDraft]) -> str | None:
+    """Title of a proposed task that would sit on a dependency cycle, if any."""
+    new_titles = {d.title for d in drafts}
+    existing = {t.title: t.id for t in project.tasks}
+    edges: dict[str, list[str]] = {t.id: list(t.depends_on) for t in project.tasks}
+    for draft in drafts:
+        node = f"new:{draft.title}"
+        edges[node] = [
+            f"new:{dep}" if dep in new_titles else existing[dep] for dep in draft.depends_on
+        ]
+        for target in draft.insert_before:
+            edges[existing[target]].append(node)
+    for draft in drafts:
+        start = f"new:{draft.title}"
+        stack, seen = list(edges[start]), set()
+        while stack:
+            current = stack.pop()
+            if current == start:
+                return draft.title
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(edges.get(current, []))
+    return None
 
 
 def _deep_link(project_id: str, task_id: str | None = None) -> str:
@@ -700,28 +807,18 @@ class CrewService:
         self._redispatch_mentioned_agents(project, mentions, author_member_id, msg)
         return msg
 
-    def is_contextual_question(self, message: ChannelMessage) -> bool:
-        """Whether a member's @Anna message asks for project context.
+    def should_answer_contextually(self, message: ChannelMessage) -> bool:
+        """Whether a member's @Anna say is answered by a contextual Host task.
 
-        Task intent remains an explicit draft-card flow. A question mark or a
-        direct Chinese/English question lead is enough to route ordinary
-        contextual questions to the Host; the answer is appended to this same
-        channel, so no second UI conversation is invented.
-        """
-        if not (
+        Every member say that @-mentions Anna gets one visible Anna outcome:
+        task intent → the coordination draft card; anything else → a contextual
+        answer appended to this same channel (or a visible failure row). No
+        second UI conversation is invented."""
+        return (
             message.kind == "say"
             and message.author_kind == "member"
             and SYSTEM_ANNA_ACTOR_ID in message.mentions
-        ):
-            return False
-        if self.should_draft_intent(message):
-            return False
-        body = (message.body or "").strip().lower()
-        return (
-            "?" in body
-            or "？" in body
-            or body.startswith(("why ", "what ", "how ", "which ", "请问", "能否", "可以", "当前"))
-            or any(token in body for token in ("进展", "状态", "上下文", "共识", "做到哪", "下一步"))
+            and not self.should_draft_intent(message)
         )
 
     def append_anna_message(
@@ -732,9 +829,13 @@ class CrewService:
         task_id: str | None = None,
         run_ref: str | None = None,
     ) -> ChannelMessage:
-        """Append a Host-produced contextual answer to the existing channel."""
+        """Append a Host-produced contextual answer to the existing channel.
+
+        Channel rows persist on their own; the project itself is unchanged, so
+        it is not re-saved (a background answer must not race a concurrent
+        lifecycle transition into a version conflict)."""
         project = self._load(project_id)
-        message = self._emit_channel(
+        return self._emit_channel(
             project,
             kind="say",
             body=body,
@@ -744,8 +845,57 @@ class CrewService:
             author_member_id=None,
             audit_ref="",
         )
-        self._store.save_project(project)
-        return message
+
+    def append_anna_failure(
+        self,
+        project_id: str,
+        source_message_id: str,
+        *,
+        stage: str,
+        reason_code: str,
+    ) -> ChannelMessage:
+        """Write ONE visible Anna failure row for a say Anna could not handle.
+
+        ``stage`` is ``"intent"`` (coordination drafting) or ``"answer"``
+        (contextual Host answer). Idempotent per ``(stage, source say)`` via a
+        deterministic row id; only the safe reason code reaches the channel."""
+        project = self._load(project_id)
+        code = safe_reason_code(reason_code, f"{stage}_failed")
+        return self._emit_channel(
+            project,
+            kind="event",
+            body=_ANNA_FAILURE_COPY[stage].format(code=code),
+            author_kind="anna",
+            author_member_id=None,
+            audit_ref="",
+            payload={
+                "anna_failure": {
+                    "stage": stage,
+                    "reason_code": code,
+                    "source_message_id": source_message_id,
+                }
+            },
+            message_id=self._anna_failure_id(project.id, stage, source_message_id),
+        )
+
+    @staticmethod
+    def _anna_failure_id(project_id: str, stage: str, source_message_id: str) -> str:
+        return f"{project_id}:anna-failure:{stage}:{source_message_id}"
+
+    def _is_assignable_member(self, workspace_id: str, member_id: str) -> bool:
+        """A real workspace member (never a system actor such as ``anna``).
+
+        No roster wired keeps legacy constructions permissive; a roster lookup
+        failure is treated conservatively (not a member)."""
+        if not member_id or is_system_actor(member_id):
+            return False
+        if self._roster is None:
+            return True
+        try:
+            return member_id in set(self._roster(workspace_id))
+        except Exception:  # pragma: no cover - roster is best-effort
+            logger.warning("crew roster lookup failed; member not validated", exc_info=True)
+            return False
 
     def _filter_mentions(self, project: CrewProject, mentions: list[str]) -> list[str]:
         """Keep only real members plus system actors (order preserved)."""
@@ -777,7 +927,10 @@ class CrewService:
             return False
         if SYSTEM_ANNA_ACTOR_ID not in message.mentions:
             return False
-        return bool(_INTENT_PATTERN.search(message.body or ""))
+        body = message.body or ""
+        if _QUESTION_PATTERN.search(body) and not _EXPLICIT_CREATE_PATTERN.search(body):
+            return False
+        return bool(_INTENT_PATTERN.search(body))
 
     def draft_intent_card(
         self, project_id: str, source_message: ChannelMessage
@@ -797,8 +950,16 @@ class CrewService:
         None when a card for this say already exists.
 
         Designed as a synchronous seam: the route schedules it on a thread so it
-        never blocks the say response, while a test can invoke it directly."""
-        # Idempotency: at most one intent card per source say row.
+        never blocks the say response, while a test can invoke it directly.
+
+        If drafting raises, the exception is logged and ONE Anna-authored
+        failure row (``kind="event"``) is written instead of silence; that row
+        also counts as this say's outcome, so a repeat call writes nothing."""
+        # Idempotency: at most one intent card (or failure row) per source say.
+        if self._store.get_channel_message(
+            self._anna_failure_id(project_id, "intent", source_message.id)
+        ) is not None:
+            return None
         for existing in self._store.list_channel_messages(project_id):
             if (
                 existing.kind == "command"
@@ -809,19 +970,40 @@ class CrewService:
 
         project = self._load(project_id)
         roster_roles = sorted({t.role_required for t in project.tasks if t.role_required})
-        if self._drafter is not None:
-            bind_scope = getattr(getattr(self._drafter, "harness_runtime", None), "bind_scope", None)
-            if callable(bind_scope):
-                bind_scope(project.id, project.workspace_id, author_member_id)
-            drafts = self._drafter.draft(
-                project_id=project.id,
-                goal_text=project.goal_text,
-                message_text=source_message.body,
-                roster_roles=roster_roles,
+        try:
+            if self._drafter is not None:
+                bind_scope = getattr(
+                    getattr(self._drafter, "harness_runtime", None), "bind_scope", None
+                )
+                if callable(bind_scope):
+                    bind_scope(
+                        project.id, project.workspace_id, source_message.author_member_id
+                    )
+                drafts = self._drafter.draft(
+                    project_id=project.id,
+                    goal_text=project.goal_text,
+                    message_text=source_message.body,
+                    roster_roles=roster_roles,
+                    existing_tasks=self._drafting_task_facts(project),
+                )
+            else:
+                from services.crew.app.command_drafting import deterministic_task_drafts
+                drafts = deterministic_task_drafts(source_message.body)
+        except Exception as exc:  # noqa: BLE001 - surfaced as a visible row below
+            logger.warning(
+                "crew intent drafting failed for %s/%s",
+                project_id,
+                source_message.id,
+                exc_info=True,
             )
-        else:
-            from services.crew.app.command_drafting import deterministic_task_drafts
-            drafts = deterministic_task_drafts(source_message.body)
+            return self.append_anna_failure(
+                project_id,
+                source_message.id,
+                stage="intent",
+                reason_code=safe_reason_code(
+                    getattr(exc, "code", None), "intent_drafting_failed"
+                ),
+            )
 
         suggested = next(
             (mention for mention in source_message.mentions if not is_system_actor(mention)),
@@ -898,6 +1080,7 @@ class CrewService:
                 goal_text=project.goal_text,
                 message_text=text,
                 roster_roles=roster_roles,
+                existing_tasks=self._drafting_task_facts(project),
             )
         else:
             # No model collaborator wired: the honest single-task fallback.
@@ -919,6 +1102,156 @@ class CrewService:
         )
         return command, drafts
 
+    def propose_changes(
+        self,
+        *,
+        workspace_id: str,
+        run_id: str,
+        tool_call_id: str | None,
+        arguments: dict[str, Any],
+    ) -> ChannelMessage:
+        """Record Anna's ``crew.propose_changes`` as ONE confirmable command card.
+
+        Validates the proposal against the current project (raising
+        ``CrewProposalError`` with a public code) and writes a single
+        ``kind="command"`` Anna row whose payload the existing confirm endpoint
+        consumes. Proposal only: no task, graph edge or assignment changes and
+        no audit event until the owner confirms. Idempotent by
+        ``(run_id, tool_call_id)`` when a tool call id is given."""
+        project_id = arguments.get("project_id")
+        project = (
+            self._store.get_project(project_id)
+            if isinstance(project_id, str) and project_id.strip()
+            else None
+        )
+        if project is None or project.workspace_id != workspace_id:
+            raise CrewProposalError("project_not_found")
+        message_id = (
+            f"{project.id}:proposal:{run_id}:{tool_call_id}" if tool_call_id else None
+        )
+        if message_id is not None:
+            existing_card = self._store.get_channel_message(message_id)
+            if existing_card is not None:
+                return existing_card
+
+        raw_tasks = arguments.get("new_tasks")
+        raw_assignments = arguments.get("assignments")
+        raw_tasks = [] if raw_tasks is None else raw_tasks
+        raw_assignments = [] if raw_assignments is None else raw_assignments
+        if not isinstance(raw_tasks, list):
+            raise CrewProposalError("invalid_new_tasks")
+        if not isinstance(raw_assignments, list):
+            raise CrewProposalError("invalid_assignments")
+        if not raw_tasks and not raw_assignments:
+            raise CrewProposalError("empty_proposal")
+        if len(raw_tasks) > _MAX_PROPOSED_TASKS:
+            raise CrewProposalError("too_many_new_tasks")
+        if len(raw_assignments) > _MAX_PROPOSED_ASSIGNMENTS:
+            raise CrewProposalError("too_many_assignments")
+        summary = arguments.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            raise CrewProposalError("summary_required")
+        summary = summary.strip()
+        if len(summary) > _MAX_PROPOSAL_TEXT:
+            raise CrewProposalError("summary_too_long")
+
+        existing = {t.title: t for t in project.tasks}
+        drafts: list[TaskDraft] = []
+        for index, raw in enumerate(raw_tasks):
+            if not isinstance(raw, dict):
+                raise CrewProposalError(f"invalid_new_task:{index}")
+            title = raw.get("title")
+            depends_on = _title_list(raw.get("depends_on"))
+            insert_before = _title_list(raw.get("insert_before"))
+            assignee_id = raw.get("assignee_id")
+            if (
+                not isinstance(title, str)
+                or not title.strip()
+                or depends_on is None
+                or insert_before is None
+                or (assignee_id is not None and not isinstance(assignee_id, str))
+            ):
+                raise CrewProposalError(f"invalid_new_task:{index}")
+            title = title.strip()
+            if title in existing or any(d.title == title for d in drafts):
+                raise CrewProposalError(f"duplicate_title:{title}")
+            if assignee_id is not None and not self._is_assignable_member(
+                project.workspace_id, assignee_id
+            ):
+                raise CrewProposalError(f"assignee_not_member:{assignee_id}")
+            drafts.append(TaskDraft(
+                title=title,
+                role=str(raw.get("role") or "").strip() or _DEFAULT_PROPOSED_ROLE,
+                depends_on=depends_on,
+                acceptance=str(raw.get("acceptance") or "").strip(),
+                insert_before=insert_before,
+                assignee_id=assignee_id,
+            ))
+        new_titles = {d.title for d in drafts}
+        for draft in drafts:
+            for dep in draft.depends_on:
+                if dep not in new_titles and dep not in existing:
+                    raise CrewProposalError(f"unknown_task_title:{dep}")
+            for target_title in draft.insert_before:
+                target = existing.get(target_title)
+                if target is None:
+                    raise CrewProposalError(f"unknown_task_title:{target_title}")
+                if target.status not in _INSERT_BEFORE_STATUSES:
+                    raise CrewProposalError(f"insert_before_not_allowed:{target_title}")
+        cycle_title = _proposal_cycle(project, drafts)
+        if cycle_title is not None:
+            raise CrewProposalError(f"dependency_cycle:{cycle_title}")
+
+        assignments: list[AssignmentProposal] = []
+        for index, raw in enumerate(raw_assignments):
+            if not isinstance(raw, dict):
+                raise CrewProposalError(f"invalid_assignment:{index}")
+            task_id, member_id = raw.get("task_id"), raw.get("member_id")
+            reason = raw.get("reason") or ""
+            if (
+                not isinstance(task_id, str)
+                or not task_id.strip()
+                or not isinstance(member_id, str)
+                or not member_id.strip()
+                or not isinstance(reason, str)
+                or len(reason) > _MAX_PROPOSAL_TEXT
+            ):
+                raise CrewProposalError(f"invalid_assignment:{index}")
+            task = _find_task(project, task_id)
+            if task is None:
+                raise CrewProposalError(f"unknown_task:{task_id}")
+            if not self._is_assignable_member(project.workspace_id, member_id):
+                raise CrewProposalError(f"assignee_not_member:{member_id}")
+            if task.is_gate or task.status not in _ASSIGNABLE_STATUSES:
+                raise CrewProposalError(f"assignment_not_allowed:{task_id}")
+            if any(a.task_id == task_id for a in assignments):
+                raise CrewProposalError(f"duplicate_assignment:{task_id}")
+            assignments.append(
+                AssignmentProposal(task_id=task_id, member_id=member_id, reason=reason.strip())
+            )
+
+        return self._emit_channel(
+            project,
+            kind="command",
+            body=f"Anna 提议：{summary}",
+            author_kind="anna",
+            author_member_id=None,
+            audit_ref="",
+            payload={
+                "drafts": [d.model_dump() for d in drafts],
+                "assignments": [a.model_dump() for a in assignments],
+                "origin": "anna_coordination",
+                "source": {
+                    "type": "workbench_run",
+                    "run_id": run_id,
+                    "tool_call_id": tool_call_id,
+                },
+                "text": summary,
+                "suggested_assignee": None,
+            },
+            message_id=message_id,
+        )
+
     def confirm_drafts(
         self,
         project_id: str,
@@ -926,27 +1259,39 @@ class CrewService:
         confirmed_by: str,
         source_message_id: str | None = None,
         suggested_assignee: str | None = None,
+        assignments: list[AssignmentProposal] | None = None,
     ) -> CrewProject:
-        """Phase 2 (Boss-only): materialize a confirmed subset of drafts as tasks.
+        """Phase 2 (Boss-only): materialize a confirmed subset of a command card.
 
         Boss-ness = project ownership; a non-owner ``confirmed_by`` raises
         ``CrewPermissionError``. New tasks carry ``origin="channel"`` +
         ``created_from_message_id`` (provenance back to the command row) and
         resolve ``depends_on`` by title (against the confirmed drafts, then
-        existing task titles). Emits an「已确认·已下推」event row + a ``grown``
-        notification to the Boss; the whole push is audited.
+        existing task titles). ``insert_before`` makes not-yet-started existing
+        tasks wait for the new task. Per-draft ``assignee_id`` and the chosen
+        ``assignments`` go through the normal ``assign`` path. Anything that
+        cannot be applied is skipped and named on the confirmation row. Emits an
+        「已确认·已下推」event row (+ a ``grown`` notification when tasks were
+        created); the whole push is audited and idempotent per command row.
         """
         project = self._load(project_id)
         if confirmed_by != project.owner_user_id:
             raise CrewPermissionError("只有项目负责人可以确认下推任务")
-        if not drafts:
+        assignments = list(assignments or [])
+        if not drafts and not assignments:
             return project
 
         # 幂等短路(终审 #3):一条命令行只下推一次。若已有任务的血缘指回同一
-        # source_message_id(双标签页 / 重复点击的二次 confirm),直接返回现 project
-        # (200 幂等,响应仍含既有任务),不重复建任务 / 频道行 / 通知。
-        if source_message_id is not None and any(
-            t.created_from_message_id == source_message_id for t in project.tasks
+        # source_message_id,或该命令行已有确认审计(仅指派、无新任务的提议),
+        # 直接返回现 project,不重复建任务 / 改派 / 频道行 / 通知。
+        if source_message_id is not None and (
+            any(t.created_from_message_id == source_message_id for t in project.tasks)
+            or any(
+                event.get("type") == "crew.channel.tasks_confirmed"
+                and (event.get("payload") or {}).get("created_from_message_id")
+                == source_message_id
+                for event in project.audit_events
+            )
         ):
             return project
 
@@ -984,34 +1329,133 @@ class CrewService:
                 created_from_message_id=source_message_id,
             ))
 
+        existing_tasks = {t.title: t for t in project.tasks}
         project.tasks.extend(new_tasks)
+        # ``insert_before``: each named EXISTING task now also waits for the new
+        # task. Only not-yet-started targets (todo/blocked) are re-ordered; any
+        # other target, an unknown title, or an edge that would close a cycle is
+        # skipped and reported on the confirmation row (never silently dropped).
+        drafts_by_title = {d.title: d for d in drafts}
+        reordered: list[tuple[CrewTask, CrewTask]] = []  # (target, new task)
+        skipped_order: list[tuple[str, str]] = []  # (title, reason label)
+        for new_task in new_tasks:
+            for target_title in drafts_by_title[new_task.title].insert_before:
+                target = existing_tasks.get(target_title)
+                if target is None:
+                    skipped_order.append((target_title, "未找到"))
+                elif target.status not in _INSERT_BEFORE_STATUSES:
+                    skipped_order.append(
+                        (target_title, _TASK_STATUS_LABEL.get(target.status, target.status))
+                    )
+                elif _depends_transitively(project, new_task.id, target.id):
+                    skipped_order.append((target_title, "会形成循环依赖"))
+                elif new_task.id not in target.depends_on:
+                    target.depends_on.append(new_task.id)
+                    # The new task is never done yet, so the target must wait.
+                    target.status = "blocked"
+                    reordered.append((target, new_task))
         # A dependency referenced by title may already be done — recompute so a
         # newly-added task with satisfied deps starts ready, not stuck blocked.
         lifecycle.recompute_readiness(project)
+
+        # Assignment plan: per-draft assignees, then the chosen assignments.
+        # Validated against the post-push graph; applied after save through the
+        # normal ``assign`` path (channel row, notification, auto-pilot).
+        planned: list[tuple[str, str]] = []  # (task_id, member_id)
+        skipped_assign: list[tuple[str, str, str]] = []  # (title, member, reason)
+        requested = [
+            (task.id, drafts_by_title[task.title].assignee_id)
+            for task in new_tasks
+            if drafts_by_title[task.title].assignee_id
+        ] + [(item.task_id, item.member_id) for item in assignments]
+        for task_id, member_id in requested:
+            task = _find_task(project, task_id)
+            if task is None:
+                skipped_assign.append((task_id, member_id, "任务不存在"))
+            elif not self._is_assignable_member(project.workspace_id, member_id):
+                skipped_assign.append((task.title, member_id, "成员无效"))
+            elif task.is_gate:
+                skipped_assign.append((task.title, member_id, "评审门不可指派"))
+            elif task.status not in _ASSIGNABLE_STATUSES:
+                skipped_assign.append(
+                    (task.title, member_id, _TASK_STATUS_LABEL.get(task.status, task.status))
+                )
+            else:
+                planned.append((task_id, member_id))
 
         audit_ref = self._append_event(project, "crew.channel.tasks_confirmed", {
             "count": len(new_tasks),
             "task_ids": [t.id for t in new_tasks],
             "created_from_message_id": source_message_id,
             "confirmed_by": confirmed_by,
+            "insert_before": [
+                {"task_id": target.id, "waits_for": new_task.id}
+                for target, new_task in reordered
+            ],
+            "assignments": [
+                {"task_id": task_id, "member_id": member_id} for task_id, member_id in planned
+            ],
+            "skipped": [
+                {"kind": "insert_before", "title": title, "reason": reason}
+                for title, reason in skipped_order
+            ] + [
+                {"kind": "assignment", "title": title, "member_id": member, "reason": reason}
+                for title, member, reason in skipped_assign
+            ],
         })
-        names = "、".join(f"“{t.title}”" for t in new_tasks)
+        if new_tasks:
+            names = "、".join(f"“{t.title}”" for t in new_tasks)
+            body = f"已确认下推 {len(new_tasks)} 项任务：{names}。"
+        else:
+            body = "已确认 Anna 提议。"
+        if reordered:
+            body += "顺序调整：" + "、".join(
+                f"“{target.title}”需等待“{new_task.title}”完成" for target, new_task in reordered
+            ) + "。"
+        if skipped_order:
+            body += "未调整顺序：" + "、".join(
+                f"“{title}”（{reason}）" for title, reason in skipped_order
+            ) + "。"
+        if planned:
+            body += f"按提议指派 {len(planned)} 项。"
+        if skipped_assign:
+            body += "未执行指派：" + "、".join(
+                f"“{title}”→@{self._name(member)}（{reason}）"
+                for title, member, reason in skipped_assign
+            ) + "。"
         self._emit_channel(
             project, kind="event",
-            body=f"已确认下推 {len(new_tasks)} 项任务：{names}。",
+            body=body,
             audit_ref=audit_ref,
+            # Lets the channel mark the source card as confirmed even when it
+            # created no task (an assignments-only proposal).
+            payload=None if source_message_id is None else {"confirms_message_id": source_message_id},
         )
-        self._emit_notification(
-            project, to=project.owner_user_id, kind="grown",
-            title=f"{len(new_tasks)} 项任务已由频道生长并下推。",
-            task_id=None, ref=audit_ref,
-        )
+        if new_tasks:
+            self._emit_notification(
+                project, to=project.owner_user_id, kind="grown",
+                title=f"{len(new_tasks)} 项任务已由频道生长并下推。",
+                task_id=None, ref=audit_ref,
+            )
         self._store.save_project(project)
+        for task_id, member_id in planned:
+            try:
+                project = self.assign(project_id, task_id, member_id)
+            except lifecycle.CrewLifecycleError:
+                logger.warning(
+                    "confirmed assignment of %s to %s raced a transition; skipped",
+                    task_id,
+                    member_id,
+                )
         # R4b 采纳即派:意图卡的建议负责人(发言中 @ 指定)下推后立即派给首任务,
         # 走正规 assign 通道(频道事件 / 收件通知 / auto-pilot 全部自然触发——
         # 「采纳并开跑」的开跑就在这里)。幽灵成员静默跳过;状态竞态导致不可派时
-        # 保持「已下推未派」,确认本身不失败。
-        if suggested_assignee and new_tasks:
+        # 保持「已下推未派」,确认本身不失败。草案自带 assignee_id 时以草案为准。
+        if (
+            suggested_assignee
+            and new_tasks
+            and not drafts_by_title[new_tasks[0].title].assignee_id
+        ):
             valid = True
             if self._roster is not None:
                 try:
@@ -1082,6 +1526,14 @@ class CrewService:
         if project is None:
             raise ValueError(f"Project {project_id!r} not found")
         return project
+
+    @staticmethod
+    def _drafting_task_facts(project: CrewProject) -> list[dict[str, str]]:
+        """Existing tasks as the drafter sees them (title, role, status)."""
+        return [
+            {"title": t.title, "role": t.role_required, "status": t.status}
+            for t in project.tasks
+        ]
 
     def _current_member_facts(self, workspace_id: str) -> list[dict[str, str]]:
         if self._member_facts is None:

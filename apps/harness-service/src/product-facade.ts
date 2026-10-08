@@ -33,8 +33,22 @@ import {
   type WorkbenchSessionRecord,
 } from "./workbench-session";
 import { planProductV1Migration } from "./workbench-migration";
+import { projectTrace } from "@anna/trace";
+import {
+  continuationPrompt,
+  decideGoal,
+  GOAL_DEFAULT_MAX_RUNS,
+  GOAL_MAX_RUNS_LIMIT,
+  parsePlan,
+  planProgress,
+  type GoalRunEvidence,
+  type PlanSnapshot,
+  type WorkbenchGoalRecord,
+} from "./workbench-goal";
 import { resolveWorkbenchWorkdir, workdirResourceId } from "./workbench-files";
 import { registeredWorkbenchSkills } from "./workbench-skills";
+import { sandboxSupport } from "./workbench-sandbox";
+import type { McpManager } from "./workbench-mcp";
 import { assertNoDuplicateJsonKeys, decideAssignee, validateAssigneeDecisionInput, type AssigneeDecisionInput, type JevTelemetryRecord, type JevTransport } from "./jev-decision";
 
 const maxJsonBodyBytes = 1_024 * 1_024;
@@ -77,6 +91,10 @@ export interface ProductHostOptions {
   readonly now?: () => string;
   readonly jevTransport?: JevTransport;
   readonly jevTelemetry?: (record: JevTelemetryRecord) => void;
+  /** How often the Host checks active Session Goals for a settled Run. */
+  readonly goalSupervisorIntervalMs?: number;
+  /** Host MCP client, reported to the UI so permission prompts can name external write tools. */
+  readonly mcp?: McpManager;
 }
 
 export interface RunningProductHost {
@@ -133,6 +151,21 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     ...(options.protectedPaths ?? []),
   ].filter((value): value is string => typeof value === "string" && value.trim() !== "");
 
+  // Session Goal supervision state (functions are declared below).
+  const goalLocks = new Map<string, Promise<unknown>>();
+  let supervising = false;
+  const goalSupervisor = setInterval(() => {
+    if (supervising || closed) return;
+    supervising = true;
+    void (async () => {
+      for (const session of await workbenchSessions.listSessionsWithGoalStatus("active")) {
+        if (closed) break;
+        await advanceGoal(session.session_id).catch(() => undefined);
+      }
+    })().catch(() => undefined).finally(() => { supervising = false; });
+  }, options.goalSupervisorIntervalMs ?? 1_000);
+  goalSupervisor.unref?.();
+
   const server = createServer((request, response) => {
     void handleRequest(request, response).catch((error: unknown) => {
       if (response.headersSent || response.destroyed) return;
@@ -169,6 +202,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     close: () => {
       if (closePromise !== undefined) return closePromise;
       closed = true;
+      clearInterval(goalSupervisor);
       for (const controller of activeJevRequests) controller.abort();
       closePromise = new Promise<void>((resolveClose, rejectClose) => {
         server.close((error) => error ? rejectClose(error) : resolveClose());
@@ -190,7 +224,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       await handleHarnessRequest(request, response, pathname, requestUrl.searchParams);
       return;
     }
-    if (pathname === "/api/workbench/migrations/product-v1"
+    if (pathname === "/api/workbench/migrations/product-v1" || pathname === "/api/workbench/tools"
       || pathname === "/api/workbench/sessions" || pathname.startsWith("/api/workbench/sessions/")
       || pathname === "/api/workbench/runs" || pathname.startsWith("/api/workbench/runs/")) {
       await handleWorkbenchRequest(request, response, pathname, requestUrl.searchParams);
@@ -214,6 +248,12 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     }
     if (pathname === "/api" || pathname.startsWith("/api/")) {
       responseJson(response, 404, { code: "not_found" });
+      return;
+    }
+    if (pathname === "/v2" || pathname.startsWith("/v2/")) {
+      // Never answer an API path with the SPA document: the review inspector
+      // must see an explicit JSON error, not parse HTML.
+      responseJson(response, 404, { code: "review_api_not_served_by_product_host" });
       return;
     }
     if (request.method === "GET") {
@@ -567,6 +607,26 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       });
       return;
     }
+    if (pathname === "/api/workbench/tools" && request.method === "GET") {
+      await resolveWorkbenchScope(request);
+      const support = sandboxSupport();
+      const tools = options.mcp?.tools() ?? [];
+      responseJson(response, 200, {
+        sandbox: support.available
+          ? { available: true, kind: "macos-seatbelt", network: "denied" }
+          : { available: false, reason: support.reason },
+        mcp_servers: (options.mcp?.status() ?? []).map((server) => ({
+          server_id: server.server_id,
+          state: server.state,
+          transport: server.transport,
+          tool_count: server.tool_count,
+          ...(server.error === undefined ? {} : { error: server.error }),
+          tools: tools.filter((tool) => tool.server_id === server.server_id)
+            .map((tool) => ({ capability_id: tool.capability_id, tool_name: tool.tool_name, read_only: tool.read_only })),
+        })),
+      });
+      return;
+    }
     if (pathname === "/api/workbench/sessions" && request.method === "POST") {
       const body = asRecord(await readJsonBody(request));
       assertAllowedKeys(body, ["project_id", "surface"]);
@@ -638,7 +698,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
       const body = asRecord(await readJsonBody(request));
       assertAllowedKeys(body, [
         "prompt", "source_event_id", "surface", "parent_run_id", "resource_refs", "requested_artifact",
-        "skill_id", "agent_id", "model_profile_id",
+        "skill_id", "agent_id", "model_profile_id", "permission_mode",
       ]);
       const prompt = requiredSettingString(body.prompt, "prompt");
       const sourceEventId = requiredSettingString(body.source_event_id, "source_event_id");
@@ -651,6 +711,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         throw new ProductHttpError(422, "resource_refs_not_supported");
       }
       const requestedArtifact = requestedArtifactKind(body.requested_artifact);
+      const permissionMode = requestedPermissionMode(body.permission_mode, resourceRefs);
       const requestedSkillId = optionalId(body.skill_id, "skill_id");
       const skillSource = requestedSkillId === undefined
         ? undefined
@@ -701,6 +762,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         ...(agentId === undefined ? {} : { agent_id: agentId }),
         ...(modelProfileId === undefined ? {} : { model_profile_id: modelProfileId }),
         ...(requestedArtifact === undefined ? {} : { requested_artifact: requestedArtifact }),
+        ...(permissionMode === "contained-write" ? { permission_mode: permissionMode } : {}),
       };
       const lookup = await workbenchSessions.createOrGetRun(run);
       if (lookup.kind === "conflict") throw new ProductHttpError(409, "run_conflict");
@@ -736,24 +798,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
           return;
         }
       }
-      if (lookup.kind === "created") {
-        workbenchSessions.beginRunAdmission(lookup.run.run_id);
-        try {
-          await startWorkbenchRun(lookup.run);
-          workbenchSessions.completeRunAdmission(lookup.run.run_id, { ok: true });
-        } catch (error) {
-          const failure = error instanceof ProductHttpError
-            ? { statusCode: error.statusCode, code: error.code }
-            : { statusCode: 503, code: "harness_unavailable" };
-          workbenchSessions.completeRunAdmission(lookup.run.run_id, {
-            ok: false,
-            ...failure,
-          });
-          throw error;
-        } finally {
-          workbenchSessions.endRunAdmission(lookup.run.run_id);
-        }
-      }
+      if (lookup.kind === "created") await admitWorkbenchRun(lookup.run);
       const status = lookup.kind === "created"
         ? "queued"
         : (await readWorkbenchRun(lookup.run))?.status ?? "queued";
@@ -764,6 +809,64 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         source_event_id: lookup.run.source_event_id,
         status,
       });
+      return;
+    }
+    const goalMatch = pathname.match(/^\/api\/workbench\/sessions\/([^/]+)\/goal(?:\/(pause|resume|stop|complete))?$/);
+    if (goalMatch !== null && request.method === "POST") {
+      const scope = await resolveWorkbenchScope(request);
+      const session = await workbenchSessions.getSession(decodeSegment(goalMatch[1]));
+      if (session === undefined) throw new ProductHttpError(404, "session_not_found");
+      const authorizedScope = await authorizeWorkbenchSession(request, session, scope);
+      const body = asRecord(await readJsonBody(request));
+      if (goalMatch[2] === undefined) {
+        const created = await createGoal(session, authorizedScope, body);
+        responseJson(response, created.created ? 201 : 200, { goal: publicGoal(created.goal), run_id: created.runId });
+        return;
+      }
+      const goal = await controlGoal(session.session_id, goalMatch[2] as "pause" | "resume" | "stop" | "complete", body);
+      responseJson(response, 200, { goal: publicGoal(goal.goal), ...(goal.runId === undefined ? {} : { run_id: goal.runId }) });
+      return;
+    }
+    const runControlMatch = pathname.match(/^\/api\/workbench\/runs\/([^/]+)\/(steer|trace)$/);
+    if (runControlMatch !== null && (runControlMatch[2] === "steer" ? request.method === "POST" : request.method === "GET")) {
+      const scope = await resolveWorkbenchScope(request);
+      const run = await workbenchSessions.getRun(decodeSegment(runControlMatch[1]));
+      if (run === undefined) throw new ProductHttpError(404, "run_not_found");
+      const session = await workbenchSessions.getSession(run.session_id);
+      if (session === undefined) throw new ProductHttpError(404, "run_not_found");
+      try {
+        await authorizeWorkbenchSession(request, session, scope);
+      } catch (error) {
+        if (error instanceof ProductHttpError && error.statusCode === 401) throw error;
+        throw new ProductHttpError(404, "run_not_found");
+      }
+      const detail = await readWorkbenchRun(run);
+      if (runControlMatch[2] === "trace") {
+        responseJson(response, 200, projectTrace(detail?.events ?? [], {
+          runId: run.run_id,
+          surface: run.surface,
+          scope: { workspaceId: run.workspace_id, channelId: run.channel_id } as ChannelScope,
+          conversationId: run.session_id,
+        }));
+        return;
+      }
+      const body = asRecord(await readJsonBody(request));
+      assertAllowedKeys(body, ["text"]);
+      const text = typeof body.text === "string" ? body.text.trim() : "";
+      if (text === "" || text.length > 8_000) throw new ProductHttpError(400, "invalid_steer_text");
+      const status = detail?.status ?? "queued";
+      if (terminalEvents.has(`run.${status}`)) {
+        responseJson(response, 202, { run_id: run.run_id, status, accepted: false });
+        return;
+      }
+      if (options.runtime.steer === undefined) throw new ProductHttpError(409, "harness_signal_unavailable");
+      // OMP consumes a steer at its next turn boundary; acknowledge delivery
+      // without holding the request open for the whole model turn.
+      const delivery = options.runtime.steer(run.workspace_id, run.channel_id, run.run_id, text)
+        .then(() => "consumed" as const, () => "rejected" as const);
+      const outcome = await Promise.race([delivery, new Promise<"pending">((resolvePending) => setTimeout(() => resolvePending("pending"), 1_500))]);
+      if (outcome === "rejected") throw new ProductHttpError(409, "harness_signal_unavailable");
+      responseJson(response, 202, { run_id: run.run_id, status, accepted: true, consumed: outcome === "consumed" });
       return;
     }
     const runStopMatch = pathname.match(/^\/api\/workbench\/runs\/([^/]+)\/stop$/);
@@ -821,7 +924,7 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
           watermark: watermarkFor(detail.events, run.run_id),
         });
       } else {
-        responseJson(response, 200, publicWorkbenchRun(run, detail));
+        responseJson(response, 200, publicWorkbenchRun(run, detail, options.runtime.liveOutput?.(run.run_id)));
       }
       return;
     }
@@ -886,6 +989,255 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     }
   }
 
+  async function admitWorkbenchRun(run: WorkbenchRunRecord): Promise<void> {
+    workbenchSessions.beginRunAdmission(run.run_id);
+    try {
+      await startWorkbenchRun(run);
+      workbenchSessions.completeRunAdmission(run.run_id, { ok: true });
+    } catch (error) {
+      const failure = error instanceof ProductHttpError
+        ? { statusCode: error.statusCode, code: error.code }
+        : { statusCode: 503, code: "harness_unavailable" };
+      workbenchSessions.completeRunAdmission(run.run_id, { ok: false, ...failure });
+      throw error;
+    } finally {
+      workbenchSessions.endRunAdmission(run.run_id);
+    }
+  }
+
+  // ---------------------------------------------------------------- Session Goal
+
+  function withGoalLock<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = goalLocks.get(sessionId) ?? Promise.resolve();
+    const next = previous.then(operation, operation);
+    const settled = next.then(() => undefined, () => undefined);
+    goalLocks.set(sessionId, settled);
+    void settled.then(() => {
+      if (goalLocks.get(sessionId) === settled) goalLocks.delete(sessionId);
+    });
+    return next;
+  }
+
+  async function submitGoalRun(
+    session: WorkbenchSessionRecord,
+    goal: WorkbenchGoalRecord,
+    prompt: string,
+    trigger: "user" | "goal_continuation",
+  ): Promise<WorkbenchRunRecord> {
+    const index = goal.run_ids.length + 1;
+    const timestamp = now();
+    const candidate: WorkbenchRunRecord = {
+      schema_version: 2,
+      run_id: randomUUID(),
+      session_id: session.session_id,
+      workspace_id: session.workspace_id,
+      actor_user_id: session.actor_user_id,
+      channel_id: session.channel_id,
+      surface: session.surface,
+      prompt,
+      source_event_id: `goal:${goal.goal_id}:${index}`,
+      resource_refs: goal.resource_refs,
+      conversation_id: session.session_id,
+      created_at: timestamp,
+      updated_at: timestamp,
+      admission_status: "pending",
+      goal_id: goal.goal_id,
+      trigger,
+      ...(session.project_id === undefined ? {} : { project_id: session.project_id }),
+      ...(goal.permission_mode === "contained-write" ? { permission_mode: goal.permission_mode } : {}),
+    };
+    const lookup = await workbenchSessions.createOrGetRun(candidate);
+    if (lookup.kind === "conflict") throw new ProductHttpError(409, "run_conflict");
+    // Reference the Run from the Goal before admission so a crash cannot orphan it.
+    await workbenchSessions.updateSession(session.session_id, (current) => current.goal?.goal_id !== goal.goal_id
+      ? current
+      : {
+          ...current,
+          goal: {
+            ...current.goal,
+            run_ids: current.goal.run_ids.includes(lookup.run.run_id) ? current.goal.run_ids : [...current.goal.run_ids, lookup.run.run_id],
+            updated_at: now(),
+          },
+        });
+    if (lookup.kind === "created") {
+      // Admission failures are recorded on the Run and settle the Goal on the next tick.
+      await admitWorkbenchRun(lookup.run).catch(() => undefined);
+    } else {
+      const canonical = await readWorkbenchEvents(lookup.run, productTaskForWorkbenchRun(lookup.run));
+      if (!canonical.canonical && lookup.run.admission_status !== "failed"
+        && workbenchSessions.waitForRunAdmission(lookup.run.run_id) === undefined) {
+        await admitWorkbenchRun(lookup.run).catch(() => undefined);
+      }
+    }
+    return lookup.run;
+  }
+
+  async function createGoal(
+    session: WorkbenchSessionRecord,
+    scope: { workspace_id: string; actor_user_id: string },
+    body: Record<string, unknown>,
+  ): Promise<{ goal: WorkbenchGoalRecord; runId: string; created: boolean }> {
+    assertAllowedKeys(body, ["objective", "source_event_id", "max_runs", "permission_mode", "resource_refs"]);
+    const objective = typeof body.objective === "string" ? body.objective.trim() : "";
+    if (objective === "" || objective.length > 8_000) throw new ProductHttpError(400, "invalid_objective");
+    const sourceEventId = requiredSettingString(body.source_event_id, "source_event_id");
+    const maxRuns = body.max_runs === undefined ? GOAL_DEFAULT_MAX_RUNS : body.max_runs;
+    if (typeof maxRuns !== "number" || !Number.isInteger(maxRuns) || maxRuns < 1 || maxRuns > GOAL_MAX_RUNS_LIMIT) {
+      throw new ProductHttpError(400, "invalid_max_runs");
+    }
+    const resourceRefs = body.resource_refs === undefined ? [] : requiredResourceRefs(body.resource_refs);
+    try {
+      workdirResourceId(resourceRefs);
+    } catch {
+      throw new ProductHttpError(422, "resource_refs_not_supported");
+    }
+    const permissionMode = requestedPermissionMode(body.permission_mode, resourceRefs);
+    if (scope.workspace_id !== session.workspace_id || scope.actor_user_id !== session.actor_user_id) {
+      throw new ProductHttpError(404, "session_not_found");
+    }
+    return withGoalLock(session.session_id, async () => {
+      const current = await workbenchSessions.getSession(session.session_id);
+      if (current === undefined) throw new ProductHttpError(404, "session_not_found");
+      if (current.goal?.source_event_id === sourceEventId) {
+        return { goal: current.goal, runId: current.goal.run_ids[0] ?? "", created: false };
+      }
+      if (current.goal !== undefined && ["active", "paused", "awaiting_review"].includes(current.goal.status)) {
+        throw new ProductHttpError(409, "goal_already_active");
+      }
+      const timestamp = now();
+      const goal: WorkbenchGoalRecord = {
+        goal_id: randomUUID(),
+        objective,
+        status: "active",
+        max_runs: maxRuns,
+        run_ids: [],
+        permission_mode: permissionMode,
+        resource_refs: resourceRefs,
+        source_event_id: sourceEventId,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+      await workbenchSessions.updateSession(current.session_id, (record) => ({ ...record, goal }));
+      const run = await submitGoalRun(current, goal, objective, "user");
+      const saved = (await workbenchSessions.getSession(current.session_id))?.goal ?? goal;
+      return { goal: saved, runId: run.run_id, created: true };
+    });
+  }
+
+  async function goalEvidence(goal: WorkbenchGoalRecord): Promise<GoalRunEvidence & { latest?: WorkbenchRunRecord }> {
+    const latestId = goal.run_ids.at(-1);
+    const latest = latestId === undefined ? undefined : await workbenchSessions.getRun(latestId);
+    if (latest === undefined) return { hasFinalText: false };
+    if (latest.admission_status === "failed") return { latest, admissionError: latest.admission_error ?? "run_admission_failed", hasFinalText: false };
+    const detail = await readWorkbenchRun(latest);
+    const events = detail?.events ?? [];
+    const terminal = events.find((event) => terminalEvents.has(event.type));
+    // The plan is cumulative evidence: a continuation that did not touch the
+    // plan keeps the previous Run's plan (and so its open items).
+    let plan: PlanSnapshot | undefined = planFromEvents(events);
+    for (const runId of [...goal.run_ids].reverse().slice(1)) {
+      if (plan !== undefined) break;
+      const prior = await workbenchSessions.getRun(runId);
+      if (prior !== undefined) plan = planFromEvents((await readWorkbenchRun(prior))?.events ?? []);
+    }
+    const failurePayload = terminal?.type === "run.failed" ? recordValue(terminal.payload) : undefined;
+    return {
+      latest,
+      ...(terminal === undefined ? {} : { terminalStatus: terminal.type.slice("run.".length) }),
+      ...(typeof failurePayload?.reason === "string" ? { failureReason: failurePayload.reason } : {}),
+      ...(plan === undefined ? {} : { plan }),
+      hasFinalText: messagesForWorkbenchRun(latest, events).some((message) => message.role === "assistant"),
+    };
+  }
+
+  async function advanceGoal(sessionId: string): Promise<void> {
+    await withGoalLock(sessionId, async () => {
+      const session = await workbenchSessions.getSession(sessionId);
+      const goal = session?.goal;
+      if (session === undefined || goal === undefined || goal.status !== "active") return;
+      const evidence = await goalEvidence(goal);
+      const progress = planProgress(evidence.plan);
+      const decision = decideGoal(goal, evidence);
+      if (decision.kind === "wait") {
+        if (progress !== undefined && (goal.plan_progress?.completed !== progress.completed || goal.plan_progress?.total !== progress.total)) {
+          await workbenchSessions.updateSession(sessionId, (record) => record.goal?.goal_id !== goal.goal_id ? record : {
+            ...record,
+            goal: { ...record.goal, plan_progress: { completed: progress.completed, total: progress.total }, updated_at: now() },
+          });
+        }
+        return;
+      }
+      const patch: Partial<WorkbenchGoalRecord> = {
+        last_reason: decision.reason,
+        ...(progress === undefined ? {} : { plan_progress: { completed: progress.completed, total: progress.total } }),
+        updated_at: now(),
+        ...(decision.kind === "settle" ? { status: decision.status } : {}),
+      };
+      const updated = await workbenchSessions.updateSession(sessionId, (record) => record.goal?.goal_id !== goal.goal_id ? record : {
+        ...record,
+        goal: { ...record.goal, ...patch },
+      });
+      if (decision.kind === "continue" && updated.goal !== undefined) {
+        await submitGoalRun(updated, updated.goal, continuationPrompt(updated.goal, evidence.plan, decision.reason), "goal_continuation");
+      }
+    });
+  }
+
+  async function controlGoal(
+    sessionId: string,
+    action: "pause" | "resume" | "stop" | "complete",
+    body: Record<string, unknown>,
+  ): Promise<{ goal: WorkbenchGoalRecord; runId?: string }> {
+    assertAllowedKeys(body, action === "resume" ? ["max_runs"] : []);
+    return withGoalLock(sessionId, async () => {
+      const session = await workbenchSessions.getSession(sessionId);
+      const goal = session?.goal;
+      if (session === undefined || goal === undefined) throw new ProductHttpError(404, "goal_not_found");
+      const save = (patch: Partial<WorkbenchGoalRecord>) => workbenchSessions.updateSession(sessionId, (record) => ({
+        ...record,
+        goal: { ...record.goal!, ...patch, updated_at: now() },
+      }));
+      if (action === "pause") {
+        if (goal.status !== "active") throw new ProductHttpError(409, "goal_not_active");
+        return { goal: (await save({ status: "paused", last_reason: "user_paused" })).goal! };
+      }
+      if (action === "complete") {
+        if (goal.status !== "awaiting_review") throw new ProductHttpError(409, "goal_not_awaiting_review");
+        return { goal: (await save({ status: "completed", last_reason: "user_confirmed" })).goal! };
+      }
+      if (action === "stop") {
+        if (!["active", "paused", "awaiting_review", "budget_exhausted", "failed"].includes(goal.status)) {
+          throw new ProductHttpError(409, "goal_not_stoppable");
+        }
+        const saved = await save({ status: "stopped", last_reason: "user_stopped" });
+        const latest = goal.run_ids.at(-1) === undefined ? undefined : await workbenchSessions.getRun(goal.run_ids.at(-1)!);
+        if (latest !== undefined && options.runtime.stop !== undefined) {
+          const status = (await readWorkbenchRun(latest))?.status;
+          if (status !== undefined && !terminalEvents.has(`run.${status}`) && status !== "not_started") {
+            await options.runtime.stop(latest.workspace_id, latest.channel_id, latest.run_id, "Goal stopped by user").catch(() => undefined);
+          }
+        }
+        return { goal: saved.goal! };
+      }
+      // resume
+      if (!["paused", "failed", "budget_exhausted"].includes(goal.status)) throw new ProductHttpError(409, "goal_not_resumable");
+      let maxRuns = goal.max_runs;
+      if (body.max_runs !== undefined) {
+        if (typeof body.max_runs !== "number" || !Number.isInteger(body.max_runs) || body.max_runs < 1 || body.max_runs > GOAL_MAX_RUNS_LIMIT) {
+          throw new ProductHttpError(400, "invalid_max_runs");
+        }
+        maxRuns = body.max_runs;
+      }
+      if (goal.run_ids.length >= maxRuns) throw new ProductHttpError(409, "goal_budget_exhausted");
+      const resumed = await save({ status: "active", max_runs: maxRuns, last_reason: "user_resumed" });
+      const evidence = await goalEvidence(resumed.goal!);
+      const latestTerminal = evidence.latest === undefined || evidence.admissionError !== undefined || evidence.terminalStatus !== undefined;
+      if (!latestTerminal) return { goal: resumed.goal! };
+      const run = await submitGoalRun(resumed, resumed.goal!, continuationPrompt(resumed.goal!, evidence.plan, "user_resumed"), "goal_continuation");
+      return { goal: (await workbenchSessions.getSession(sessionId))?.goal ?? resumed.goal!, runId: run.run_id };
+    });
+  }
+
   async function startWorkbenchRun(run: WorkbenchRunRecord): Promise<void> {
     try {
       const task = await workbenchTaskForRun(run);
@@ -946,16 +1298,24 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
         if (content !== undefined) history.push({ role: "assistant", content });
       }
     }
+    const base = productTaskForWorkbenchRun(run);
+    const goal = run.goal_id === undefined ? undefined : (await workbenchSessions.getSession(run.session_id))?.goal;
+    const goalContext = goal === undefined || goal.goal_id !== run.goal_id
+      ? undefined
+      : {
+          goal_id: goal.goal_id,
+          objective: goal.objective,
+          run_index: Math.max(1, goal.run_ids.indexOf(run.run_id) + 1 || goal.run_ids.length + 1),
+          max_runs: goal.max_runs,
+        };
+    const context = {
+      ...(base.context ?? {}),
+      ...(history.length === 0 ? {} : { conversation_history: history }),
+      ...(goalContext === undefined ? {} : { goal: goalContext }),
+    };
     const task: ProductTask = {
-      ...productTaskForWorkbenchRun(run),
-      ...(history.length === 0
-        ? {}
-        : {
-            context: {
-              ...(productTaskForWorkbenchRun(run).context ?? {}),
-              conversation_history: history,
-            },
-          }),
+      ...base,
+      ...(Object.keys(context).length === 0 ? {} : { context }),
     };
     if (options.businessOrigin === undefined) return task;
     try {
@@ -984,9 +1344,11 @@ export async function startProductHost(options: ProductHostOptions): Promise<Run
     const runs = await workbenchSessions.listRuns(session.session_id);
     const details = await Promise.all(runs.map(async (run) => ({ run, detail: await readWorkbenchRun(run) })));
     const messages = details.flatMap((item) => messagesForWorkbenchRun(item.run, item.detail?.events ?? []));
+    const { goal, ...record } = session;
     return {
-      ...session,
-      runs: details.map((item) => publicWorkbenchRun(item.run, item.detail)),
+      ...record,
+      ...(goal === undefined ? {} : { goal: publicGoal(goal) }),
+      runs: details.map((item) => publicWorkbenchRun(item.run, item.detail, options.runtime.liveOutput?.(item.run.run_id))),
       messages,
       watermark: {
         session_id: session.session_id,
@@ -1368,6 +1730,7 @@ function productTaskForWorkbenchRun(run: WorkbenchRunRecord): ProductTask {
     ...(run.parent_run_id === undefined ? {} : { parent_run_id: run.parent_run_id }),
     resource_refs: run.resource_refs,
     ...(run.model_profile_id === undefined ? {} : { model_profile_id: run.model_profile_id }),
+    ...(run.permission_mode === "contained-write" ? { permission_mode: run.permission_mode } : {}),
     ...((run.skill_id === undefined && run.agent_id === undefined)
       ? {}
       : {
@@ -1384,8 +1747,29 @@ function productTaskForWorkbenchRun(run: WorkbenchRunRecord): ProductTask {
 function publicWorkbenchRun(
   run: WorkbenchRunRecord,
   detail: { readonly status: string; readonly events: readonly CanonicalEvent[]; readonly result?: Record<string, unknown> } | undefined,
+  live?: { readonly text: string; readonly reasoningChars: number; readonly requestIndex: number; readonly updatedAt: string },
 ): Record<string, unknown> {
+  const events = detail?.events ?? [];
+  const activity = runActivity(events);
+  const terminal = events.some((event) => terminalEvents.has(event.type));
+  // A request's text is persisted when its assistant transcript message exists
+  // (one per model request). Hiding live text earlier — at omp.model.response —
+  // left a visible gap before the message appeared in the session projection.
+  const persistedAssistantMessages = events.filter((event) => event.type === "omp.transcript.message"
+    && recordValue(recordValue(event.payload).message).role === "assistant").length;
+  const liveOutput = live === undefined || terminal || persistedAssistantMessages >= live.requestIndex
+    || (live.text === "" && live.reasoningChars === 0)
+    ? undefined
+    : { text: live.text, reasoning_chars: live.reasoningChars, request_index: live.requestIndex, updated_at: live.updatedAt };
   return {
+    permission_mode: run.permission_mode ?? "readonly",
+    ...(run.goal_id === undefined ? {} : { goal_id: run.goal_id }),
+    trigger: run.trigger ?? "user",
+    ...(liveOutput === undefined ? {} : { live_output: liveOutput }),
+    ...(activity.plan === undefined ? {} : { plan: activity.plan }),
+    ...(activity.tools.length === 0 ? {} : { tools: activity.tools }),
+    ...(activity.sandbox === undefined ? {} : { sandbox: activity.sandbox }),
+    ...(activity.usage === undefined ? {} : { usage: activity.usage }),
     schema_version: 2,
     run_id: run.run_id,
     session_id: run.session_id,
@@ -1496,6 +1880,117 @@ function publicWorkbenchEvent(event: CanonicalEvent): Record<string, unknown> {
     body.tool_status = typeof result?.status === "string" ? result.status : undefined;
   }
   return body;
+}
+
+function requestedPermissionMode(value: unknown, resourceRefs: readonly string[]): "readonly" | "contained-write" {
+  if (value === undefined || value === "readonly") return "readonly";
+  if (value !== "contained-write") throw new ProductHttpError(400, "invalid_permission_mode");
+  if (resourceRefs.length !== 1 || !resourceRefs[0]!.startsWith("workdir:")) {
+    throw new ProductHttpError(422, "permission_requires_workdir");
+  }
+  return "contained-write";
+}
+
+function publicGoal(goal: WorkbenchGoalRecord): Record<string, unknown> {
+  const { source_event_id: _source, resource_refs: _refs, ...rest } = goal;
+  return { ...rest, runs_used: goal.run_ids.length };
+}
+
+function planFromEvents(events: readonly CanonicalEvent[]): PlanSnapshot | undefined {
+  for (const event of [...events].reverse()) {
+    if (event.type !== "omp.transcript.message") continue;
+    const message = recordValue(recordValue(event.payload).message);
+    if (message.role !== "toolResult" || message.toolName !== "todo" || message.status === "failed") continue;
+    const plan = parsePlan(message.details);
+    if (plan !== undefined) return plan;
+  }
+  return undefined;
+}
+
+interface RunActivity {
+  readonly plan?: PlanSnapshot & { readonly updated_seq: number };
+  readonly tools: Array<Record<string, unknown>>;
+  readonly sandbox?: Record<string, unknown>;
+  readonly usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+/** Host-derived run activity: plan, tool timeline, the sandbox descriptor reported by a real exec, and provider-reported usage. */
+function runActivity(events: readonly CanonicalEvent[]): RunActivity {
+  const tools = new Map<string, Record<string, unknown>>();
+  let plan: RunActivity["plan"];
+  let sandbox: Record<string, unknown> | undefined;
+  let usage: RunActivity["usage"];
+  for (const event of events) {
+    const payload = recordValue(event.payload);
+    if (event.type === "omp.tool.dispatch" && typeof payload.toolCallId === "string") {
+      tools.set(payload.toolCallId, {
+        call_id: payload.toolCallId,
+        name: typeof payload.tool === "string" ? payload.tool : "unknown",
+        status: "running",
+        started_at: event.timestamp,
+      });
+    } else if (event.type === "omp.tool.response" && typeof payload.toolCallId === "string") {
+      const entry = tools.get(payload.toolCallId);
+      if (entry === undefined) continue;
+      const result = recordValue(payload.result);
+      const output = recordValue(result.output);
+      entry.status = typeof result.status === "string" ? result.status : "unknown";
+      entry.ended_at = event.timestamp;
+      const summary = toolSummary(String(entry.name), entry.status as string, output);
+      if (summary !== undefined) entry.summary = summary;
+      if (entry.name === "sandbox.exec" && isRecord(output.sandbox)) sandbox = output.sandbox;
+    } else if (event.type === "omp.transcript.message") {
+      const message = recordValue(payload.message);
+      if (message.role === "toolResult" && message.toolName === "todo" && typeof message.toolCallId === "string") {
+        const parsed = parsePlan(message.details);
+        if (parsed !== undefined && message.status !== "failed") plan = { ...parsed, updated_seq: event.seq };
+        tools.set(message.toolCallId, {
+          call_id: message.toolCallId,
+          name: "todo",
+          status: message.status === "failed" ? "failed" : "succeeded",
+          started_at: event.timestamp,
+          ended_at: event.timestamp,
+          summary: parsed === undefined ? "计划工具" : `计划 ${planProgress(parsed)?.completed ?? 0}/${planProgress(parsed)?.total ?? 0}`,
+        });
+      }
+    } else if (event.type === "run.usage.updated") {
+      const cumulative = recordValue(payload.cumulative);
+      usage = {
+        ...(typeof cumulative.input === "number" ? { input_tokens: cumulative.input } : {}),
+        ...(typeof cumulative.output === "number" ? { output_tokens: cumulative.output } : {}),
+      };
+    }
+  }
+  return {
+    ...(plan === undefined ? {} : { plan }),
+    tools: [...tools.values()],
+    ...(sandbox === undefined ? {} : { sandbox }),
+    ...(usage === undefined || Object.keys(usage).length === 0 ? {} : { usage }),
+  };
+}
+
+function toolSummary(name: string, status: string, output: Record<string, any>): string | undefined {
+  if (status !== "succeeded" && typeof output.reason === "string") {
+    if (name === "sandbox.exec" && typeof output.exit_code === "number") {
+      return `exit ${output.exit_code} · ${Math.round(Number(output.duration_ms) || 0)} ms`;
+    }
+    return output.reason.slice(0, 120);
+  }
+  if (name === "sandbox.exec") {
+    if (output.timed_out === true) return "超时，已终止";
+    if (typeof output.exit_code === "number") return `exit ${output.exit_code} · ${Math.round(Number(output.duration_ms) || 0)} ms`;
+  }
+  if ((name === "workdir.write_file" || name === "workdir.edit_file") && typeof output.path === "string") {
+    return `${name === "workdir.write_file" ? (output.created === false ? "覆盖" : "写入") : "修改"} ${output.path}${typeof output.bytes === "number" ? ` (${output.bytes} B)` : ""}`;
+  }
+  if (name === "workdir.read_file" && typeof output.path === "string") return `读取 ${output.path}`;
+  if (name === "workdir.list" && Array.isArray(output.entries)) return `${output.entries.length} 项`;
+  if (name === "workdir.search" && Array.isArray(output.matches)) return `${output.matches.length} 处匹配`;
+  if (name === "crew.propose_changes" && typeof output.message_id === "string") {
+    return `协调提案待确认 · 新任务 ${Number(output.new_task_count) || 0} · 指派 ${Number(output.assignment_count) || 0}`;
+  }
+  if (name.startsWith("mcp.") && output.is_error === true) return "MCP 工具报告错误";
+  return undefined;
 }
 
 function watermarkFor(events: readonly CanonicalEvent[], runId: string): Record<string, unknown> {

@@ -33,6 +33,7 @@ import {
 import { createNormalizer } from "../../lib/api/normalize";
 import { getIdentity } from "../../lib/api/identity";
 import { addWorkdir, listWorkdirs, pickFolder, touchWorkdir, type Workdir } from "../../lib/api/workdirs";
+import { getWorkbenchTools, mcpWriteToolNames, type WorkbenchPermissionMode } from "../../lib/api/workbench";
 import { usePersona } from "../../lib/persona";
 import { v2ApiBase } from "../../lib/runtime";
 import { detectSuspension, type SuspensionInfo } from "../../lib/streamResume";
@@ -189,6 +190,22 @@ export function HomePage({ displayName }: { displayName: string }) {
   const [workdirs, setWorkdirs] = useState<Workdir[]>([]);
   const [workdir, setWorkdir] = useState<Workdir | null>(null);
   const [permission, setPermission] = useState<PermissionMode>("ask");
+  /* Workbench 权限:仅对当前绑定的工作目录生效,默认关(readonly);换目录即复位,不把授权带到别处。 */
+  const [allowWrite, setAllowWrite] = useState(false);
+  const [mcpWriteTools, setMcpWriteTools] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    // Best effort: the permission label names external-write MCP tools when the Host has any.
+    getWorkbenchTools().then((tools) => { if (active) setMcpWriteTools(mcpWriteToolNames(tools)); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  /* 目标模式:下一次发送创建会话 Goal(Host 续跑,max_runs 1–8,默认 4)。 */
+  const [goalMode, setGoalMode] = useState(false);
+  const [goalMaxRuns, setGoalMaxRuns] = useState(4);
+  const workdirId = workdir?.id ?? null;
+  useEffect(() => {
+    setAllowWrite(false);
+  }, [workdirId]);
 
   /* ---- 场景层 ---- */
   const [openScene, setOpenScene] = useState<string | null>(null);
@@ -549,6 +566,35 @@ export function HomePage({ displayName }: { displayName: string }) {
     return [...parts, draft.trim()].filter(Boolean).join("\n\n");
   }, [attachments, draft]);
 
+  /* Workbench 提交:目标模式 → 会话 Goal;否则普通 Run。readonly 是 Host 默认,只在用户
+     显式授权可写时才带 permission_mode(CONTRACTS §1.2)。 */
+  const workbenchPermission: WorkbenchPermissionMode | undefined =
+    workdir !== null && allowWrite ? "contained-write" : undefined;
+  const startWorkbench = useCallback((message: string) => {
+    const resourceRefs = workdir === null ? undefined : [`workdir:${workdir.id}`];
+    const permissionOption = workbenchPermission === undefined ? {} : { permissionMode: workbenchPermission };
+    if (goalMode) {
+      void workbench
+        .startGoal(message, {
+          maxRuns: goalMaxRuns,
+          ...(resourceRefs === undefined ? {} : { resourceRefs }),
+          ...permissionOption,
+        })
+        .then((result) => {
+          /* 目标已交给 Host 续跑;下一句默认回到普通追问(失败则保留开关,便于重试) */
+          if (result.ok) setGoalMode(false);
+        });
+      return;
+    }
+    void workbench.start(message, {
+      ...(resourceRefs === undefined ? {} : { resourceRefs }),
+      ...(skillTag === null ? {} : { skillId: skillTag.id }),
+      ...(agentId === "" ? {} : { agentId }),
+      ...(profileId === defaultProfileId ? {} : { modelProfileId: profileId }),
+      ...permissionOption,
+    });
+  }, [workbench, workdir, workbenchPermission, goalMode, goalMaxRuns, skillTag, agentId, profileId, defaultProfileId]);
+
   const chatSend = useCallback(() => {
     const message = composeMessage();
     if (!message) return;
@@ -563,16 +609,11 @@ export function HomePage({ displayName }: { displayName: string }) {
     setDraft("");
     setSteerNote(null); /* J3:新一轮开始,上一轮的插话回执不该留在屏上 */
     setAttachments([]);
-    void workbench.start(message, {
-      ...(workdir === null ? {} : { resourceRefs: [`workdir:${workdir.id}`] }),
-      ...(skillTag === null ? {} : { skillId: skillTag.id }),
-      ...(agentId === "" ? {} : { agentId }),
-      ...(profileId === defaultProfileId ? {} : { modelProfileId: profileId }),
-    });
+    startWorkbench(message);
     /* Workbench 的订阅由 useWorkbenchSession 管理；页面卸载/切换只清理轮询，不发 stop。 */
     window.setTimeout(() => bus.refreshSidebar(), 600);
     return;
-  }, [composeMessage, workbench, workdir, skillTag, agentId, profileId, defaultProfileId, bus]);
+  }, [composeMessage, startWorkbench, bus]);
 
   /* B1:Create 走流式管线(与 Chat 同一 useRunStream,LoopCard 同构,N7) */
   const createSend = useCallback(() => {
@@ -589,12 +630,7 @@ export function HomePage({ displayName }: { displayName: string }) {
       setDraft("");
       setSteerNote(null);
       setAttachments([]);
-      void workbench.start(message, {
-        ...(workdir === null ? {} : { resourceRefs: [`workdir:${workdir.id}`] }),
-        ...(skillTag === null ? {} : { skillId: skillTag.id }),
-        ...(agentId === "" ? {} : { agentId }),
-        ...(profileId === defaultProfileId ? {} : { modelProfileId: profileId }),
-      });
+      startWorkbench(message);
       window.setTimeout(() => bus.refreshSidebar(), 600);
       return;
     }
@@ -658,7 +694,7 @@ export function HomePage({ displayName }: { displayName: string }) {
       );
     }
     window.setTimeout(() => bus.refreshSidebar(), 600);
-  }, [composeMessage, createArtifactIntent, kind, agentId, workdir, permission, runStream, workbench, skillTag, profileId, defaultProfileId, bus]);
+  }, [composeMessage, createArtifactIntent, kind, agentId, workdir, permission, runStream, workbench, startWorkbench, bus]);
 
   const onSend = useCallback(() => {
     if (runStream.running || workbench.starting || workbench.running) return;
@@ -711,6 +747,27 @@ export function HomePage({ displayName }: { displayName: string }) {
         });
     },
     [],
+  );
+
+  /* Workbench 补充说明:交给正在跑的这次 Run(POST /steer)。Host 回 accepted 才说「已交给」;
+     没被接住(已终态 / 通道未就绪 / 网络)→ 把话追加回输入框并说明原因,不假装送到了。 */
+  const steerWorkbench = workbench.steer;
+  const handleWorkbenchSteer = useCallback(
+    (text: string) => {
+      setSteerNote(null);
+      setDraft("");
+      void steerWorkbench(text).then((result) => {
+        if (result.ok) {
+          setSteerNote(result.queued
+            ? "补充说明已排队，Anna 会在下一步采纳（若这次运行先结束则不会采纳）。"
+            : "补充说明已交给正在运行的这次任务。");
+          return;
+        }
+        setDraft((prev) => restoredDraft(prev, text));
+        setSteerNote(`${result.error} 话已还给输入框。`);
+      });
+    },
+    [steerWorkbench],
   );
 
   const onActivate = useCallback(async () => {
@@ -833,6 +890,9 @@ export function HomePage({ displayName }: { displayName: string }) {
   ) : null;
 
   /* ---- composer(两态共用) ---- */
+  const workbenchView = (sessionMode === "chat" || sessionMode === "create") && workbenchRequested;
+  /* 下一次发送是否走 Workbench(Chat 恒是;Create 只有未显式选择产出类型时是) */
+  const nextSendIsWorkbench = mode === "chat" || !createArtifactIntent;
   const composer = (
     <HomeComposer
       mode={mode}
@@ -842,8 +902,9 @@ export function HomePage({ displayName }: { displayName: string }) {
       running={runStream.running || workbench.starting || workbench.running}
       onStop={handleStop}
       stopDisabled={workbenchRequested && (workbench.starting || !workbench.runId)}
-      /* J3:仅 chat 会话态且已有后台 run —— 只有这里存在「正在跑的这一次」可供补话 */
-      onInterject={sessionMode === "chat" && !workbenchRequested ? handleInterject : undefined}
+      /* J3 / Workbench steer:运行中可给「正在跑的这一次」补话 —— Workbench 走 /steer,
+         Legacy chat 后台 run 走 interject;其它场景无可补话的 run */
+      onInterject={workbenchView ? handleWorkbenchSteer : sessionMode === "chat" ? handleInterject : undefined}
       placeholder={sessionMode ? (mode === "create" ? "补充要求、调整草案，或吩咐下一件事……" : "追问、补充，或吩咐下一件事……") : PLACEHOLDERS[mode]}
       inputRef={inputRef}
       skillTag={skillTag}
@@ -871,8 +932,15 @@ export function HomePage({ displayName }: { displayName: string }) {
       onSelectWorkdir={selectWorkdir}
       onOpenFolder={onOpenFolder}
       onAddPath={onAddPath}
-      permission={mode === "create" ? permission : undefined}
-      onPermission={mode === "create" ? setPermission : undefined}
+      permission={mode === "create" && createArtifactIntent ? permission : undefined}
+      onPermission={mode === "create" && createArtifactIntent ? setPermission : undefined}
+      allowWrite={allowWrite}
+      mcpWriteTools={mcpWriteTools}
+      onAllowWrite={nextSendIsWorkbench ? setAllowWrite : undefined}
+      goalMode={nextSendIsWorkbench && goalMode}
+      onGoalMode={nextSendIsWorkbench ? setGoalMode : undefined}
+      goalMaxRuns={goalMaxRuns}
+      onGoalMaxRuns={nextSendIsWorkbench ? setGoalMaxRuns : undefined}
       envLocked={runStream.running || workbench.starting || workbench.running}
       ctxPercent={sessionMode !== null ? runStream.ctxPercent : undefined}
     />
@@ -979,10 +1047,11 @@ export function HomePage({ displayName }: { displayName: string }) {
     );
   }
 
-  if ((sessionMode === "chat" || sessionMode === "create") && workbenchRequested) {
+  if (workbenchView) {
     return (
       <WorkbenchChatPanel
         session={workbench.session}
+        run={workbench.run}
         prompt={workbench.prompt || lastMessage}
         status={workbench.starting ? "queued" : workbench.status}
         runId={workbench.runId}
@@ -991,6 +1060,8 @@ export function HomePage({ displayName }: { displayName: string }) {
         events={workbench.events}
         onStop={() => void workbench.stop("Stopped by user")}
         composer={composer}
+        notice={steerNote}
+        onGoalAction={workbench.controlGoal}
       />
     );
   }

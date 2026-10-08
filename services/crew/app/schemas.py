@@ -66,11 +66,24 @@ class TaskDraft(BaseModel):
     ``depends_on`` references OTHER drafts *by their title* (not ids — the tasks
     do not exist yet); ``confirm_drafts`` resolves them against the confirmed
     subset (and existing project task titles) when materializing real tasks.
+
+    ``insert_before`` names EXISTING tasks (by title) that must wait for this
+    new task; ``assignee_id`` is an optional member to assign on confirm. Both
+    are proposals only: nothing changes until the owner confirms.
     """
     title: str
     role: str
     depends_on: list[str] = Field(default_factory=list)  # references by draft title
     acceptance: str = ""
+    insert_before: list[str] = Field(default_factory=list)  # existing task titles
+    assignee_id: str | None = None
+
+
+class AssignmentProposal(BaseModel):
+    """A proposed (re)assignment of an EXISTING task, pending owner confirm."""
+    task_id: str
+    member_id: str
+    reason: str = ""
 
 
 class SopTaskSpec(BaseModel):

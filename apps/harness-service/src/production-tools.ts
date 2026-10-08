@@ -323,6 +323,8 @@ export function createProductionToolGateway(
 
 function requiresHostEffectKey(name: string): boolean {
   return isLocalArtifactTool(name)
+    || name === "crew.propose_changes"
+    || name.startsWith("mcp.")
     || name === "reimbursement.create_draft"
     || name === "reimbursement.submit_intent"
     || name === "reimbursement.approve_intent"
@@ -330,7 +332,10 @@ function requiresHostEffectKey(name: string): boolean {
 }
 
 function isLocalArtifactTool(name: string): boolean {
-  return name === "chat.emit_page"
+  return name === "workdir.write_file"
+    || name === "workdir.edit_file"
+    || name === "sandbox.exec"
+    || name === "chat.emit_page"
     || name === "chat.emit_document"
     || name.startsWith("create.emit_");
 }

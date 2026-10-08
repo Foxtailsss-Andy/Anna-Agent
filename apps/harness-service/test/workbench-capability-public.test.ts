@@ -8,7 +8,7 @@ import { expect, test } from "vitest";
 import { createLiveHarnessV2Runtime, createOmpKernelDescriptor } from "../src/production";
 import { startProductHost } from "../src/product-facade";
 import { ProductSessionStore } from "../src/product-session";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { findFreePort, startBusinessFixture, catalogTools } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -104,7 +104,7 @@ test("public Workbench OMP follows the observed search result from enough to pag
         });
         try {
           if (lastToolResult === undefined) {
-            expect(modelContexts.at(-1)?.tools.map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+            expect(catalogTools(modelContexts.at(-1)?.tools.map((tool) => tool.name) ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
             yield capabilityToolResponse("public-" + branch + "-directory", "capabilities.search", { query: "public" });
             return;
           }
@@ -266,7 +266,7 @@ test("public Workbench OMP follows the observed search result from enough to pag
     ]);
     expect(modelContexts.filter((context) => context.branch === "first")).toHaveLength(4);
     expect(modelContexts.filter((context) => context.branch === "second")).toHaveLength(7);
-    expect(modelContexts.find((context) => context.branch === "first")?.tools.map((tool) => tool.name))
+    expect(catalogTools(modelContexts.find((context) => context.branch === "first")?.tools.map((tool) => tool.name) ?? []))
       .toEqual(["capabilities.search", "capabilities.load"]);
     expect(modelContexts.filter((context) => context.branch === "second")
       .some((context) => context.tools.some((tool) => tool.name === "web_read"))).toBe(true);
@@ -364,7 +364,7 @@ test("configured public search succeeds across chat, create, and crew with and w
           .find((message) => isToolResultMessage(message));
         try {
           if (lastToolResult === undefined) {
-            expect((context.tools ?? []).map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+            expect(catalogTools((context.tools ?? []).map((tool) => tool.name))).toEqual(["capabilities.search", "capabilities.load"]);
             yield capabilityToolResponse("configured-search-directory", "capabilities.search", { query: "public" });
             return;
           }
@@ -523,7 +523,7 @@ test("public OMP exposes configuration and parameter failures as recoverable obs
           if (lastToolResult === undefined) {
             currentRunKind = ompRunCount === 0 ? "create" : ompRunCount === 1 ? "crew" : "chat";
             ompRunCount += 1;
-            expect((context.tools ?? []).map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+            expect(catalogTools((context.tools ?? []).map((tool) => tool.name))).toEqual(["capabilities.search", "capabilities.load"]);
             if (currentRunKind === "crew") {
               yield capabilityToolResponse("feedback-crew-directory", "capabilities.search", { query: "project" });
               return;
@@ -765,7 +765,7 @@ test("explicit Skill restrictions cannot block public reads or grant Crew channe
           .find((message) => isToolResultMessage(message));
         try {
           if (lastToolResult === undefined) {
-            expect((context.tools ?? []).map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+            expect(catalogTools((context.tools ?? []).map((tool) => tool.name))).toEqual(["capabilities.search", "capabilities.load"]);
             yield capabilityToolResponse("skill-public-directory", "capabilities.search", { query: "" });
             return;
           }

@@ -27,6 +27,12 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Legacy chat Run trace (Python TraceDoc). Workbench Runs answer 422 here — use getWorkbenchRunTrace. */
 export async function getRunTrace(runId: string): Promise<TraceDto> {
   return apiJson<TraceDto>(`/api/chat/runs/${runId}/trace`, { headers: authHeaders() });
+}
+
+/** Workbench Run trace served by the Product Host (CONTRACTS §1.4); same TraceDto shape. */
+export async function getWorkbenchRunTrace(runId: string): Promise<TraceDto> {
+  return apiJson<TraceDto>(`/api/workbench/runs/${encodeURIComponent(runId)}/trace`);
 }

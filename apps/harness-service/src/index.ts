@@ -78,6 +78,15 @@ export interface HarnessV2Runtime {
     runId: string,
     fromSeq?: number,
   ) => Promise<readonly CanonicalEvent[]>;
+  /** Ephemeral text of the model response currently streaming for a Run, if any. */
+  readonly liveOutput?: (runId: string) => LiveRunOutput | undefined;
+}
+
+export interface LiveRunOutput {
+  readonly text: string;
+  readonly reasoningChars: number;
+  readonly requestIndex: number;
+  readonly updatedAt: string;
 }
 
 export interface HarnessServiceOptions {

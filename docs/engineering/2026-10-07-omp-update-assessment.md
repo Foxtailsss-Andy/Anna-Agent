@@ -35,3 +35,13 @@ npm run test --workspace=@anna/omp-loop-kernel -- --run test/worker-restore.test
 结果：退出码 0，2 个测试文件通过，3 passed，7 因名称筛选未选中，32.12 秒。覆盖已完成 transcript 恢复不重放、已配对 unknown 工具结果不重放，以及运行中 steer 消费入历史。**这不是 18.8 兼容性验证，也不包含真实 Provider 或性能实测。**
 
 重新评估的触发条件：Anna 当前路径出现可复现缺陷且新版能修复；产品明确需要中断内容持久化或 DSML 恢复；固定工作负载证实有实际性能收益。届时先确定 Host checkpoint/预算契约，再由 GPT-5.6 Luna / high 实现，独立审核实际 worker 的取消、恢复、steer、工具授权及打包结果；广泛交付仍执行 AGENTS.md 完整检查。
+
+## 2026-10-08 补充：通用 Agent 范围下的重新评估（Opus 5.5 / xhigh）
+
+用户把范围扩大为通用 Agent（工具、MCP、Sandbox、长任务目标保持、主动续跑）。重新评估后仍保留 18.0.11，但**更充分地使用 OMP**，改动落在 Host 侧：
+
+- 所需能力（写文件、执行、MCP、计划、续跑、流式、steer）都在现有 `anna-omp/1` 协议之内由 Host 提供；18.8 的改进点不在这条路径上，升级只会重签哈希与运行时。
+- OMP 内置 bash/edit/write/MCP 在 Worker 内执行，而 Worker 的 seatbelt 禁止 exec/网络、cwd 是一次性目录；启用它们会绕开 Host 授权和事件。因此新工具全部经 Host 代理，OMP 仍负责循环、原生 `todo` 计划和 steer 队列。
+- 已改：Worker 关闭 `todo.reminders`。OMP 在回合以未完成 todo 结束时会注入隐藏 developer 提醒，Host 历史校验会拒绝它，导致任何"计划未完成就停下"的 Run 以协议错误失败（Host 集成测试复现）。续跑改由 Host 的 Session Goal 决定。该改动更新了 `worker.ts`，运行时已重新物化并校验（manifest `sha256:8a2243ac…26bd6`）。
+- 已改：`verifyRuntimeManifest` 每个 Host 进程只做一次全量哈希，之后每次 Run 只比较 lstat 指纹（同机实测全量 3,545 ms → 缓存 114–125 ms）。
+- 仍未采用：OMP compaction（会改写 Host 拥有的历史，需要新的检查点协议）、OMP goal mode（Host 侧 Session Goal 已覆盖，且需要证据驱动的终止规则）。

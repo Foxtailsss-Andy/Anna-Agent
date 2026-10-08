@@ -275,6 +275,8 @@ export function projectTrace(
         );
       }
       closeSpan(root, event.timestamp, rootStatus);
+      // The terminal outcome distinguishes a user Stop from a failure (both are status error).
+      root.attributes["anna.outcome"] = event.type.slice("run.".length);
       continue;
     }
     if (isRunTerminal(event.type)) {
@@ -282,6 +284,101 @@ export function projectTrace(
       continue;
     }
     if (event.type === "run.started" && event.streamId === options.runId) {
+      continue;
+    }
+    // OMP kernel checkpoints: one model request → one turn with one inference
+    // span; Host-dispatched tools become tool spans under that turn.
+    if (event.type === "run.model.requested" && event.streamId === options.runId && isRecord(event.payload)) {
+      if (currentInference !== undefined && currentInference.end_time === null) {
+        currentInference.attributes["anna.orphaned"] = true;
+        closeSpan(currentInference, event.timestamp, "error");
+      }
+      if (currentTurn !== undefined && currentTurn.end_time === null) closeSpan(currentTurn, event.timestamp, "ok");
+      const model = typeof event.payload.model === "string" ? event.payload.model : undefined;
+      currentTurn = span(
+        `s${spans.length + 1}`,
+        root.span_id,
+        `turn ${spans.filter((candidate) => candidate.kind === "turn").length + 1}`,
+        "turn",
+        event.timestamp,
+        typeof event.payload.requestIndex === "number" ? { "anna.request.index": event.payload.requestIndex } : {},
+      );
+      spans.push(currentTurn);
+      currentInference = span(
+        `s${spans.length + 1}`,
+        currentTurn.span_id,
+        model === undefined ? "chat" : `chat ${model}`,
+        "inference",
+        event.timestamp,
+        {
+          "gen_ai.operation.name": "chat",
+          ...(model === undefined ? {} : { "gen_ai.request.model": model }),
+        },
+      );
+      spans.push(currentInference);
+      root.attributes["anna.turns"] = spans.filter((candidate) => candidate.kind === "turn").length;
+      continue;
+    }
+    if (event.type === "omp.model.response" && event.streamId === options.runId && isRecord(event.payload)) {
+      if (currentInference !== undefined && currentInference.end_time === null) {
+        const message = isRecord(event.payload.message) ? event.payload.message : undefined;
+        const usage = isRecord(message?.usage) ? message.usage : undefined;
+        if (typeof usage?.input === "number" && Number.isFinite(usage.input)) {
+          currentInference.attributes["gen_ai.usage.input_tokens"] = usage.input;
+        }
+        if (typeof usage?.output === "number" && Number.isFinite(usage.output)) {
+          currentInference.attributes["gen_ai.usage.output_tokens"] = usage.output;
+        }
+        if (typeof message?.stopReason === "string") {
+          currentInference.attributes["gen_ai.response.finish_reasons"] = [message.stopReason];
+        }
+        closeSpan(currentInference, event.timestamp, "ok");
+      } else {
+        appendEvent(event);
+      }
+      continue;
+    }
+    if (event.type === "omp.tool.dispatch" && event.streamId === options.runId && isRecord(event.payload)) {
+      const toolCallId = typeof event.payload.toolCallId === "string" ? event.payload.toolCallId : event.id;
+      if (!openTools.has(toolCallId)) {
+        const toolName = typeof event.payload.tool === "string" ? event.payload.tool : "unknown";
+        const toolSpan = span(
+          `s${spans.length + 1}`,
+          currentTurn?.span_id ?? root.span_id,
+          `execute_tool ${toolName}`,
+          "tool",
+          event.timestamp,
+          {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": toolName,
+            "anna.tool.call_id": toolCallId,
+          },
+        );
+        spans.push(toolSpan);
+        openTools.set(toolCallId, toolSpan);
+      }
+      continue;
+    }
+    if (event.type === "omp.tool.response" && event.streamId === options.runId && isRecord(event.payload)) {
+      const toolCallId = typeof event.payload.toolCallId === "string" ? event.payload.toolCallId : undefined;
+      const toolSpan = toolCallId === undefined ? undefined : openTools.get(toolCallId);
+      if (toolSpan !== undefined && toolCallId !== undefined) {
+        const result = isRecord(event.payload.result) ? event.payload.result : undefined;
+        if (typeof result?.status === "string") toolSpan.attributes["anna.tool.status"] = result.status;
+        closeSpan(toolSpan, event.timestamp, result?.status === "succeeded" ? "ok" : "error");
+        openTools.delete(toolCallId);
+      } else {
+        appendEvent(event);
+      }
+      continue;
+    }
+    if (event.type === "run.progress" && isRecord(event.payload) && event.payload.phase === "turn_end") {
+      appendEvent(event);
+      if (currentTurn !== undefined && currentTurn.end_time === null
+        && (currentInference === undefined || currentInference.end_time !== null)) {
+        closeSpan(currentTurn, event.timestamp, spans.some((candidate) =>
+          candidate.parent_span_id === currentTurn?.span_id && candidate.status === "error") ? "error" : "ok");
+      }
       continue;
     }
     if (event.type !== "run.progress" || !isRecord(event.payload)) {

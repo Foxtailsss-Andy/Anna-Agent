@@ -9,6 +9,10 @@
  * - 「@ 成员」pill = 光标插 `@` 触发同一浮层(单一机制)。
  * - 窄栏让位(328):撤常驻微提示,「(Enter 发送)」并入 placeholder;动作行仅剩 @成员/＋任务/
  *   send 单行右簇。组词中才在动作行左侧短暂现 warn pill「组词中 · Enter 不发送」并暗化发送键。
+ * - Enter / 纸飞机路由(composerSendRoute):正文带非 Anna 成员的结构化提及 → 发频道(同「发频道」,
+ *   mentions 落行、被 @ 者收通知);否则 → 问 Anna。
+ * - Anna Run 进行中:问 Anna 不再静默并行起新 Run —— 有 onSteerAnna 则「补充给 Anna」,
+ *   否则给出可见提示并保留输入。
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -18,15 +22,18 @@ import { ApiError } from "../../../lib/api/client";
 import { channelCommand, postChannel, type TeamMember } from "../../../lib/api/crew";
 import { MentionPicker } from "./MentionPicker";
 import { buildSayPayload, type InsertedMention } from "./channelModel";
+import { composerRoster, composerSendRoute } from "./composerRoute";
 import {
   activeMentionQuery,
   cycleIndex,
   filterMembers,
   insertAtSign,
   insertMentionAtCaret,
-  SYSTEM_ANNA_MENTION_ID,
   withAnnaCoordinator,
 } from "./pickerModel";
+
+/** 运行中且无法补充时的可见提示(不起并行 Run,不清空输入)。 */
+export const ANNA_BUSY_NOTICE = "Anna 正在处理上一条，等它完成或先停止此 Run 再问。";
 
 function PaperPlane() {
   return (
@@ -43,9 +50,13 @@ export interface ComposerProps {
   onRefresh: () => void;
   /** 普通追问交给当前 Crew Project 的 Workbench Session。 */
   onAskAnna?: (text: string) => Promise<void | { ok: true } | { ok: false; error: string }>;
+  /** 当前 Crew Anna Run 是否仍在运行(运行中不再起并行 Run)。 */
+  annaRunning?: boolean;
+  /** 运行中把这句话补充给当前 Run(steer);未提供时运行中只给提示。 */
+  onSteerAnna?: (text: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerProps) {
+export function Composer({ projectId, members, onRefresh, onAskAnna, annaRunning = false, onSteerAnna }: ComposerProps) {
   const [text, setText] = useState("");
   const [caret, setCaret] = useState(0);
   const [inserted, setInserted] = useState<InsertedMention[]>([]);
@@ -54,10 +65,21 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
   const [composing, setComposing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const empty = text.trim() === "";
+  const canAskAnna = onAskAnna !== undefined;
+  const steering = annaRunning && onSteerAnna !== undefined;
+  const route = canAskAnna ? composerSendRoute(text, inserted, members) : "channel";
+  const askLabel = steering ? "补充给 Anna" : "问 Anna";
+  const sendLabel = route === "channel" ? "发频道" : askLabel;
+
+  // 运行结束 → 撤掉「运行中」提示
+  useEffect(() => {
+    if (!annaRunning) setNotice(null);
+  }, [annaRunning]);
 
   const pickerMembers = withAnnaCoordinator(members);
   const active = composing ? null : activeMentionQuery(text, caret);
@@ -106,19 +128,21 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
     restoreCaret(r.caret);
   };
 
+  const clearInput = () => {
+    setText("");
+    setInserted([]);
+    setCaret(0);
+  };
+
   const submitSay = async () => {
     if (empty || busy) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      const payload = buildSayPayload(text.trim(), inserted, [
-        { id: SYSTEM_ANNA_MENTION_ID, display_name: "Anna" },
-        ...members.filter((m) => m.id !== SYSTEM_ANNA_MENTION_ID),
-      ]);
+      const payload = buildSayPayload(text.trim(), inserted, composerRoster(members));
       await postChannel(projectId, payload.body, payload.mentions);
-      setText("");
-      setInserted([]);
-      setCaret(0);
+      clearInput();
       onRefresh();
     } catch (e) {
       setError(e instanceof ApiError ? e.body || String(e) : String(e));
@@ -129,14 +153,34 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
 
   const submitAskAnna = async () => {
     if (empty || busy || onAskAnna === undefined) return;
+    if (annaRunning) {
+      // 不静默起并行 Run:能补充就补充给当前 Run,否则只提示、保留输入
+      if (onSteerAnna === undefined) {
+        setError(null);
+        setNotice(ANNA_BUSY_NOTICE);
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const result = await onSteerAnna(text.trim());
+        if (result.ok === false) throw new Error(result.error);
+        clearInput();
+      } catch (e) {
+        setError(e instanceof ApiError ? e.body || String(e) : String(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const result = await onAskAnna(text.trim());
       if (result && result.ok === false) throw new Error(result.error);
-      setText("");
-      setInserted([]);
-      setCaret(0);
+      clearInput();
     } catch (e) {
       setError(e instanceof ApiError ? e.body || String(e) : String(e));
     } finally {
@@ -144,15 +188,20 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
     }
   };
 
+  /** Enter / 纸飞机:@成员 → 发频道;否则问 Anna(无 Anna 入口时一律发频道)。 */
+  const submitRouted = () => {
+    if (route === "channel") void submitSay();
+    else void submitAskAnna();
+  };
+
   const submitCommand = async () => {
     if (empty || busy) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await channelCommand(projectId, text.trim());
-      setText("");
-      setInserted([]);
-      setCaret(0);
+      clearInput();
       onRefresh();
     } catch (e) {
       setError(e instanceof ApiError ? e.body || String(e) : String(e));
@@ -194,7 +243,7 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
         isComposing: e.nativeEvent.isComposing,
         preventDefault: () => e.preventDefault(),
       },
-      { running: busy, hasText: !empty, onSend: () => void (onAskAnna === undefined ? submitSay() : submitAskAnna()) },
+      { running: busy, hasText: !empty, onSend: submitRouted },
     );
   };
 
@@ -202,9 +251,20 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
     setCaret(e.currentTarget.selectionStart ?? 0);
   };
 
+  const placeholder = !canAskAnna
+    ? "对 Boss 或 @成员 说……（Enter 发送）"
+    : steering
+      ? "Enter：@成员 → 发频道；否则补充给 Anna"
+      : "Enter：@成员 → 发频道；否则问 Anna";
+
   return (
     <div className="ir-chan-composer" ref={rootRef}>
       {error && <div className="ir-chan-err ir-chan-composer__err">{error}</div>}
+      {notice && (
+        <div className="ir-chan-composer__notice" role="status">
+          {notice}
+        </div>
+      )}
 
       {pickerOpen && (
         <MentionPicker
@@ -236,7 +296,8 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
             setText(e.currentTarget.value);
             setCaret(e.currentTarget.selectionStart ?? 0);
           }}
-          placeholder="对 Boss 或 @成员 说……（Enter 发送）"
+          placeholder={placeholder}
+          title={canAskAnna ? "Enter：@成员 → 发频道；否则问 Anna · Shift+Enter 换行" : undefined}
           rows={1}
           disabled={busy}
         />
@@ -258,18 +319,24 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
           >
             @ 成员
           </button>
-          {onAskAnna !== undefined && (
+          {canAskAnna && (
             <button
               type="button"
               className="ir-chan-toolpill"
               onClick={() => void submitAskAnna()}
               disabled={empty || busy}
-              title="使用当前项目与频道事实回答"
+              title={
+                steering
+                  ? "把这句话补充给正在运行的 Anna Run"
+                  : annaRunning
+                    ? "Anna 正在运行；等它完成或先停止此 Run"
+                    : "使用当前项目与频道事实回答"
+              }
             >
-              问 Anna
+              {askLabel}
             </button>
           )}
-          {onAskAnna !== undefined && (
+          {canAskAnna && (
             <button
               type="button"
               className="ir-chan-toolpill"
@@ -292,9 +359,10 @@ export function Composer({ projectId, members, onRefresh, onAskAnna }: ComposerP
           <button
             type="button"
             className={`ir-chan-composer__send${composing ? " is-composing" : ""}`}
-            onClick={onAskAnna === undefined ? submitSay : submitAskAnna}
+            onClick={submitRouted}
             disabled={empty || busy}
-            aria-label="发送"
+            aria-label={canAskAnna ? `发送（${sendLabel}）` : "发送"}
+            title={canAskAnna ? `Enter：${sendLabel}` : undefined}
           >
             <PaperPlane />
           </button>

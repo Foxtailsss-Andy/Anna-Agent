@@ -69,3 +69,79 @@ export async function verifyRuntimeManifest(root: string, expectedDigest: string
   if (remaining.size !== 0) throw new Error("runtime manifest file is missing");
   return { manifestSha256: digest, bunSha256: BUN_SHA256, files: entries.length };
 }
+
+type RuntimeVerification = Awaited<ReturnType<typeof verifyRuntimeManifest>>;
+
+interface VerifiedRuntime {
+  readonly paths: readonly string[];
+  readonly fingerprint: string;
+  readonly result: RuntimeVerification;
+}
+
+const verifiedRuntimes = new Map<string, VerifiedRuntime>();
+const pendingVerifications = new Map<string, Promise<RuntimeVerification>>();
+
+/**
+ * Full content verification once per Host process, then a metadata check per
+ * Run attempt.
+ *
+ * The full walk hashes every runtime file (~21k files / 450 MB, ~4 s), which
+ * the review measured as a fixed pre-model delay on every Run. After one
+ * successful full verification, later calls compare an lstat fingerprint
+ * (size, mtime/ctime in ns, inode, device, mode) of every listed file, every
+ * directory containing one, and manifest.json. Any in-place write, rename,
+ * added or removed entry changes a ctime/mtime/inode and forces a new full
+ * verification. The fingerprint is taken before and after the full walk and
+ * only cached when both agree, so a concurrent modification is not trusted.
+ */
+export async function verifyRuntimeManifestCached(root: string, expectedDigest: string): Promise<RuntimeVerification> {
+  const canonicalRoot = await realpath(root);
+  const key = `${canonicalRoot}\0${expectedDigest}`;
+  const cached = verifiedRuntimes.get(key);
+  if (cached !== undefined) {
+    const current = await runtimeFingerprint(canonicalRoot, cached.paths).catch(() => undefined);
+    if (current === cached.fingerprint) return cached.result;
+    verifiedRuntimes.delete(key);
+  }
+  const pending = pendingVerifications.get(key);
+  if (pending !== undefined) return pending;
+  const verification = (async () => {
+    const paths = await manifestPaths(canonicalRoot);
+    const before = await runtimeFingerprint(canonicalRoot, paths);
+    const result = await verifyRuntimeManifest(canonicalRoot, expectedDigest);
+    const after = await runtimeFingerprint(canonicalRoot, paths);
+    if (before === after) verifiedRuntimes.set(key, { paths, fingerprint: after, result });
+    return result;
+  })().finally(() => pendingVerifications.delete(key));
+  pendingVerifications.set(key, verification);
+  return verification;
+}
+
+async function manifestPaths(canonicalRoot: string): Promise<string[]> {
+  const manifest = JSON.parse(await readFile(join(canonicalRoot, "manifest.json"), "utf8")) as { files?: unknown };
+  if (!Array.isArray(manifest.files)) throw new Error("runtime manifest schema is invalid");
+  const files = manifest.files.map((entry) => {
+    const path = typeof entry === "object" && entry !== null ? (entry as { path?: unknown }).path : undefined;
+    if (typeof path !== "string") throw new Error("runtime manifest entry is invalid");
+    return path;
+  });
+  const directories = new Set<string>([""]);
+  for (const path of files) {
+    const parts = path.split("/");
+    for (let index = 1; index < parts.length; index += 1) directories.add(parts.slice(0, index).join("/"));
+  }
+  return ["manifest.json", ...[...directories].sort(), ...files];
+}
+
+async function runtimeFingerprint(canonicalRoot: string, paths: readonly string[]): Promise<string> {
+  const digest = createHash("sha256");
+  const batchSize = 256;
+  for (let start = 0; start < paths.length; start += batchSize) {
+    const batch = paths.slice(start, start + batchSize);
+    const stats = await Promise.all(batch.map((path) => lstat(path === "" ? canonicalRoot : join(canonicalRoot, path), { bigint: true })));
+    stats.forEach((info, index) => {
+      digest.update(`${batch[index]}\0${info.size}\0${info.mtimeNs}\0${info.ctimeNs}\0${info.ino}\0${info.dev}\0${info.mode}\n`);
+    });
+  }
+  return digest.digest("hex");
+}

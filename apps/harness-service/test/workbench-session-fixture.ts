@@ -159,3 +159,23 @@ async function stopChild(child: ChildProcess): Promise<void> {
     });
   });
 }
+
+/**
+ * Host tools that a Workbench profile admits outside the progressive
+ * capability catalog (plan, workdir browse/edit, sandbox, Crew proposal).
+ * They are active from the first model request; catalog capabilities are not.
+ */
+export const DIRECT_HOST_TOOLS: ReadonlySet<string> = new Set([
+  "todo",
+  "workdir.list",
+  "workdir.search",
+  "workdir.write_file",
+  "workdir.edit_file",
+  "sandbox.exec",
+  "crew.propose_changes",
+]);
+
+/** The capability-catalog view of a model request's tool names. */
+export function catalogTools(names: readonly string[]): string[] {
+  return names.filter((name) => !DIRECT_HOST_TOOLS.has(name));
+}

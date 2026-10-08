@@ -1,13 +1,11 @@
 # Active issue tracker
 
-The active initiative is [Jev Crew Preview](../superpowers/plans/2026-09-21-jev-crew-preview/README.md).
+The active initiative is the [general-Agent upgrade](../superpowers/plans/2026-10-08-general-agent-upgrade/README.md) (2026-10-08).
 
-- Requirements and contracts: `SPEC.md`.
-- Acceptance and evaluation: `ACCEPTANCE.md`.
-- Tickets and ownership: `EXECUTION.md`.
-- Current owner and progress: `STATUS.md`.
-- Cross-Session procedure: `SUPERVISOR.md`.
+- Plan, decisions and ticket graph: `README.md` in that directory.
+- Host/UI/business contracts: `CONTRACTS.md`.
+- Owner status, worker sessions, test and live evidence: the private delivery directory recorded in `README.md` (`STATUS.md`, `reports/`, `evidence/`).
 
-Baseline: `e2e603cbc70de5fddaeb4036e001cbaba4e4da0c`. Each ticket records its own starting SHA and current candidate changes. Include new untracked owned files in review; an empty HEAD diff does not prove an unfinished change passed.
+Baseline: `4697d5c` (= `f8f5f82` plus the reviewed 2026-10-07 candidate). Include new untracked owned files in review; an empty HEAD diff does not prove an unfinished change passed.
 
-Earlier Workbench cards remain historical context, not the current execution queue. New user instructions take precedence over prior project plans and role settings.
+The [Jev Crew Preview](../superpowers/plans/2026-09-21-jev-crew-preview/README.md) and earlier Workbench cards are accepted history, not the current execution queue. New user instructions take precedence over prior project plans and role settings.

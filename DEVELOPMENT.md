@@ -31,7 +31,39 @@ Use `npm run desktop:run` for the RC1 product flow. `npm run dev` alone starts V
 
 After launch, start an ordinary question in Home/Create, continue the same conversation, and use session history to reopen it. Choose a workdir explicitly before asking Anna to read its files. Cowork dashboards and existing business actions remain available independently of ordinary conversation; Crew conversation is scoped to the selected project. Stop targets the selected Run. A missing provider configuration is an explicit failure, not a generated answer.
 
-The [RC1 release record](docs/releases/rc1-developer-preview.md) separates deterministic external transports, real local OMP execution, and outstanding live/provider and platform checks. RC1 adds no new installer or broad recovery/sandbox guarantee.
+The [RC1 release record](docs/releases/rc1-developer-preview.md) separates deterministic external transports, real local OMP execution, and outstanding live/provider and platform checks. RC1 added no installer or broad recovery guarantee; the Sandbox scope is described under General-Agent capabilities below.
+
+## General-Agent capabilities
+
+Ordinary Home and Crew requests run as Workbench Runs on the same Host + OMP loop. What a Run may do is fixed by its profile at admission:
+
+- **Plan:** the OMP `todo` tool is always admitted; its latest snapshot is shown as the Run's plan (“过程”).
+- **Workdir (read):** after you choose a workdir, `workdir.list`, `workdir.search` and the `workdir.read_file` capability read inside it only. Workdirs that overlap Host/business configuration or state are rejected.
+- **Modify + Sandbox:** turn on “允许 Anna 在此工作目录内修改文件并运行命令（沙箱）” for the Run (`permission_mode: contained-write`). This admits `workdir.write_file`, `workdir.edit_file` and `sandbox.exec`. `sandbox.exec` runs `/bin/sh -c` under `/usr/bin/sandbox-exec` (macOS seatbelt): no network, writes only inside the workdir and a per-call scratch directory, reads of other user data roots denied, scrubbed environment, timeout ≤ 120 s. It is a process sandbox, not a container; on platforms without `sandbox-exec` the tool is not admitted.
+- **Crew changes:** in a Crew project, Anna proposes graph/assignment changes with `crew.propose_changes`. The proposal card in the Channel changes nothing until the project owner adopts it.
+- **Steer:** while a Run is active, the composer sends “补充说明” to that Run instead of starting another.
+- **Goal mode (目标模式):** a user-authorized objective with a run limit (1–8). The Host starts the next Run only while the todo plan has open items (or a Run ran out of its single-Run budget), and stops at `awaiting_review` for your confirmation. Stop/pause/resume/stop-goal are on the Goal card.
+
+### MCP servers
+
+Declare MCP servers in a protected Host-only JSON file and pass its path:
+
+```bash
+ANNA_HARNESS_MCP_CONFIG_PATH=/absolute/protected/path/mcp.json npm run desktop:run
+```
+
+```json
+{ "mcpServers": {
+  "fixture": { "command": "node", "args": ["/abs/path/to/tools/mcp-fixture-server/server.mjs", "--notes-dir", "/abs/notes"] },
+  "remote": { "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer <secret>" }, "timeout_ms": 20000 }
+} }
+```
+
+The Host connects at startup (stdio or Streamable HTTP; loopback `http://` or `https://` only) and admits tools as `mcp.<server>.<tool>`. stdio servers get only `PATH`, `HOME`/`TMPDIR` (scratch) and `LANG` plus their configured `env`; they never inherit the Host environment. Server status is written to the Host diagnostics log. Keep this file outside any workdir; it is a protected path.
+
+### Diagnostics
+
+The launcher appends Host and business-service stderr to `<ANNA_HARNESS_STATE_ROOT>/logs/{host,business}.stderr.log` (mode 0600, rotated once at 5 MiB), so failures after startup remain diagnosable.
 
 ## Optional Jev Crew suggestions
 

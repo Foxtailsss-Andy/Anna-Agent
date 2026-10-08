@@ -44,6 +44,8 @@ export interface WaterfallSummary {
   tokensOut: number | undefined;
   durationMs: number;
   status: TraceSpanDto['status'];
+  /** Terminal Run outcome from the agent span (`anna.outcome`), e.g. `cancelled` for a user Stop. */
+  outcome?: string;
 }
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
@@ -99,6 +101,7 @@ export function toWaterfall(doc: TraceDto): { summary: WaterfallSummary; groups:
       tokensOut: sum('gen_ai.usage.output_tokens'),
       durationMs: agent?.duration_ms ?? 0,
       status: agent?.status ?? 'unset',
+      outcome: typeof agent?.attributes['anna.outcome'] === 'string' ? (agent.attributes['anna.outcome'] as string) : undefined,
     },
     groups,
   };

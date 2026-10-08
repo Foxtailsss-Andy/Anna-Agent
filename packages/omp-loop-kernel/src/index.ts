@@ -4,6 +4,8 @@ export {
   type OmpContextPreparation,
   type OmpHostModelTransport,
   type OmpLoopKernelOptions,
+  type OmpModelStreamListener,
+  type OmpModelStreamObserver,
 } from "./omp-loop-kernel";
 export {
   launchManagedWorker,

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -57,6 +57,7 @@ async function createWindow() {
     },
   });
   mainWindow = window;
+  routeExternalLinks(window);
 
   if (process.env.VITE_DEV_SERVER_URL) {
     await window.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -107,6 +108,35 @@ ipcMain.handle("anna:pick-folder", async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
 });
+
+// Links in answers (target=_blank) open in the system browser instead of a
+// new Electron window that would carry the app's preload. In-app origins keep
+// Electron's default handling.
+function routeExternalLinks(window) {
+  const isExternalWeb = (target) => {
+    try {
+      const url = new URL(target);
+      // Read the current runtime origin each time: a runtime restart may move the Host port.
+      const internal = new Set([runtime?.apiBase, process.env.VITE_DEV_SERVER_URL]
+        .filter(Boolean)
+        .map((value) => new URL(value).origin));
+      return (url.protocol === "https:" || url.protocol === "http:") && !internal.has(url.origin)
+        && url.hostname !== "127.0.0.1" && url.hostname !== "localhost";
+    } catch {
+      return false;
+    }
+  };
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (!isExternalWeb(url)) return { action: "allow" };
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (event, url) => {
+    if (!isExternalWeb(url)) return;
+    event.preventDefault();
+    void shell.openExternal(url);
+  });
+}
 
 function createRuntimeFailureWindow(error) {
   const window = new BrowserWindow({

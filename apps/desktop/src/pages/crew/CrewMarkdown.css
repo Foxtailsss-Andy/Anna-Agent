@@ -10,8 +10,10 @@
   line-height: 1.75;
   color: var(--ink);
   min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  /* 只在真溢出时断词:anywhere / break-word(word-break)会把 min-content 压到一个字,
+     被 td 继承后自动表格布局把多列挤成一字一行(review C2a)。宿主行的 word-break 一并归位。 */
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .crew-md > :first-child {
@@ -119,29 +121,174 @@
   margin: 12px 0;
 }
 
-/* GFM 表格(splitMarkdownSegments 结构化;横向溢出自身滚动,页面不横滚) */
+/* GFM 表格(remark-gfm;CrewMarkdown 把 table 包进本容器):
+   列有可读最小宽度,放不下时容器自身横滚,页面不横滚、不把列挤成一字一行 */
 .crew-md__tablewrap {
   margin: 0 0 8px;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.crew-md__tablewrap:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
 }
 .crew-md__table {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.55;
   width: auto;
   min-width: 100%;
 }
 .crew-md__table th,
 .crew-md__table td {
   border: 1px solid var(--line);
-  padding: 4px 10px;
+  padding: 5px 10px;
   text-align: left;
   vertical-align: top;
+  min-width: 5.5em;
+  max-width: 24em;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .crew-md__table th {
   color: var(--ink-2);
   font-weight: 600;
   background: var(--surface-2);
   white-space: nowrap;
+}
+.crew-md__table tbody tr:nth-child(even) > * {
+  background: var(--panel);
+}
+
+/* GFM 扩展:删除线 / 任务列表 / 脚注 */
+.crew-md del {
+  color: var(--ink-3);
+}
+.crew-md .contains-task-list {
+  padding-left: 4px;
+  list-style: none;
+}
+.crew-md .task-list-item {
+  list-style: none;
+}
+.crew-md .task-list-item input[type="checkbox"] {
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+  accent-color: var(--iris);
+}
+.crew-md .footnotes {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+/* ```chart → CrewChart(内联 SVG + 数据表);非法数据回落原代码块 + 提示 */
+.crew-chart {
+  margin: 0 0 10px;
+  min-width: 0;
+}
+.crew-chart__title {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  margin: 0 0 2px;
+}
+.crew-chart__unit {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.crew-chart__svg {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  overflow: visible;
+}
+.crew-chart__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.crew-chart__zero {
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+}
+.crew-chart__tick,
+.crew-chart__xlabel {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: var(--ink-2);
+}
+.crew-chart__s0 { --chart-c: #575bc4; }
+.crew-chart__s1 { --chart-c: #b98a2f; }
+.crew-chart__s2 { --chart-c: #3e9c82; }
+.crew-chart__s3 { --chart-c: #9c56b8; }
+.crew-chart__s4 { --chart-c: #be4a44; }
+.crew-chart__s5 { --chart-c: #5a7fa8; }
+.crew-chart__s6 { --chart-c: #8b8ed9; }
+.crew-chart__s7 { --chart-c: #6c6c72; }
+.crew-chart__bar {
+  fill: var(--chart-c);
+}
+.crew-chart__bar:hover,
+.crew-chart__point:hover {
+  opacity: 0.8;
+}
+.crew-chart__line {
+  fill: none;
+  stroke: var(--chart-c);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.crew-chart__point {
+  fill: var(--chart-c);
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+.crew-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.crew-chart__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.crew-chart__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--chart-c);
+}
+.crew-chart__data {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.crew-chart__data summary {
+  cursor: pointer;
+}
+.crew-chart__data .crew-md__tablewrap {
+  margin-top: 4px;
+}
+.crew-md__chart-invalid {
+  margin: 0 0 8px;
+}
+.crew-md__chart-invalid pre {
+  margin-bottom: 4px;
+}
+.crew-md__chart-note {
+  font-size: 11px;
+  color: var(--warn-ink);
 }
 
 /* ============================================================
@@ -212,16 +359,16 @@
 .crew-reader .crew-md strong {
   color: var(--ink);
 }
-/* 表格:圆角外框 + mono 11.5(§3e) */
+/* 表格:圆角外框 + mono(§3e);外框内横滚(不再 overflow:hidden 截掉右侧列) */
 .crew-reader .crew-md__tablewrap {
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
   margin: 0 0 14px;
 }
 .crew-reader .crew-md__table {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .crew-reader .crew-md__table th,
 .crew-reader .crew-md__table td {

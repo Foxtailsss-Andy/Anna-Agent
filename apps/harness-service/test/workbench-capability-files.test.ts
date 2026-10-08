@@ -8,7 +8,7 @@ import { createLiveHarnessV2Runtime, createOmpKernelDescriptor } from "../src/pr
 import { startProductHost } from "../src/product-facade";
 import { ProductSessionStore } from "../src/product-session";
 import { readRegisteredWorkdirFile } from "../src/workbench-files";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { findFreePort, startBusinessFixture, catalogTools } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -123,7 +123,7 @@ test("public Workbench Create reads a registered Markdown workdir through a load
             runOrdinal += 1;
             readCount = 0;
             discoveredWorkdirSchema = undefined;
-            expect(modelContexts.at(-1)?.tools.map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+            expect(catalogTools(modelContexts.at(-1)?.tools.map((tool) => tool.name) ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
             yield capabilityToolResponse("search-files", "capabilities.search", { query: "workdir" });
             return;
           }

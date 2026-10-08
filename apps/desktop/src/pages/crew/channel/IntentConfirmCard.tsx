@@ -8,6 +8,8 @@
  * - 调整:切到标准命令卡(CommandDraftCard 勾选清单;登记:复用既有可编辑件)；
  * - 忽略:200ms 淡出下沉后本地隐藏(reduced-motion 直接消失),不发服务端、不追问。
  * 已确认(血缘回链命中)亦交 CommandDraftCard 呈现「已下推」态,避免双份逻辑。
+ * Coordination Proposal(CONTRACTS §2:assignments / insert_before / workbench_run 来源)交 ProposalCard;
+ * 旧 payload 渲染保持不变。
  */
 
 import { useState } from "react";
@@ -20,7 +22,8 @@ import { dispatchRingCall } from "../graph/graphMotion";
 import { CommandDraftCard } from "./CommandDraftCard";
 import { MessageRow, type RowAuthor } from "./ChronicleLine";
 import { commandDrafts, isCommandConfirmed } from "./channelModel";
-import { intentAssigneeIsAgent, intentSuggestedAssignee } from "./intentCard";
+import { coordinationProposal, intentAssigneeIsAgent, intentSuggestedAssignee } from "./intentCard";
+import { ProposalCard } from "./ProposalCard";
 
 function PlayIcon() {
   return (
@@ -49,6 +52,8 @@ export interface IntentConfirmCardProps {
   /** 触发 say 的发言者名(ChannelColumn 由 origin_message_id 解析) */
   originAuthorName: string;
   onRefresh: (project?: CrewProject) => void;
+  /** The channel holds a confirmation row for this card (covers assignments-only proposals). */
+  confirmedInChannel?: boolean;
 }
 
 export function IntentConfirmCard({
@@ -61,6 +66,7 @@ export function IntentConfirmCard({
   isOwner,
   originAuthorName,
   onRefresh,
+  confirmedInChannel = false,
 }: IntentConfirmCardProps) {
   const [adjusting, setAdjusting] = useState(false);
   const [dismissing, setDismissing] = useState(false);
@@ -70,6 +76,26 @@ export function IntentConfirmCard({
 
   const confirmed = isCommandConfirmed(message.id, tasks);
   const drafts = commandDrafts(message);
+  const proposal = coordinationProposal(message);
+
+  // Coordination Proposal(新任务带顺序/负责人 + 既有任务指派)→ 提案卡;旧 payload 走下方原卡
+  if (proposal) {
+    return (
+      <ProposalCard
+        author={author}
+        time={time}
+        message={message}
+        proposal={proposal}
+        members={members}
+        tasks={tasks}
+        projectId={projectId}
+        isOwner={isOwner}
+        originAuthorName={originAuthorName}
+        onRefresh={onRefresh}
+        confirmedInChannel={confirmedInChannel}
+      />
+    );
+  }
 
   // 已采纳 或 用户点「调整」→ 交标准命令卡(勾选清单 / 已下推态),不重复实现
   if (confirmed || adjusting) {

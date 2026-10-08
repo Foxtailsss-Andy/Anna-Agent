@@ -12,7 +12,7 @@ import {
 import { startProductHost } from "../src/product-facade";
 import { ProductSessionStore } from "../src/product-session";
 import { skillLoadTool } from "../src/workbench-capabilities";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { findFreePort, startBusinessFixture, catalogTools } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -98,7 +98,7 @@ This method must not be readable in this run.
           messages: context.messages as unknown[],
         });
         if (modelContexts.length === 1) {
-          expect(modelContexts[0]?.tools).toEqual(["capabilities.search", "capabilities.load"]);
+          expect(catalogTools(modelContexts[0]?.tools ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
           yield capabilityToolResponse("forbidden-search-1", "capabilities.search", { query: "general" });
           return;
         }
@@ -1024,7 +1024,7 @@ test("public Workbench can discover and read a registered Skill on demand", asyn
         });
         const requestIndex = modelContexts.length;
         if (requestIndex === 1) {
-          expect(modelContexts[0]?.tools.map((tool) => tool.name)).toEqual(["capabilities.search", "capabilities.load"]);
+          expect(catalogTools(modelContexts[0]?.tools.map((tool) => tool.name) ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
           expect(modelContexts[0]?.systemPrompt).not.toContain(skillBodyMarker);
           expect(JSON.stringify(context.messages)).not.toContain(skillBodyMarker);
           yield capabilityToolResponse("skill-search-1", "capabilities.search", { query: "general" });

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from services.chat.app.orchestrator import ChatOrchestrator, ChatRunNotFoundError
-from services.crew.app.service import CrewService
+from services.crew.app.service import CrewProposalError, CrewService
 from services.hiker.app.orchestrator import HikerOrchestrator
 from services.identity.app.service import IdentityService
 from services.identity.app.schemas import SessionIdentity
@@ -36,6 +36,8 @@ class CrewToolCallRequest(BaseModel):
     run_id: str
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
+    # Host-side tool call id; makes proposal tools idempotent per (run, call).
+    tool_call_id: str | None = None
 
 
 class ReimbursementToolCallRequest(BaseModel):
@@ -374,9 +376,37 @@ def build_router(
         persist their proposals only after the caller's normal confirm/lifecycle
         operation; this adapter therefore returns the typed arguments as an
         observation and never creates a project/task itself.
+        ``crew.propose_changes`` records one Anna command card (the proposal)
+        that the project owner confirms through the existing confirm endpoint.
         """
         require_token(x_anna_service_token)
         require_scope(request.workspace_id, request.actor_user_id, request.run_id)
+        if request.name.replace("__", ".") == "crew.propose_changes":
+            # A Coordination Proposal: ONE confirmable Anna card, no fact
+            # mutation until the project owner confirms it.
+            if not any(member.id == request.actor_user_id for member in identity.list_members(request.workspace_id)):
+                raise HTTPException(status_code=404, detail="crew scope not found")
+            tool_call_id = (request.tool_call_id or "").strip() or None
+            try:
+                card = crew.propose_changes(
+                    workspace_id=request.workspace_id,
+                    run_id=request.run_id,
+                    tool_call_id=tool_call_id,
+                    arguments=dict(request.arguments),
+                )
+            except CrewProposalError as exc:
+                raise HTTPException(status_code=422, detail=exc.code) from exc
+            payload = card.payload or {}
+            return {
+                "name": "crew.propose_changes",
+                "effect": "proposal",
+                "result": {
+                    "message_id": card.id,
+                    "new_task_count": len(payload.get("drafts") or []),
+                    "assignment_count": len(payload.get("assignments") or []),
+                    "status": "awaiting_confirmation",
+                },
+            }
         if request.name in {"crew.project.read", "crew.channel.read"}:
             if not any(member.id == request.actor_user_id for member in identity.list_members(request.workspace_id)):
                 raise HTTPException(status_code=404, detail="crew scope not found")
@@ -387,10 +417,15 @@ def build_router(
             if project is None or project.workspace_id != request.workspace_id:
                 raise HTTPException(status_code=404, detail="crew scope not found")
             if request.name == "crew.project.read":
+                # The roster lets Anna name assignees by member id; contact fields stay out.
+                members = [
+                    {"id": member.id, "display_name": member.display_name, "kind": member.kind, "role": member.role}
+                    for member in identity.list_members(request.workspace_id)
+                ]
                 return {
                     "name": request.name,
                     "effect": "read",
-                    "result": {"project": project.model_dump(mode="json")},
+                    "result": {"project": project.model_dump(mode="json"), "members": members},
                 }
             return {
                 "name": request.name,

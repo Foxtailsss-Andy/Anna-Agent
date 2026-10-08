@@ -187,11 +187,16 @@ export interface DraftView {
   role: string;
   depends_on: string[];
   acceptance: string;
+  /** CONTRACTS §2:须等本新任务的既有任务标题;仅在草案带非空 insert_before 时出现 */
+  insert_before?: string[];
 }
 
 interface HasPayload {
   payload?: Record<string, unknown> | null;
 }
+
+const titleList = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
 /** 从命令行 payload 读草案数组(缺字段补默认;非数组 → 空)。 */
 export function commandDrafts(msg: HasPayload): DraftView[] {
@@ -199,13 +204,13 @@ export function commandDrafts(msg: HasPayload): DraftView[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((d) => {
     const o = (d ?? {}) as Record<string, unknown>;
+    const insertBefore = titleList(o.insert_before);
     return {
       title: typeof o.title === "string" ? o.title : "",
       role: typeof o.role === "string" ? o.role : "",
-      depends_on: Array.isArray(o.depends_on)
-        ? o.depends_on.filter((x): x is string => typeof x === "string")
-        : [],
+      depends_on: titleList(o.depends_on),
       acceptance: typeof o.acceptance === "string" ? o.acceptance : "",
+      ...(insertBefore.length ? { insert_before: insertBefore } : {}),
     };
   });
 }

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { OmpKernelDescriptorV1 } from "@anna/harness-v2";
 import { measureOmpImplementation } from "./kernel-source";
-import { verifyRuntimeManifest } from "./runtime-manifest";
+import { verifyRuntimeManifestCached } from "./runtime-manifest";
 
 declare const __ANNA_OMP_IMPLEMENTATION__: ReturnType<typeof measureOmpImplementation>;
 
@@ -24,7 +24,7 @@ export async function verifyOmpKernelIdentity(runtimeRoot: string, descriptor: O
     || descriptor.upstream.integrity !== "sha512-3H90cCc+3yLtvSKM2RooIvkhG+77OFFoXD6+9GPZDF3PQ3FF6uCnPP57OaUa8VZ8YwOm9Eio5ZmfdFuvwLn+VA==") {
     throw new Error("OMP implementation identity mismatch");
   }
-  await verifyRuntimeManifest(runtimeRoot, `sha256:${descriptor.runtime.runtimeManifestSha256}`);
+  await verifyRuntimeManifestCached(runtimeRoot, `sha256:${descriptor.runtime.runtimeManifestSha256}`);
   const hash = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");
   for (const [file, expected] of [["worker.ts", actual.workerSha256], ["protocol.ts", actual.protocolSha256], ["package-lock.json", actual.dependencyLockSha256]]) {
     if (hash(await readFile(join(runtimeRoot, file))) !== expected) throw new Error("OMP runtime source identity mismatch");

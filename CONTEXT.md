@@ -139,3 +139,35 @@ _Avoid_: 把频道消息直接当任务、无来源的后台作业
 **Coordination Proposal**：
 Anna 根据频道上下文提出的结构化协作变更；涉及改派、改图或外部副作用时，确认前不成为事实。
 _Avoid_: 静默改图、用自然语言冒充已执行
+
+## 6. 通用 Agent 能力词汇（2026-10-08 定案）
+
+Anna 是通用 Agent；以下能力都经同一 Node Host + OMP 循环、同一 Workbench Run 到达 Home/Crew，不另起模型循环。
+
+**Host Tool**：
+由 Host 执行、经 Run Profile 准入与 ToolGateway 策略/持久化事件的工具（`todo` 由 OMP 原生执行，其余全部 Host 代理）。渐进式 Capability（`capabilities.search/load` 目录内）与直接 Host Tool（`todo`、`workdir.*`、`sandbox.exec`、`crew.propose_changes`、`mcp.*`）并存。
+_Avoid_: 让 Worker 进程自带 bash/写文件/MCP、绕过 Host 授权的"内置工具"
+
+**Permission mode**：
+每个 Run 的权限档。当前产品实现 `readonly`（默认）与 `contained-write`（必须绑定唯一 workdir；准入 workdir 写/改与 Sandbox 执行、非只读 MCP 工具）。`ask`/`full` 仍是词表保留值，未开放。
+_Avoid_: 把"选了工作目录"当作授权写入
+
+**Sandbox**：
+`sandbox.exec` 的 macOS seatbelt（`/usr/bin/sandbox-exec`）进程隔离：禁网络、只可写 workdir 与单次 scratch、读不到 workdir 之外的用户数据根、环境变量清空、超时杀进程组。不是容器或虚拟机；其他平台不准入该工具。
+_Avoid_: 把目录选择或 Docker 不存在时的普通子进程称作沙箱
+
+**MCP Server**：
+用户在受保护的 Host 配置文件（`ANNA_HARNESS_MCP_CONFIG_PATH`）中声明的外部工具服务器；Host 是 MCP Client，工具以 `mcp.<server>.<tool>` 准入。`readOnlyHint` 工具为读；其余视为外部写，只在 `contained-write` 准入。
+_Avoid_: 业务连接器内部的 MCP 适配器与此混称（那是 Python 业务侧的 ERP/Hiker 连接实现）
+
+**Session Goal（目标模式）**：
+用户明确授权的、可跨多个普通 Workbench Run 推进的目标，带 `max_runs`（≤ 8）上限。Host 只依据持久化证据（终态 + OMP todo 计划）决定续跑或落定；计划全部完成只进入 `awaiting_review`，由用户确认才 `completed`。Stop 某个目标 Run → 目标 `paused`；可暂停/恢复/停止。
+_Avoid_: 模型自称完成即完成、无上限后台自治
+
+**Steer（补充说明）**：
+运行中向当前 Run 追加的用户消息，由 OMP 在下一个回合边界消费并写入规范历史。
+_Avoid_: 为补充一句话另起一个并行 Run
+
+**Live output**：
+模型响应流式到达时的临时文本视图（仅 Run 投影，不入事件库）；规范事实仍是最终的 `omp.model.response` / transcript 事件。
+_Avoid_: 把流式片段当作持久化回答

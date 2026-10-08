@@ -230,6 +230,16 @@
   cursor: default;
 }
 
+/* 运行中:同一位置的发送键变成「补充说明」胶囊(交给正在跑的这次 Run,不是新 Run) */
+.hcp__send--steer {
+  width: auto;
+  border-radius: 999px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
 .hcp__stop {
   display: inline-flex;
   align-items: center;
@@ -321,6 +331,77 @@
 .hcp__env--locked .hcp__envchip {
   opacity: 0.6;
   cursor: default;
+}
+
+/* ---- Workbench 选项行:目标模式 · 可写权限(原生 checkbox/select,键盘可达) ---- */
+.hcp__opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 8px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--ink-2, #6c6c72);
+}
+
+.hcp__opts--locked {
+  opacity: 0.6;
+}
+
+.hcp__opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hcp__opt-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.hcp__opt-check input {
+  margin: 0;
+  accent-color: var(--iris, #575bc4);
+}
+
+.hcp__opt--on {
+  color: var(--iris-deep, #44479f);
+  font-weight: 500;
+}
+
+/* 可写 = 升级权限:沿 Bypass 的琥珀静态警示语汇 */
+.hcp__opt--write {
+  color: #8f6b24;
+  font-weight: 500;
+}
+
+.hcp__opt--write input {
+  accent-color: #b98a2f;
+}
+
+[data-theme="dark"] .hcp__opt--on {
+  color: #a9ace8;
+}
+
+[data-theme="dark"] .hcp__opt--write {
+  color: #d6a85c;
+}
+
+.hcp__opt-select {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: rgb(120 120 128 / 9%);
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+[data-theme="dark"] .hcp__opt-select {
+  background: rgb(255 255 255 / 8%);
 }
 
 .hcp__ctx {

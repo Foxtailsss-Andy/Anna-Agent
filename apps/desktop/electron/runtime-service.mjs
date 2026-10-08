@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -208,6 +208,7 @@ export function createProductRuntimeConfig({
     stateRoot,
     hostWorkspaceRoot,
     env.ANNA_JEV_API_KEY_FILE,
+    env.ANNA_HARNESS_MCP_CONFIG_PATH,
   ].filter((value) => typeof value === "string" && value.trim() !== "");
   const hostEnv = {
     ...ordinaryEnv,
@@ -443,7 +444,7 @@ export async function startProductRuntimeService(config, options = {}) {
     },
     stdio: options.stdio ?? "pipe",
   });
-  const readHostStderr = monitorChildOutput(host);
+  const readHostStderr = monitorChildOutput(host, undefined, diagnosticLogPath(config, "host"));
   let hostStarted = false;
   observeRuntimeExit(host, options, readHostStderr, () => hostStarted);
   const hostFailure = processFailure(host, "Anna Product Host", readHostStderr, () => hostStarted);
@@ -500,21 +501,50 @@ function spawnBusinessService(config, options) {
     env: config.businessEnv,
     stdio: options.stdio ?? "pipe",
   });
-  const readStderr = monitorChildOutput(child);
+  const readStderr = monitorChildOutput(child, undefined, diagnosticLogPath(config, "business"));
   return { child, apiBase: config.businessApiBase, get stderr() { return readStderr(); }, started: false };
 }
 
-function monitorChildOutput(child, maxStderrBytes = 64 * 1024) {
+const DIAGNOSTIC_LOG_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Private per-process stderr log under the Harness state root (rotated once at 5 MiB). */
+export function diagnosticLogPath(config, name) {
+  if (!config?.stateRoot) return undefined;
+  return path.join(config.stateRoot, "logs", `${name}.stderr.log`);
+}
+
+function openDiagnosticLog(logPath) {
+  if (logPath === undefined) return undefined;
+  try {
+    mkdirSync(path.dirname(logPath), { recursive: true, mode: 0o700 });
+    if (existsSync(logPath) && statSync(logPath).size > DIAGNOSTIC_LOG_MAX_BYTES) {
+      renameSync(logPath, `${logPath}.1`);
+    }
+    const stream = createWriteStream(logPath, { flags: "a", mode: 0o600 });
+    stream.on("error", () => {});
+    stream.write(`--- ${new Date().toISOString()} process started ---\n`);
+    return stream;
+  } catch {
+    return undefined;
+  }
+}
+
+function monitorChildOutput(child, maxStderrBytes = 64 * 1024, logPath = undefined) {
   // Always consume both pipes. Uvicorn access logs are stdout; leaving that
   // pipe unread eventually blocks the Python event loop on a busy desktop.
   child.stdout?.on("data", () => {});
+  // Keep stderr after startup too: post-start failures (for example a
+  // swallowed Crew drafting exception) must stay diagnosable.
+  const log = openDiagnosticLog(logPath);
   let stderr = "";
   child.stderr?.on("data", (chunk) => {
+    log?.write(chunk);
     stderr += chunk.toString();
     if (Buffer.byteLength(stderr, "utf8") > maxStderrBytes) {
       stderr = stderr.slice(-maxStderrBytes);
     }
   });
+  child.once?.("exit", () => log?.end());
   return () => stderr;
 }
 

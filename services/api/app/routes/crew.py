@@ -9,7 +9,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from services.crew.app import approvals_projection, inbox as inbox_agg
 from services.crew.app.actors import SYSTEM_ACTOR_IDS
@@ -25,8 +25,13 @@ from services.crew.app.command_drafting import CommandDraftingService
 from services.crew.app.decomposition import CrewDecompositionService
 from services.crew.app.lifecycle import CrewLifecycleError
 from services.crew.app.matching import CrewMatchingService, deterministic_proposals
-from services.crew.app.schemas import TaskDraft
-from services.crew.app.service import CrewPermissionError, CrewService, SuggestionAdoptionError
+from services.crew.app.schemas import AssignmentProposal, TaskDraft
+from services.crew.app.service import (
+    CrewPermissionError,
+    CrewService,
+    SuggestionAdoptionError,
+    safe_reason_code,
+)
 from services.crew.app.showcase import SHOWCASE_SCENARIO_ID
 from services.crew.app.sop_templates import list_templates
 from services.identity.app.schemas import SessionIdentity
@@ -266,9 +271,11 @@ class ChannelCommandConfirmRequest(BaseModel):
 
     ``draft_indexes`` selects into the command row's drafted list (server-side
     source of truth — the client cannot fabricate arbitrary tasks); omit to
-    confirm all drafts."""
+    confirm all drafts. ``assignment_indexes`` selects the card's proposed
+    assignments the same way (omit = all)."""
     message_id: str
     draft_indexes: list[int] | None = None
+    assignment_indexes: list[int] | None = None
 
 
 class ConsensusUpsertRequest(BaseModel):
@@ -348,6 +355,14 @@ def build_router(
         crew._member_facts = _member_facts
 
     host_workers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="anna-host-worker") if product_mode and harness_client else None
+    # Contextual @Anna answers wait on a whole Host task (up to the client's
+    # wait timeout). They run on their own small pool so the say POST returns
+    # at once and long answers never starve Worker dispatch.
+    context_workers = (
+        ThreadPoolExecutor(max_workers=2, thread_name_prefix="anna-crew-context")
+        if product_mode and harness_client
+        else None
+    )
     host_runs: dict[tuple[str, str], str] = {}
 
     def _host_worker_task(
@@ -1081,66 +1096,95 @@ def build_router(
                 except Exception:  # noqa: BLE001 — drafting must not break the say
                     logger.warning("crew intent drafting failed", exc_info=True)
             asyncio.create_task(_draft_intent())
-        if product_mode and harness_client is not None and crew.is_contextual_question(message):
-            # Ordinary @Anna questions are answered through the same Host loop
-            # and appended to the existing channel; no second UI conversation is
-            # created. The context is assembled from persisted Crew facts only.
-            project = crew.get_project(project_id)
-            if project is not None:
-                memory_items = (
-                    memory_store.list_items(
-                        project.workspace_id,
-                        scope="project",
-                        project_id=project.id,
-                        limit=100,
-                    )
-                    if memory_store is not None
-                    else []
+        if product_mode and harness_client is not None and crew.should_answer_contextually(message):
+            # Every other @Anna say is answered through the same Host loop and
+            # appended to the existing channel, in the background: the POST
+            # returns the stored say immediately. A Host failure leaves one
+            # visible Anna failure row instead of silence.
+            if context_workers is not None:
+                context_workers.submit(
+                    _answer_contextually, project_id, message, session.user_id
                 )
-                context = {
-                    "source": "crew.contextual_answer",
-                    "project_id": project.id,
-                    "source_message_id": message.id,
-                    "project": project.model_dump(mode="json"),
-                    "channel_messages": [
-                        item.model_dump(mode="json") for item in crew.list_channel(project.id)
-                    ],
-                    "project_memory": [
-                        item.model_dump(mode="json") for item in reversed(memory_items)
-                    ],
-                }
-                task = ProductTask(
-                    run_id=f"crew-context:{project.id}:{message.id}",
-                    workspace_id=project.workspace_id,
-                    actor_user_id=session.user_id,
-                    surface="crew",
-                    prompt=message.body,
-                    channel_id=f"crew_channel:{project.id}",
-                    conversation_id=f"crew_project:{project.id}",
-                    context=context,
-                    permission_mode="readonly",
-                    source_event_id=message.id,
-                )
-                try:
-                    answer_run = await asyncio.to_thread(
-                        harness_client.submit_and_wait, task
-                    )
-                    answer = _host_answer(answer_run)
-                    if answer:
-                        await asyncio.to_thread(
-                            crew.append_anna_message,
-                            project.id,
-                            answer,
-                            run_ref=answer_run.run_id,
-                        )
-                except HarnessHostError:
-                    logger.warning(
-                        "crew contextual answer failed for %s/%s",
-                        project_id,
-                        message.id,
-                        exc_info=True,
-                    )
         return message.model_dump(mode="json")
+
+    def _answer_contextually(project_id: str, message, actor_user_id: str) -> None:
+        """Background: one contextual Host answer (or failure row) per say."""
+        try:
+            project = crew.get_project(project_id)
+            if project is None:
+                return
+            # The context is assembled from persisted Crew facts only.
+            memory_items = (
+                memory_store.list_items(
+                    project.workspace_id,
+                    scope="project",
+                    project_id=project.id,
+                    limit=100,
+                )
+                if memory_store is not None
+                else []
+            )
+            context = {
+                "source": "crew.contextual_answer",
+                "project_id": project.id,
+                "source_message_id": message.id,
+                "project": project.model_dump(mode="json"),
+                "channel_messages": [
+                    item.model_dump(mode="json") for item in crew.list_channel(project.id)
+                ],
+                "project_memory": [
+                    item.model_dump(mode="json") for item in reversed(memory_items)
+                ],
+            }
+            task = ProductTask(
+                run_id=f"crew-context:{project.id}:{message.id}",
+                workspace_id=project.workspace_id,
+                actor_user_id=actor_user_id,
+                surface="crew",
+                prompt=message.body,
+                channel_id=f"crew_channel:{project.id}",
+                conversation_id=f"crew_project:{project.id}",
+                context=context,
+                permission_mode="readonly",
+                source_event_id=message.id,
+            )
+            answer_run = harness_client.submit_and_wait(task)
+            answer = (
+                _host_answer(answer_run)
+                if answer_run.status in _HOST_SUCCESS_STATUSES
+                else None
+            )
+            if answer:
+                crew.append_anna_message(project.id, answer, run_ref=answer_run.run_id)
+                return
+            reason = _host_failure_code(answer_run)
+            logger.warning(
+                "crew contextual answer failed for %s/%s: %s",
+                project_id,
+                message.id,
+                reason,
+            )
+        except HarnessHostError as exc:
+            reason = safe_reason_code(exc.code, "harness_request_failed")
+            logger.warning(
+                "crew contextual answer failed for %s/%s: %s",
+                project_id,
+                message.id,
+                reason,
+                exc_info=True,
+            )
+        except Exception:  # noqa: BLE001 - background work must stay visible
+            reason = "answer_failed"
+            logger.warning(
+                "crew contextual answer failed for %s/%s",
+                project_id,
+                message.id,
+                exc_info=True,
+            )
+        try:
+            crew.append_anna_failure(project_id, message.id, stage="answer", reason_code=reason)
+        except Exception:  # noqa: BLE001 - nothing more can be surfaced
+            logger.warning("crew answer failure row could not be written", exc_info=True)
 
     @router.get("/api/crew/notifications")
     def list_notifications(
@@ -1209,6 +1253,20 @@ def build_router(
             selected = [TaskDraft.model_validate(all_drafts[i]) for i in indexes]
         except (IndexError, TypeError, KeyError) as exc:
             raise HTTPException(status_code=400, detail="invalid draft index") from exc
+        all_assignments = (command.payload or {}).get("assignments") or []
+        assignment_indexes = (
+            request.assignment_indexes
+            if request.assignment_indexes is not None
+            else list(range(len(all_assignments)))
+        )
+        if any(i < 0 or i >= len(all_assignments) for i in assignment_indexes):
+            raise HTTPException(status_code=400, detail="invalid assignment index")
+        try:
+            selected_assignments = [
+                AssignmentProposal.model_validate(all_assignments[i]) for i in assignment_indexes
+            ]
+        except ValidationError as exc:
+            raise HTTPException(status_code=400, detail="invalid assignment index") from exc
         # R4b adopt-and-assign: only Anna coordination/legacy intent cards may
         # carry a suggested assignee into the normal confirm path.
         payload = command.payload or {}
@@ -1221,6 +1279,7 @@ def build_router(
             updated = crew.confirm_drafts(
                 project_id, selected, session.user_id, source_message_id=command.id,
                 suggested_assignee=suggested,
+                assignments=selected_assignments,
             )
         except CrewPermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -1452,3 +1511,18 @@ def _host_answer(run) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+_HOST_SUCCESS_STATUSES = frozenset({"completed", "succeeded"})
+
+
+def _host_failure_code(run) -> str:
+    """Safe reason code for a Host run that produced no usable answer."""
+    result = run.result or {}
+    for key in ("error_code", "code"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            return safe_reason_code(value, f"host_run_{run.status}")
+    if run.status in _HOST_SUCCESS_STATUSES:
+        return "empty_answer"
+    return safe_reason_code(f"host_run_{run.status}", "host_run_failed")

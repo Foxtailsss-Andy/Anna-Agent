@@ -7,7 +7,7 @@ import { expect, test } from "vitest";
 import { createLiveHarnessV2Runtime, createOmpKernelDescriptor } from "../src/production";
 import { startProductHost } from "../src/product-facade";
 import { ProductSessionStore } from "../src/product-session";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { findFreePort, startBusinessFixture, catalogTools } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -197,8 +197,8 @@ test("Workbench discovers and loads a Crew project capability before reading the
     const detail = await waitForRun(host.url, run.run_id, business.authorization);
     expect(detail.status).toBe("completed");
     expect(modelContexts).toHaveLength(4);
-    expect(modelContexts[0]?.tools).toEqual(["capabilities.search", "capabilities.load"]);
-    expect(modelContexts[1]?.tools).toEqual(["capabilities.search", "capabilities.load"]);
+    expect(catalogTools(modelContexts[0]?.tools ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
+    expect(catalogTools(modelContexts[1]?.tools ?? [])).toEqual(["capabilities.search", "capabilities.load"]);
     expect(modelContexts[2]?.tools).toContain("crew.project.read");
     expect(modelContexts[3]?.tools).toContain("crew.project.read");
     expect(JSON.stringify(modelContexts[3]?.messages)).toContain("WB-02 capability loading project");

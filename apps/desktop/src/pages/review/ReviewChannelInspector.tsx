@@ -23,7 +23,7 @@ export function ReviewChannelInspector({ workspaceId }: ReviewChannelInspectorPr
     try {
       setEvents(await getChannelEvents(workspaceId, channelId, streamId));
     } catch (cause) {
-      setError(String(cause));
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(null);
     }
@@ -36,7 +36,7 @@ export function ReviewChannelInspector({ workspaceId }: ReviewChannelInspectorPr
     try {
       setTrace(await getRunTraceCursor(runId, workspaceId, channelId));
     } catch (cause) {
-      setError(String(cause));
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(null);
     }

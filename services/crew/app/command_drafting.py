@@ -47,7 +47,18 @@ DRAFT_TOOL: dict[str, Any] = {
                         "depends_on": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "titles of OTHER drafts this one depends on",
+                            "description": (
+                                "titles of other drafts or existing tasks that must "
+                                "finish BEFORE this new task can start"
+                            ),
+                        },
+                        "insert_before": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "titles of EXISTING tasks that must wait for this new "
+                                "task (e.g. 'put it before X' -> [\"X\"])"
+                            ),
                         },
                         "acceptance": {"type": "string"},
                     },
@@ -64,9 +75,23 @@ _SYSTEM_PROMPT = (
     "You are Anna Crew. A teammate posted a request in a project channel. Turn it "
     "into 1 to 3 concrete, actionable task drafts tailored to the project. Assign "
     "each a responsible 职能 from the roster roles. Add a short acceptance line "
-    "where useful. Keep it minimal — do not re-plan the whole project. Call "
-    "crew.emit_task_drafts with the final drafts."
+    "where useful. Keep it minimal — do not re-plan the whole project. Express "
+    "ordering against the existing tasks: depends_on lists tasks that must finish "
+    "before the new task; insert_before lists existing tasks that must wait for "
+    "the new task. Call crew.emit_task_drafts with the final drafts."
 )
+
+
+def _string_list(raw: Any) -> list[str]:
+    """Normalize a model-emitted list of titles (strip, drop empties, dedupe)."""
+    if not isinstance(raw, list):
+        return []
+    values: list[str] = []
+    for item in raw:
+        text = str(item).strip()
+        if text and text not in values:
+            values.append(text)
+    return values
 
 
 def deterministic_task_drafts(message_text: str) -> list[TaskDraft]:
@@ -101,14 +126,12 @@ def _drafts_from_tool_args(arguments: dict[str, Any]) -> list[TaskDraft]:
         title = str(entry.get("title") or "").strip()
         if not title:
             continue
-        depends_raw = entry.get("depends_on") or []
-        depends_on = [str(d).strip() for d in depends_raw if str(d).strip()] \
-            if isinstance(depends_raw, list) else []
         drafts.append(TaskDraft(
             title=title,
             role=str(entry.get("role") or _DEFAULT_ROLE).strip() or _DEFAULT_ROLE,
-            depends_on=depends_on,
+            depends_on=_string_list(entry.get("depends_on")),
             acceptance=str(entry.get("acceptance") or "").strip(),
+            insert_before=_string_list(entry.get("insert_before")),
         ))
         if len(drafts) >= MAX_DRAFTS:
             break
@@ -144,14 +167,24 @@ class CommandDraftingService:
         goal_text: str,
         message_text: str,
         roster_roles: list[str],
+        existing_tasks: list[dict[str, str]] | None = None,
     ) -> list[TaskDraft]:
+        """Draft tasks; ``existing_tasks`` items carry ``title``/``role``/``status``."""
         roster = "、".join(roster_roles) if roster_roles else _DEFAULT_ROLE
+        task_lines = "\n".join(
+            f"- {task['title']}（职能：{task.get('role') or '-'}，状态：{task.get('status') or '-'}）"
+            for task in (existing_tasks or [])
+        ) or "（暂无）"
         user_content = (
             f"项目目标：{goal_text}\n"
             f"花名册职能：{roster}\n"
+            f"现有任务：\n{task_lines}\n"
             f"频道请求：{message_text}\n\n"
             "请起草 1 到 3 项任务（≤3），每项给出 title、role（取自花名册职能）、"
-            "可选 depends_on（引用其他草案的 title）与 acceptance 验收标准。"
+            "可选 acceptance 验收标准，并用两个字段表达顺序：\n"
+            "- depends_on：新任务开始前必须完成的任务 title（其他草案或现有任务）；\n"
+            "- insert_before：必须等新任务完成才能开始的【现有任务】title。"
+            "“放在 X 之前”即 insert_before:[\"X\"]；“在 X 之后”即 depends_on:[\"X\"]。"
         )
         request = ModelRequest(
             messages=[

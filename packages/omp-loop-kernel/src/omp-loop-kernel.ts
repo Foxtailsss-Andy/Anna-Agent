@@ -18,24 +18,39 @@ import type {
 import type { CapabilityPolicySnapshot } from "@anna/harness-v2";
 import { buildRunContext, parseJsonValue } from "@anna/harness-v2";
 
-import { verifyRuntimeManifest } from "./runtime-manifest";
+import { verifyRuntimeManifestCached } from "./runtime-manifest";
 import {
   runManagedOmpWorker,
   type HostModelResponse,
   type ManagedOmpWorkerControl,
 } from "./worker-client";
 import { parseAssistant } from "./protocol";
-import type { AssistantMessage, Content, Message, ModelContext, Observation, ToolDefinition, Usage } from "./protocol";
+import type { AssistantMessage, Content, Message, ModelContext, ModelDelta, Observation, ToolDefinition, Usage } from "./protocol";
 
 export type OmpContextPreparation = (
   command: StartRun,
   signal: AbortSignal,
 ) => Promise<PreparedRunContext>;
 
+/** Receives provider deltas while a Host model response is still streaming. */
+export interface OmpModelStreamObserver {
+  onDelta(delta: ModelDelta): void;
+}
+
 export type OmpHostModelTransport = (
   context: ModelContext,
   signal: AbortSignal,
+  observer?: OmpModelStreamObserver,
 ) => AsyncIterable<HostModelResponse>;
+
+/**
+ * Ephemeral live view of a streaming model response. It is never persisted:
+ * the canonical record remains the single final `omp.model.response` event.
+ */
+export interface OmpModelStreamListener {
+  delta(command: StartRun, requestIndex: number, delta: ModelDelta): void;
+  end(command: StartRun, requestIndex: number): void;
+}
 
 export type OmpKernelEvent =
   | { readonly type: "model.request"; readonly context: ModelContext }
@@ -62,6 +77,8 @@ export interface OmpLoopKernelOptions {
   readonly initialMessagesFor?: (command: StartRun) => readonly Message[] | Promise<readonly Message[]>;
   readonly beforeModel?: (command: StartRun, context: ModelContext) => Promise<void> | void;
   readonly onEvent?: (event: OmpKernelEvent) => Promise<void> | void;
+  /** Optional ephemeral stream of provider deltas per Run model request. */
+  readonly modelStream?: OmpModelStreamListener;
   readonly now?: () => string;
   readonly createEventId?: () => string;
 }
@@ -182,7 +199,7 @@ export class OmpLoopKernel implements LoopKernel {
   ): Promise<RunOutcome> {
     const attemptStartedAt = Date.now();
     if (signal.aborted) throw new Error("OMP Run was cancelled before startup");
-    await verifyRuntimeManifest(this.options.runtimeRoot, this.options.expectedManifestDigest);
+    await verifyRuntimeManifestCached(this.options.runtimeRoot, this.options.expectedManifestDigest);
     const readable = readableSink(sink);
     let history = readable === undefined ? [] : await readEvents(readable, command.runId);
     if (history.some((event) => isTerminalEvent(event.type))) throw new Error("OMP cannot start a terminal Run");
@@ -412,70 +429,83 @@ export class OmpLoopKernel implements LoopKernel {
         await this.options.onEvent?.({ type: "model.request", context });
       },
       modelTransport: (async function* (this: OmpLoopKernel, context: ModelContext, modelSignal: AbortSignal) {
-        for await (const response of this.options.modelTransport(context, modelSignal)) {
-          const message = parseAssistant(response.message);
-          await this.options.onEvent?.({ type: "model.response", message });
-          const usage = message.usage;
-          const assistantTranscriptIndex = transcriptIndex;
-          let toolOrdinal = 0;
-          for (const block of message.content) {
-            if (block.type !== "toolCall") continue;
-            if (authorizingToolCalls.has(block.id)) throw new OmpToolCheckpointMismatchError();
-            authorizingToolCalls.set(block.id, {
-              name: block.name,
-              arguments: block.arguments,
-              transcriptIndex: assistantTranscriptIndex,
-              resultTranscriptIndex: assistantTranscriptIndex + 1 + toolOrdinal,
-            });
-            toolOrdinal += 1;
-          }
-          if (readable !== undefined && modelRequestEventId !== undefined) {
-            await appendEvent(
-              sink,
-              command,
-              await nextSequenceFromSink(readable, command.runId),
-              "omp.model.response",
-              {
-                schemaVersion: 1,
-                requestIndex: modelRequests,
-                requestEventId: modelRequestEventId,
-                transcriptIndex: assistantTranscriptIndex,
-                message: parseJsonValue(message, "OMP model response checkpoint"),
+        const streamListener = this.options.modelStream;
+        const streamRequestIndex = modelRequests;
+        const observer = streamListener === undefined
+          ? undefined
+          : {
+              onDelta: (delta: ModelDelta) => {
+                try { streamListener.delta(command, streamRequestIndex, delta); } catch { /* live view only */ }
               },
-              this.now,
-              this.createEventId,
-            );
-          }
-          if (usage !== undefined) {
-            addUsage(cumulativeUsage, usage);
-            if (readable !== undefined) {
+            };
+        try {
+          for await (const response of this.options.modelTransport(context, modelSignal, observer)) {
+            const message = parseAssistant(response.message);
+            await this.options.onEvent?.({ type: "model.response", message });
+            const usage = message.usage;
+            const assistantTranscriptIndex = transcriptIndex;
+            let toolOrdinal = 0;
+            for (const block of message.content) {
+              if (block.type !== "toolCall") continue;
+              if (authorizingToolCalls.has(block.id)) throw new OmpToolCheckpointMismatchError();
+              authorizingToolCalls.set(block.id, {
+                name: block.name,
+                arguments: block.arguments,
+                transcriptIndex: assistantTranscriptIndex,
+                resultTranscriptIndex: assistantTranscriptIndex + 1 + toolOrdinal,
+              });
+              toolOrdinal += 1;
+            }
+            if (readable !== undefined && modelRequestEventId !== undefined) {
               await appendEvent(
                 sink,
                 command,
                 await nextSequenceFromSink(readable, command.runId),
-                "run.usage.updated",
-                { phase: "usage_updated", requestIndex: modelRequests, cumulative: { ...cumulativeUsage } },
+                "omp.model.response",
+                {
+                  schemaVersion: 1,
+                  requestIndex: modelRequests,
+                  requestEventId: modelRequestEventId,
+                  transcriptIndex: assistantTranscriptIndex,
+                  message: parseJsonValue(message, "OMP model response checkpoint"),
+                },
                 this.now,
                 this.createEventId,
               );
             }
+            if (usage !== undefined) {
+              addUsage(cumulativeUsage, usage);
+              if (readable !== undefined) {
+                await appendEvent(
+                  sink,
+                  command,
+                  await nextSequenceFromSink(readable, command.runId),
+                  "run.usage.updated",
+                  { phase: "usage_updated", requestIndex: modelRequests, cumulative: { ...cumulativeUsage } },
+                  this.now,
+                  this.createEventId,
+                );
+              }
+            }
+            if (command.budget.inputTokens !== undefined) {
+              if (usage?.input === undefined) throw new OmpUsageUnavailableError("OMP input token budget requires Host usage");
+              inputTokens += usage.input;
+              if (inputTokens > command.budget.inputTokens) throw new OmpBudgetExceededError("OMP input token budget exhausted");
+            }
+            if (command.budget.outputTokens !== undefined) {
+              if (usage?.output === undefined) throw new OmpUsageUnavailableError("OMP output token budget requires Host usage");
+              outputTokens += usage.output;
+              if (outputTokens > command.budget.outputTokens) throw new OmpBudgetExceededError("OMP output token budget exhausted");
+            }
+            if (command.budget.cost !== undefined) {
+              if (usage?.cost === undefined) throw new OmpUsageUnavailableError("OMP cost budget requires Host usage");
+              cost += usage.cost;
+              if (cost > command.budget.cost) throw new OmpBudgetExceededError("OMP cost budget exhausted");
+            }
+            yield { ...response, message };
           }
-          if (command.budget.inputTokens !== undefined) {
-            if (usage?.input === undefined) throw new OmpUsageUnavailableError("OMP input token budget requires Host usage");
-            inputTokens += usage.input;
-            if (inputTokens > command.budget.inputTokens) throw new OmpBudgetExceededError("OMP input token budget exhausted");
-          }
-          if (command.budget.outputTokens !== undefined) {
-            if (usage?.output === undefined) throw new OmpUsageUnavailableError("OMP output token budget requires Host usage");
-            outputTokens += usage.output;
-            if (outputTokens > command.budget.outputTokens) throw new OmpBudgetExceededError("OMP output token budget exhausted");
-          }
-          if (command.budget.cost !== undefined) {
-            if (usage?.cost === undefined) throw new OmpUsageUnavailableError("OMP cost budget requires Host usage");
-            cost += usage.cost;
-            if (cost > command.budget.cost) throw new OmpBudgetExceededError("OMP cost budget exhausted");
-          }
-          yield { ...response, message };
+        } finally {
+          try { streamListener?.end(command, streamRequestIndex); } catch { /* live view only */ }
         }
       }).bind(this),
       toolGateway: async (name, input, toolCallId, toolSignal) => {
@@ -1118,9 +1148,14 @@ function checkpointToolDefinitionsFor(
     policy,
     command.runProfileSnapshot.allowedTools,
   ));
+  // Tools the profile admits outside the capability catalog (for example the
+  // native todo plan or Host-owned workdir tools) are always active; catalog
+  // capabilities become active only after a durable capability.load receipt.
+  const catalogIds = new Set(policy.catalog.capabilities.map((item) => item.id));
   return admitted.filter((tool) => tool.name === "capabilities.search"
     || tool.name === "capabilities.load"
-    || loadedIds.has(tool.name));
+    || loadedIds.has(tool.name)
+    || !catalogIds.has(tool.name));
 }
 
 function memoryHitPayload(memory: AcceptedChannelMemory, rank: number): JsonValue {

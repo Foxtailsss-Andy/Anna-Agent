@@ -4,17 +4,40 @@ import { createLiveHarnessV2Runtime } from "./production";
 import { ProductSessionStore, productSurfaces } from "./product-session";
 import { startProductHost } from "./product-facade";
 import { readProductConfig } from "./product-config";
+import { createMcpManager, loadMcpConfig } from "./workbench-mcp";
 
 const serviceToken = process.env.ANNA_HARNESS_SERVICE_TOKEN?.trim() || randomUUID();
 const hostConfigPath = process.env.ANNA_HARNESS_HOST_CONFIG_PATH?.trim()
   || process.env.ANNA_RUNTIME_CONFIG_PATH?.trim();
 const jevKeyFile = process.env.ANNA_JEV_API_KEY_FILE?.trim();
-const protectedPaths = [jevKeyFile].filter((value): value is string => value !== undefined && value !== "");
+const mcpConfigPath = process.env.ANNA_HARNESS_MCP_CONFIG_PATH?.trim() || undefined;
+// Host-only files that no Agent tool (read, write, sandbox) may reach, even
+// through an admitted workdir.
+const protectedPaths = [
+  jevKeyFile,
+  hostConfigPath,
+  mcpConfigPath,
+  process.env.ANNA_HARNESS_STATE_ROOT,
+  process.env.ANNA_HARNESS_HOST_EVENT_STORE_PATH,
+  process.env.ANNA_HARNESS_SESSION_STORE_PATH,
+  process.env.ANNA_HARNESS_BUSINESS_CONFIG_PATH,
+  ...(process.env.ANNA_HARNESS_PROTECTED_PATHS ?? "").split(":"),
+].map((value) => value?.trim()).filter((value): value is string => value !== undefined && value !== "");
 const businessOrigin = process.env.ANNA_HARNESS_BUSINESS_ORIGIN?.trim();
 const sessionStore = new ProductSessionStore(process.env.ANNA_HARNESS_SESSION_STORE_PATH);
 const hostConfig = await readProductConfig(hostConfigPath);
 const modelProfiles = modelProfilesFromConfig(hostConfig);
 const agentDirectives = agentDirectivesFromConfig(hostConfig);
+
+// MCP servers are optional; a broken server is reported in status, never fatal.
+const mcp = createMcpManager(await loadMcpConfig(mcpConfigPath).catch((error: unknown) => {
+  process.stderr.write(JSON.stringify({ type: "mcp.config.invalid", error: error instanceof Error ? error.message : "invalid" }) + "\n");
+  return {};
+}));
+await mcp.start();
+for (const server of mcp.status()) {
+  process.stderr.write(JSON.stringify({ type: "mcp.server.status", ...server }) + "\n");
+}
 
 let live: Awaited<ReturnType<typeof createLiveHarnessV2Runtime>> | undefined;
 let service!: Awaited<ReturnType<typeof startProductHost>>;
@@ -42,6 +65,7 @@ try {
     productTaskPeek: (runId: string) => sessionStore.peek(runId)?.task,
     modelProfiles,
     agentDirectives,
+    mcp,
   });
   service = await startProductHost({
     runtime: live.runtime,
@@ -53,6 +77,7 @@ try {
     serviceToken,
     sessionStore,
     protectedPaths,
+    mcp,
     jevTelemetry: (record) => {
       process.stderr.write(JSON.stringify({ type: "jev.inference", ...record }) + "\n");
     },
@@ -61,6 +86,7 @@ try {
   });
 } catch (error) {
   await live?.close();
+  await mcp.close();
   throw error;
 }
 
@@ -69,6 +95,7 @@ process.stdout.write(JSON.stringify({ status: "ready", url: service.url, surface
 const shutdown = async () => {
   await service.close();
   await live?.close();
+  await mcp.close();
 };
 
 process.once("SIGINT", () => void shutdown().then(() => process.exit(0)));

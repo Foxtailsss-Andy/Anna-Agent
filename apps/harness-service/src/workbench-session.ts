@@ -1,6 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import type { WorkbenchGoalRecord } from "./workbench-goal";
+
 export interface WorkbenchSessionRecord {
   readonly schema_version: 2;
   readonly session_id: string;
@@ -11,6 +13,8 @@ export interface WorkbenchSessionRecord {
   readonly surface: string;
   readonly created_at: string;
   readonly updated_at: string;
+  /** User-authorized multi-Run objective (at most one per Session). */
+  readonly goal?: WorkbenchGoalRecord;
 }
 
 export interface WorkbenchRunRecord {
@@ -37,6 +41,10 @@ export interface WorkbenchRunRecord {
   readonly updated_at: string;
   readonly admission_status?: "pending" | "started" | "failed";
   readonly admission_error?: string;
+  /** Absent on records created before permission modes existed (= readonly). */
+  readonly permission_mode?: "readonly" | "contained-write";
+  readonly goal_id?: string;
+  readonly trigger?: "user" | "goal_continuation";
 }
 
 interface WorkbenchState {
@@ -97,6 +105,27 @@ export class WorkbenchSessionStore {
     });
   }
 
+  /** Atomically replaces one Session record; the mutation may throw to abort. */
+  async updateSession(
+    sessionId: string,
+    mutation: (session: WorkbenchSessionRecord) => WorkbenchSessionRecord,
+  ): Promise<WorkbenchSessionRecord> {
+    await this.ensureLoaded();
+    return this.mutate((state) => {
+      const index = state.sessions.findIndex((item) => item.session_id === sessionId);
+      if (index < 0) throw new Error("session_not_found");
+      const next = mutation(state.sessions[index]!);
+      if (next.session_id !== sessionId) throw new Error("session_id_changed");
+      state.sessions[index] = next;
+      return next;
+    });
+  }
+
+  async listSessionsWithGoalStatus(status: string): Promise<readonly WorkbenchSessionRecord[]> {
+    await this.ensureLoaded();
+    return this.state!.sessions.filter((item) => item.goal?.status === status);
+  }
+
   async getSession(sessionId: string): Promise<WorkbenchSessionRecord | undefined> {
     await this.ensureLoaded();
     return this.state!.sessions.find((item) => item.session_id === sessionId);
@@ -133,6 +162,11 @@ export class WorkbenchSessionStore {
             : { kind: "conflict" };
         }
         state.runs.push(run);
+        // Session recency follows its latest Run so history and restore pick it first.
+        const sessionIndex = state.sessions.findIndex((item) => item.session_id === run.session_id);
+        if (sessionIndex >= 0 && state.sessions[sessionIndex]!.updated_at < run.created_at) {
+          state.sessions[sessionIndex] = { ...state.sessions[sessionIndex]!, updated_at: run.created_at };
+        }
         this.beginRunAdmission(run.run_id);
         createdAdmission = true;
         return { kind: "created", run };
@@ -294,6 +328,8 @@ function sameRunIdentity(left: WorkbenchRunRecord, right: WorkbenchRunRecord): b
     && left.agent_id === right.agent_id
     && left.model_profile_id === right.model_profile_id
     && left.requested_artifact === right.requested_artifact
+    && (left.permission_mode ?? "readonly") === (right.permission_mode ?? "readonly")
+    && left.goal_id === right.goal_id
     && JSON.stringify(left.resource_refs) === JSON.stringify(right.resource_refs);
 }
 
@@ -304,8 +340,8 @@ function sameSessionRecord(left: WorkbenchSessionRecord, right: WorkbenchSession
     && left.channel_id === right.channel_id
     && left.project_id === right.project_id
     && left.surface === right.surface
-    && left.created_at === right.created_at
-    && left.updated_at === right.updated_at;
+    && left.created_at === right.created_at;
+  // updated_at follows later Runs and goal is live state; neither is identity.
 }
 
 function sameMigratedRun(left: WorkbenchRunRecord, right: WorkbenchRunRecord): boolean {
@@ -371,7 +407,22 @@ function isSessionRecord(value: unknown): value is WorkbenchSessionRecord {
     && typeof value.updated_at === "string"
     && (value.admission_status === undefined || value.admission_status === "pending" || value.admission_status === "started" || value.admission_status === "failed")
     && (value.admission_error === undefined || typeof value.admission_error === "string")
-    && (value.project_id === undefined || typeof value.project_id === "string");
+    && (value.project_id === undefined || typeof value.project_id === "string")
+    && (value.goal === undefined || isGoalRecord(value.goal));
+}
+
+function isGoalRecord(value: unknown): value is WorkbenchGoalRecord {
+  return isRecord(value)
+    && typeof value.goal_id === "string"
+    && typeof value.objective === "string"
+    && typeof value.status === "string"
+    && typeof value.max_runs === "number"
+    && Array.isArray(value.run_ids)
+    && value.run_ids.every((item) => typeof item === "string")
+    && (value.permission_mode === "readonly" || value.permission_mode === "contained-write")
+    && Array.isArray(value.resource_refs)
+    && typeof value.created_at === "string"
+    && typeof value.updated_at === "string";
 }
 
 function isRunRecord(value: unknown): value is WorkbenchRunRecord {
@@ -397,7 +448,10 @@ function isRunRecord(value: unknown): value is WorkbenchRunRecord {
     && typeof value.updated_at === "string"
     && (value.project_id === undefined || typeof value.project_id === "string")
     && (value.parent_run_id === undefined || typeof value.parent_run_id === "string")
-    && (value.requested_artifact === undefined || typeof value.requested_artifact === "string");
+    && (value.requested_artifact === undefined || typeof value.requested_artifact === "string")
+    && (value.permission_mode === undefined || value.permission_mode === "readonly" || value.permission_mode === "contained-write")
+    && (value.goal_id === undefined || typeof value.goal_id === "string")
+    && (value.trigger === undefined || value.trigger === "user" || value.trigger === "goal_continuation");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

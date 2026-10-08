@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 import httpx
 from fastapi.testclient import TestClient
@@ -472,9 +473,16 @@ def test_crew_contextual_question_uses_host_and_appends_answer_to_same_channel(
         json={"body": "@Anna，现在项目进展如何？", "mentions": ["anna"]},
     )
     assert response.status_code == 200
-    channel = client.get(
-        f"/api/crew/projects/{project['id']}/channel", headers=auth
-    ).json()["messages"]
+    # The answer is produced in the background; the say POST does not wait.
+    deadline = time.monotonic() + 3.0
+    channel = []
+    while time.monotonic() < deadline:
+        channel = client.get(
+            f"/api/crew/projects/{project['id']}/channel", headers=auth
+        ).json()["messages"]
+        if channel[-1]["author_kind"] == "anna":
+            break
+        time.sleep(0.02)
     assert channel[-1]["author_kind"] == "anna"
     assert channel[-1]["body"] == "项目当前有一项待评审。"
 

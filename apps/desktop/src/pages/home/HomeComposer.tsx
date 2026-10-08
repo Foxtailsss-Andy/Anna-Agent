@@ -111,6 +111,21 @@ export interface HomeComposerProps {
   permission?: PermissionMode;
   onPermission?: (p: PermissionMode) => void;
 
+  /**
+   * Workbench 权限(CONTEXT.md permission mode):绑定了工作目录且提供 handler 时才渲染开关;
+   * 开 = contained-write(沙箱内可写可执行),关 = readonly(默认)。
+   */
+  allowWrite?: boolean;
+  onAllowWrite?: (allow: boolean) => void;
+  /** External-write MCP tools that the same permission admits (named so consent is informed). */
+  mcpWriteTools?: readonly string[];
+
+  /** 目标模式(Workbench 会话 Goal):提供 handler 时渲染开关与「最多 N 轮」(1–8)。 */
+  goalMode?: boolean;
+  onGoalMode?: (on: boolean) => void;
+  goalMaxRuns?: number;
+  onGoalMaxRuns?: (runs: number) => void;
+
   /** M9:运行中环境行锁定(60% 去 ▾ 不可点;上下文环除外) */
   envLocked?: boolean;
   /** 会话态才渲染上下文环(问候页不出现,V2 修订 ②);>80 转 warn */
@@ -174,6 +189,10 @@ function CtxRing({ percent }: { percent: number }) {
 }
 
 /* ---------------- 主件 ---------------- */
+
+/** Host 契约:Goal 的 max_runs 取 1..8(CONTRACTS §1.5)。 */
+export const GOAL_MAX_RUNS_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export const WRITE_TOGGLE_LABEL = "允许 Anna 在此工作目录内修改文件并运行命令（沙箱）";
 
 export function HomeComposer(props: HomeComposerProps) {
   const {
@@ -610,7 +629,13 @@ export function HomeComposer(props: HomeComposerProps) {
           rows={2}
           value={value}
           /* J3:运行中 composer 不锁 —— 提示语直说此刻这里说的话会进正在跑的这次任务 */
-          placeholder={canSteer ? "补充指示，边跑边说……" : placeholder}
+          placeholder={
+            canSteer
+              ? "补充说明，边跑边说……"
+              : props.goalMode && props.onGoalMode
+                ? "描述要达成的目标 —— Anna 会按计划自动续跑，完成后等你确认……"
+                : placeholder
+          }
           onChange={(e) => { handleChange(e.target.value); autoGrow(); }}
           onKeyDown={handleKeyDown}
         />
@@ -651,13 +676,13 @@ export function HomeComposer(props: HomeComposerProps) {
           )}
           <button
             type="button"
-            className={`hcp__send${canSubmit ? "" : " hcp__send--off"}`}
-            aria-label={canSteer ? "补充指示" : "发送"}
-            title={canSteer ? "补充指示 · 交给正在跑的这次任务" : undefined}
+            className={`hcp__send${canSteer ? " hcp__send--steer" : ""}${canSubmit ? "" : " hcp__send--off"}`}
+            aria-label={canSteer ? "补充说明" : props.goalMode && props.onGoalMode ? "按目标模式发送" : "发送"}
+            title={canSteer ? "补充说明 · 交给正在跑的这次任务" : undefined}
             disabled={!canSubmit}
             onClick={canSteer ? submitSteer : onSend}
           >
-            ↑
+            {canSteer ? "补充说明" : "↑"}
           </button>
         </div>
       </div>
@@ -696,10 +721,56 @@ export function HomeComposer(props: HomeComposerProps) {
         {props.ctxPercent !== undefined && <CtxRing percent={props.ctxPercent} />}
         <span className="hcp__footnote">
           {canSteer
-            ? "Enter 补充指示 · 交给正在跑的这次任务，不会另起一次 · Shift+Enter 换行"
+            ? "Enter 补充说明 · 交给正在跑的这次任务，不会另起一次 · Shift+Enter 换行"
             : footnote}
         </span>
       </div>
+
+      {/* Workbench 选项行:目标模式 + 可写权限(仅绑定工作目录时)。运行中随环境行一起锁定。 */}
+      {((props.onGoalMode && props.onGoalMaxRuns) || (props.workdir && props.onAllowWrite)) && (
+        <div className={`hcp__opts${envLocked ? " hcp__opts--locked" : ""}`}>
+          {props.onGoalMode && props.onGoalMaxRuns && (
+            <span className={`hcp__opt${props.goalMode ? " hcp__opt--on" : ""}`}>
+              <label className="hcp__opt-check">
+                <input
+                  type="checkbox"
+                  checked={props.goalMode === true}
+                  disabled={envLocked}
+                  onChange={(e) => props.onGoalMode!(e.target.checked)}
+                />
+                目标模式
+              </label>
+              {props.goalMode && (
+                <select
+                  className="hcp__opt-select"
+                  aria-label="目标模式最多轮数"
+                  value={props.goalMaxRuns ?? 4}
+                  disabled={envLocked}
+                  onChange={(e) => props.onGoalMaxRuns!(Number(e.target.value))}
+                >
+                  {GOAL_MAX_RUNS_OPTIONS.map((n) => (
+                    <option key={n} value={n}>最多 {n} 轮</option>
+                  ))}
+                </select>
+              )}
+            </span>
+          )}
+          {props.workdir && props.onAllowWrite && (
+            <label className={`hcp__opt hcp__opt-check${props.allowWrite ? " hcp__opt--write" : ""}`}>
+              <input
+                type="checkbox"
+                checked={props.allowWrite === true}
+                disabled={envLocked}
+                onChange={(e) => props.onAllowWrite!(e.target.checked)}
+              />
+              {WRITE_TOGGLE_LABEL}
+              {props.mcpWriteTools && props.mcpWriteTools.length > 0 && (
+                <span className="hcp__opt-note">，并允许调用 MCP 写操作：{props.mcpWriteTools.join("、")}</span>
+              )}
+            </label>
+          )}
+        </div>
+      )}
     </div>
   );
 }

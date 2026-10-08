@@ -27,10 +27,13 @@ import { IntentConfirmCard } from "./IntentConfirmCard";
 import { ReviewCard } from "./ReviewCard";
 import { SayBubble } from "./SayBubble";
 import { messageFamily, type MentionMeta } from "./channelModel";
+import { latestCrewSession } from "./crewSession";
 import { intentOriginMessageId, isIntentCommand } from "./intentCard";
 import { SYSTEM_ANNA_MENTION_ID } from "./pickerModel";
+import { listWorkbenchSessions } from "../../../lib/api/workbench";
 import { useWorkbenchSession } from "../../workbench/useWorkbenchSession";
 import { CrewMarkdown } from "../CrewMarkdown";
+import { TraceDrawer } from "../../trace/TraceDrawer";
 import "./channel.css";
 
 function timeOf(iso: string): string {
@@ -80,12 +83,36 @@ export function ChannelColumn({
 }: ChannelColumnProps) {
   const workbench = useWorkbenchSession("crew", projectId);
   const [collapsed, setCollapsed] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const prevLen = useRef(0);
+
+  // 恢复本项目最近的 Crew Anna 会话(Host 保留 Session;离开/重进项目或重启后卡片与历史回来)。
+  // 迟到结果(卸载 / 换项目 / 用户已先问)一律丢弃;列表失败 = 不恢复,不造会话。
+  const restoreRef = useRef(workbench.restore);
+  restoreRef.current = workbench.restore;
+  const askedRef = useRef(false);
+  useEffect(() => {
+    let live = true;
+    askedRef.current = false;
+    listWorkbenchSessions({ projectId })
+      .then(({ sessions }) => {
+        if (!live || askedRef.current) return;
+        const sessionId = latestCrewSession(sessions ?? [], projectId);
+        if (sessionId) void restoreRef.current(sessionId);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
   const tasksById = new Map((project.tasks ?? []).map((t) => [t.id, t]));
   const msgById = new Map((channel ?? []).map((m) => [m.id, m]));
+  const confirmedCommandIds = new Set((channel ?? [])
+    .map((m) => m.kind === "event" ? (m.payload as { confirms_message_id?: unknown } | null | undefined)?.confirms_message_id : undefined)
+    .filter((id): id is string => typeof id === "string"));
 
   // 新消息 → 编年史滚到底(newest 在下)
   const count = channel?.length ?? 0;
@@ -136,10 +163,27 @@ export function ChannelColumn({
     });
 
   const askAnna = async (text: string) => {
+    askedRef.current = true;
     return workbench.start(text);
   };
   const currentMessages = workbench.session?.messages ?? [];
   const workbenchStatus = workbench.starting ? "正在建立会话" : workbench.status;
+  // Streaming text of the current Run (dropped once the Host persists the message).
+  const liveText = workbench.running ? workbench.run?.live_output?.text ?? "" : "";
+  const planProgress = workbench.run?.plan?.phases.reduce(
+    (acc, phase) => ({
+      done: acc.done + phase.tasks.filter((task) => task.status === "completed").length,
+      total: acc.total + phase.tasks.length,
+    }),
+    { done: 0, total: 0 },
+  );
+  const lastTool = workbench.run?.tools?.at(-1);
+  const processLine = [
+    planProgress && planProgress.total > 0 ? `计划 ${planProgress.done}/${planProgress.total}` : null,
+    workbench.run?.tools && workbench.run.tools.length > 0 ? `工具 ${workbench.run.tools.length} 次` : null,
+    lastTool ? `最近：${lastTool.name}${lastTool.summary ? ` · ${lastTool.summary}` : ""}` : null,
+  ].filter(Boolean).join(" · ");
+  const showWorkbench = currentMessages.length > 0 || workbench.starting || workbench.running || workbench.error !== null;
 
   const renderMessage = (msg: ChannelMessage) => {
     const author = resolveAuthor(msg);
@@ -202,6 +246,7 @@ export function ChannelColumn({
               isOwner={isOwner}
               originAuthorName={originAuthorName}
               onRefresh={onRefresh}
+              confirmedInChannel={confirmedCommandIds.has(msg.id)}
             />
           );
         }
@@ -269,7 +314,7 @@ export function ChannelColumn({
           channel.map(renderMessage)
         )}
         <ActivityRows tasks={project.tasks ?? []} members={members} />
-        {(workbench.runId || workbench.error) && (
+        {showWorkbench && (
           <div className="ir-crew-workbench" role="status">
             <div className="ir-crew-workbench__head">
               <IrisPetal size={12} />
@@ -290,17 +335,42 @@ export function ChannelColumn({
                 ))}
               </div>
             )}
-            {workbench.error && <div className="ir-crew-workbench__error">{workbench.error}</div>}
-            {workbench.running && (
-              <button type="button" className="ir-crew-workbench__stop" onClick={() => void workbench.stop("Stopped by user")}>
-                停止此 Run
-              </button>
+            {liveText && (
+              <div className="ir-crew-workbench__message ir-crew-workbench__message--assistant ir-crew-workbench__message--live" aria-live="polite">
+                <CrewMarkdown source={liveText} />
+                <span className="ir-crew-workbench__live-note">正在生成</span>
+              </div>
             )}
+            {processLine && <div className="ir-crew-workbench__process">{processLine}</div>}
+            {workbench.error && <div className="ir-crew-workbench__error">{workbench.error}</div>}
+            <div className="ir-crew-workbench__actions">
+              {workbench.running && (
+                <button type="button" className="ir-crew-workbench__stop" onClick={() => void workbench.stop("Stopped by user")}>
+                  停止此 Run
+                </button>
+              )}
+              {workbench.runId && (
+                <button type="button" className="ir-crew-workbench__trace" onClick={() => setTraceOpen(true)}>
+                  执行过程
+                </button>
+              )}
+            </div>
           </div>
+        )}
+        {workbench.runId && (
+          <TraceDrawer runId={workbench.runId} open={traceOpen} onClose={() => setTraceOpen(false)} source="workbench" />
         )}
       </div>
 
-      <Composer projectId={projectId} members={members} onRefresh={onRefresh} onAskAnna={askAnna} />
+      {/* Anna 运行中:问 Anna → 补充给当前 Run(steer),不并行起第二个 Run */}
+      <Composer
+        projectId={projectId}
+        members={members}
+        onRefresh={onRefresh}
+        onAskAnna={askAnna}
+        annaRunning={workbench.running}
+        onSteerAnna={workbench.steer}
+      />
     </aside>
   );
 }

@@ -17,7 +17,7 @@ import {
   createWorkbenchCapabilityPolicy,
 } from "../src/workbench-capabilities";
 import { ProductSessionStore, validatedProductTask } from "../src/product-session";
-import { findFreePort, startBusinessFixture } from "./workbench-session-fixture";
+import { catalogTools, findFreePort, startBusinessFixture } from "./workbench-session-fixture";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const materializedRoot = join(repositoryRoot, "build/omp-runtime/darwin-arm64");
@@ -248,11 +248,13 @@ test("Workbench restores a successfully loaded capability and reads the project 
       }))) + ` contexts=${JSON.stringify(resumedModelContexts.map((context) => context.tools))}`,
     ).toBe(true);
     expect(resumedModelContexts).toHaveLength(2);
-    expect(new Set(resumedModelContexts[0]?.tools)).toEqual(new Set([
+    expect(new Set(catalogTools(resumedModelContexts[0]?.tools ?? []))).toEqual(new Set([
       "capabilities.search",
       "capabilities.load",
       "crew.project.read",
     ]));
+    // Direct Host tools stay active across restore (the kernel restore rule and the Host agree).
+    expect(resumedModelContexts[0]?.tools).toEqual(expect.arrayContaining(["todo", "crew.propose_changes"]));
     const checkpointLastSeq = checkpoint.at(-1)?.seq ?? -1;
     expect(resumedEvents
       .filter((event) => event.seq > checkpointLastSeq && event.type === "omp.tool.dispatch")

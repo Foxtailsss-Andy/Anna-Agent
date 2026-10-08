@@ -60,6 +60,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "4.0.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.6"
   },

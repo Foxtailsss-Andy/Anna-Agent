@@ -3,7 +3,7 @@
  *
  * 模板卡 = 名(feature_iteration 带「旗舰」pill)+ 真实计数(从模板真结构算,不用 mock 的 9)
  *   + DAG 骨架 SVG 小图(白 rect=任务 / delegate 底 rect=默认派 Agent / 金菱=评审门 / dashed=可生长)
- *   + 「用此模板建项目」(真建:项目名 → create API → 跳详情)+「编辑器 · P1」dashed 站位。
+ *   + 「用此模板建项目」(真建:应用内对话框填项目名 → create API → 跳详情)+「编辑器 · P1」dashed 站位。
  * 空态即空态;失败降级不造数。
  */
 
@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StateNote } from "../../components/anna/StateNote";
 import { useShellBus } from "../../components/shell/AnnaShell";
 import { createProject, listTemplates, type SopTemplate } from "../../lib/api/crew";
+import { CreateProjectDialog } from "./CreateProjectDialog";
 import { isFlagship, templateCounts, templateSkeleton, type SkeletonNode } from "./templateModel";
 import "./crew.css";
 
@@ -79,8 +80,8 @@ export function CrewTemplatesPage() {
   const [templates, setTemplates] = useState<SopTemplate[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState<string | null>(null);
-  const [createErr, setCreateErr] = useState<string | null>(null);
+  /** 正在为其建项目的模板 + 触发按钮(对话框关闭后焦点回到它) */
+  const [dialog, setDialog] = useState<{ template: SopTemplate; trigger: HTMLElement | null } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -98,20 +99,12 @@ export function CrewTemplatesPage() {
     load();
   }, [load]);
 
-  const onCreate = useCallback(
-    async (t: SopTemplate) => {
-      const name = window.prompt(`用“${t.name}”建项目 —— 给项目起个名字（如“登录页重设计”）`, "");
-      if (!name || !name.trim()) return;
-      setCreating(t.id);
-      setCreateErr(null);
-      try {
-        const project = await createProject(name.trim(), t.id);
-        bus.openCrewProject(project.id);
-      } catch (e) {
-        setCreateErr(String(e));
-      } finally {
-        setCreating(null);
-      }
+  // window.prompt 在 Electron 里抛错(prompt() is not supported)→ 改应用内对话框;失败在对话框内就地报错
+  const createFromTemplate = useCallback(
+    async (template: SopTemplate, name: string) => {
+      const project = await createProject(name, template.id);
+      setDialog(null);
+      bus.openCrewProject(project.id);
     },
     [bus],
   );
@@ -129,8 +122,6 @@ export function CrewTemplatesPage() {
               刷新
             </button>
           </div>
-
-          {createErr && <StateNote kind="error" text={createErr} />}
 
           {loading && !templates ? (
             <StateNote kind="loading" text="正在装载模板" />
@@ -162,10 +153,10 @@ export function CrewTemplatesPage() {
                       <button
                         type="button"
                         className="ir-crew-tpl__use"
-                        onClick={() => onCreate(t)}
-                        disabled={creating === t.id}
+                        onClick={(e) => setDialog({ template: t, trigger: e.currentTarget })}
+                        aria-haspopup="dialog"
                       >
-                        {creating === t.id ? "建项目中……" : "用此模板建项目"}
+                        用此模板建项目
                       </button>
                       <span className="ir-crew-tpl__stub" aria-disabled="true">
                         编辑器 · P1 即将上线
@@ -178,6 +169,15 @@ export function CrewTemplatesPage() {
           )}
         </div>
       </div>
+      {dialog && (
+        <CreateProjectDialog
+          key={dialog.template.id}
+          templateName={dialog.template.name}
+          returnFocus={dialog.trigger}
+          onSubmit={(name) => createFromTemplate(dialog.template, name)}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }

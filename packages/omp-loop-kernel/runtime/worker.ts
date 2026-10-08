@@ -186,6 +186,11 @@ class WorkerRuntime {
       "advisor.enabled": false,
       "prewalk.enabled": false,
       "goal.enabled": false,
+      // OMP would append a hidden <system-reminder> developer message (and
+      // mid-run nudges) when a turn stops with open todo items. That message is
+      // not in the Host-owned history, so the Host rejects it; continuation of
+      // unfinished plans is decided by the Host (Session Goal) instead.
+      "todo.reminders": false,
       "async.enabled": false,
       "title.refreshOnReplan": false,
       "features.unexpectedStopDetection": "none",

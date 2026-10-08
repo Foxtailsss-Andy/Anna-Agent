@@ -44,6 +44,10 @@ export interface TaskDraft {
   /** 引用其他草案(按标题;任务尚未落地) */
   depends_on: string[];
   acceptance: string;
+  /** CONTRACTS §2:须等本新任务的既有任务标题(放在「X」之前);旧草案缺省 */
+  insert_before?: string[];
+  /** CONTRACTS §2:建议负责人成员 id;旧草案缺省 */
+  assignee_id?: string | null;
 }
 
 /** services/crew/app/schemas.py:Notification */
@@ -391,19 +395,23 @@ export function channelCommand(
 /**
  * 第二段(Boss-only):按 index 下推命令行草案的子集(服务端从命令行解析真草案,
  * 客户端不可捏造);返回落地新任务后的项目。
+ * Coordination Proposal(CONTRACTS §2)另可按 index 选 payload.assignments;
+ * 省略某个 index 列表 = 服务端默认全选该类。
  */
 export function confirmChannelCommand(
   projectId: string,
   messageId: string,
   draftIndexes?: number[],
+  assignmentIndexes?: number[],
 ): Promise<CrewProject> {
   return apiJson<CrewProject>(`/api/crew/projects/${projectId}/channel/command/confirm`, {
     method: "POST",
     headers: authHeaders(),
-    json:
-      draftIndexes !== undefined
-        ? { message_id: messageId, draft_indexes: draftIndexes }
-        : { message_id: messageId },
+    json: {
+      message_id: messageId,
+      ...(draftIndexes === undefined ? {} : { draft_indexes: draftIndexes }),
+      ...(assignmentIndexes === undefined ? {} : { assignment_indexes: assignmentIndexes }),
+    },
   });
 }
 

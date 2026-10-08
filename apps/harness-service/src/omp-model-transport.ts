@@ -1,4 +1,4 @@
-import type { ManagedOmpWorkerOptions } from "../../../packages/omp-loop-kernel/src/worker-client";
+import type { OmpHostModelTransport, OmpModelStreamObserver } from "../../../packages/omp-loop-kernel/src/omp-loop-kernel";
 import type { AssistantMessage, Content, Message, ModelDelta, ModelContext, ToolDefinition, Usage } from "../../../packages/omp-loop-kernel/src/protocol";
 
 const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
@@ -19,7 +19,7 @@ export function createOmpModelTransport(options: {
   tools?: readonly ToolDefinition[];
   reasoningEffort?: DeepSeekReasoningEffort;
   thinking?: "enabled" | "disabled";
-}): ManagedOmpWorkerOptions["modelTransport"] {
+}): OmpHostModelTransport {
   const endpoint = new URL(options.endpoint);
   if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password) {
     throw new Error("OMP provider endpoint must use HTTPS without embedded credentials");
@@ -28,7 +28,7 @@ export function createOmpModelTransport(options: {
   const reasoningEffort = options.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
   const thinking = options.thinking ?? "enabled";
 
-  return async function* (context: ModelContext, signal: AbortSignal) {
+  return async function* (context: ModelContext, signal: AbortSignal, observer?: OmpModelStreamObserver) {
     signal.throwIfAborted();
     const tools = context.tools ?? options.tools;
     const aliases = providerToolNameAliases(tools);
@@ -54,7 +54,7 @@ export function createOmpModelTransport(options: {
 
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
     if (contentType.includes("text/event-stream")) {
-      yield parseStreamingResponse(response.body, signal, aliases);
+      yield parseStreamingResponse(response.body, signal, aliases, observer);
       return;
     }
 
@@ -205,9 +205,20 @@ async function parseStreamingResponse(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
   aliases: ProviderToolNameAliases,
+  observer?: OmpModelStreamObserver,
 ): Promise<HostModelResponse> {
   const accumulator = createAccumulator();
-  for await (const payload of readServerSentEvents(body, signal)) accumulatePayload(accumulator, payload, aliases);
+  let forwarded = 0;
+  for await (const payload of readServerSentEvents(body, signal)) {
+    accumulatePayload(accumulator, payload, aliases);
+    if (observer === undefined) continue;
+    // Live view only: forward text/reasoning deltas as they arrive. Tool-call
+    // fragments stay internal until the final validated response.
+    for (; forwarded < accumulator.deltas.length; forwarded += 1) {
+      const delta = accumulator.deltas[forwarded]!;
+      if (delta.type === "text" || delta.type === "reasoning") observer.onDelta(delta);
+    }
+  }
   return finishAccumulator(accumulator);
 }
 

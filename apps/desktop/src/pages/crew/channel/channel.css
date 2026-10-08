@@ -783,6 +783,16 @@
   margin-top: 0;
   margin-bottom: 7px;
 }
+/* Anna Run 进行中、无法补充时的可见提示(不起并行 Run) */
+.ir-chan-composer__notice {
+  margin-bottom: 7px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--iris-soft);
+  color: var(--iris-deep, #44479f);
+  font-size: 11px;
+  line-height: 1.5;
+}
 
 /* ============================================================
    精修二轮:R1 chip(3g) / R2 活动行(3d) / R4a 拾取器(3h) / R4b 意图卡(3i)
@@ -1420,6 +1430,38 @@
   cursor: default;
 }
 
+/* Coordination Proposal(CONTRACTS §2):来源 · 分节(新任务 / 指派);行沿用 .ir-chan-draft 勾选语汇 */
+.ir-chan-proposal__source {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--iris-deep, #44479f);
+  background: var(--iris-soft);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+.ir-chan-proposal__section {
+  margin-top: 10px;
+}
+.ir-chan-proposal__suggested {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--iris);
+}
+.ir-chan-proposal__section .ir-chan-cmd__list {
+  margin-top: 6px;
+}
+.ir-chan-proposal__label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.ir-chan-proposal .ir-chan-draft__detail {
+  overflow-wrap: break-word;
+}
+
 /* 采纳并开跑 = delegate 紫实心(§3i Agent 变体) */
 .ir-chan-btn--delegate {
   background: var(--chan-delegate-solid);
@@ -1544,7 +1586,8 @@
 
 .ir-crew-workbench__message {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.55;
 }
 
@@ -1567,15 +1610,6 @@
   outline-offset: 1px;
 }
 
-.ir-crew-workbench__answer {
-  margin-top: 8px;
-  color: var(--ink);
-  line-height: 1.55;
-}
-
-.ir-crew-workbench__answer > :first-child { margin-top: 0; }
-.ir-crew-workbench__answer > :last-child { margin-bottom: 0; }
-
 .ir-crew-workbench__error {
   margin-top: 8px;
   color: #9c3340;
@@ -1590,3 +1624,14 @@
   padding: 4px 8px;
   cursor: pointer;
 }
+
+/* Crew Anna card: streaming bubble, compact process line, actions row. */
+.ir-crew-workbench__message--live { opacity: 0.92; }
+.ir-crew-workbench__live-note { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--ink-soft, #7a7a85); }
+.ir-crew-workbench__process { margin-top: 6px; font-size: 11.5px; color: var(--ink-soft, #7a7a85); overflow-wrap: break-word; }
+.ir-crew-workbench__actions { display: flex; gap: 8px; margin-top: 8px; }
+.ir-crew-workbench__trace {
+  font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid rgb(35 35 40 / 12%); background: transparent; color: var(--ink); cursor: pointer;
+}
+.ir-crew-workbench__trace:focus-visible { outline: 2px solid rgb(87 91 196 / 55%); outline-offset: 2px; }

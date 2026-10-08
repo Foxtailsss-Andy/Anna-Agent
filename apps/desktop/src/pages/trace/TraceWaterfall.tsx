@@ -49,7 +49,9 @@ export function TraceWaterfall({ doc }: { doc: TraceDto }) {
           </span>
         ) : null}
         <span className={`trace-status trace-status--${summary.status}`}>
-          {summary.status === 'ok' ? '完成' : summary.status === 'error' ? '失败' : '进行中'}
+          {summary.outcome === 'cancelled' ? '已停止'
+            : summary.outcome === 'timed_out' ? '超时'
+              : summary.status === 'ok' ? '完成' : summary.status === 'error' ? '失败' : '进行中'}
         </span>
       </div>
       {groups.map((group) => (

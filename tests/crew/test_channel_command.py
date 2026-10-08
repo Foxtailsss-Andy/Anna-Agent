@@ -272,6 +272,39 @@ def test_say_without_anna_or_by_agent_or_chatter_no_intent_card(tmp_path):
     assert svc.should_draft_intent(chatter) is False
 
 
+def test_at_anna_question_mentioning_responsibility_is_answered_not_drafted(tmp_path):
+    """A question that merely mentions who is 负责/doing what asks for facts, not a new task
+    (live 2026-10-08: "谁在负责哪些任务？" became a task draft)."""
+    svc = _intent_svc(tmp_path)
+    project = _project(svc)
+
+    question = svc.say(
+        project.id, "acc_boss", "@Anna 目前项目整体进展如何？谁在负责哪些任务？",
+        mentions=[SYSTEM_ANNA_ACTOR_ID],
+    )
+    assert svc.should_draft_intent(question) is False
+    assert svc.should_answer_contextually(question) is True
+
+    explicit = svc.say(
+        project.id, "acc_boss", "@Anna 能帮我新增一个任务吗？负责人是 Andy",
+        mentions=[SYSTEM_ANNA_ACTOR_ID],
+    )
+    assert svc.should_draft_intent(explicit) is True
+
+
+def test_at_anna_graph_and_assignment_requests_draft_a_card(tmp_path):
+    """Review F9 / R-spec finding 7: these requests used to fall through the regex."""
+    svc = _intent_svc(tmp_path)
+    project = _project(svc)
+    for body in (
+        "@Anna 请新增一个任务：竞品调研，并把它指派给 Andy",
+        "@Anna 把文案撰写指派给 Andy",
+        "@Anna 加一个竞品调研，放在文案撰写之前",
+    ):
+        message = svc.say(project.id, "acc_boss", body, mentions=[SYSTEM_ANNA_ACTOR_ID])
+        assert svc.should_draft_intent(message) is True, body
+
+
 def test_say_at_anna_persists_mention_but_creates_no_notification(tmp_path):
     svc = _intent_svc(tmp_path)
     project = _project(svc)
