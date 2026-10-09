@@ -54,18 +54,35 @@ Home 提供执行控制、历史、文件与 Trace 查看入口。Crew 将项目
 
 ## 产品演示
 
-![Anna 在 Create、Cowork Hiker 看板和 Crew 工作流之间的产品演示](docs/public/assets/demos/anna-product-tour.gif)
+以下为 **2026-10-09** 从当前桌面源码预览版截取的真实界面，使用合成演示数据。Home 分析与 Jev 建议经过现场调用；Crew 项目图和评审界面展示内置案例。点击图片可查看细节。
 
-*一个循环展示 Create、Cowork 与 Crew 界面。Hiker 看板使用合成数据；真实模型和连接器调用的验证记录见下方「当前进展」。*
+### Home · 从本地文件到可阅读的结果
 
-<details>
-<summary>查看 Crew 产物评审界面</summary>
+Anna 读取 CSV，在沙箱中运行 Python 核算渠道转化率与投入产出比，并保存报告。表格与图表直接在对话中展开，方便阅读和比较。
 
-![Anna 产物阅读器与内联设计评审](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
+![Anna Home：已保存的渠道分析报告，展示对比表格与投入产出比柱状图](docs/public/assets/screenshots/2026-10-09/home-analysis.png)
 
-交付物、来源任务、项目频道与评审决策保留在同一个工作空间中。
+### Crew · 看清依赖、并行工作与评审关口
 
-</details>
+项目图连接任务、成员和 Worker。协作看板草图与数据口径核对汇入同一个评审关口，频道中的产物和评审操作紧邻工作图。
+
+![Anna Crew：并行任务汇入评审关口，右侧项目频道展示相关产物与评审卡](docs/public/assets/screenshots/2026-10-09/crew-overview.png)
+
+### Crew 细节 · 读完产物，再作决定
+
+全幅打开产物，查看版本和来源，再通过或附带批注退回。项目频道与阅读器并排保留，便于对照讨论和交付内容。
+
+![Anna Crew 产物阅读器：版本化内容与评审卡并排显示，底部提供通过和驳回加批注操作](docs/public/assets/screenshots/2026-10-09/crew-review.png)
+
+### Jev 细节 · 查看建议，再确认指派
+
+面对演示任务「发布文案校对」，Jev 为「内容编辑」角色建议了文案 Worker。选人浮层展示建议来源，并保留独立的**采纳指派**操作；也可以直接手动选择成员。
+
+<p align="center">
+  <a href="docs/public/assets/screenshots/2026-10-09/crew-jev.png"><img src="docs/public/assets/screenshots/2026-10-09/crew-jev.png" width="560" alt="Jev 为内容编辑任务建议 Agent Scribe；任务仍未指派，界面保留采纳指派按钮" /></a>
+</p>
+
+*图中的 Jev 耗时来自这一次截图请求，不作为新增基准成绩。[截图记录](docs/public/assets/screenshots/2026-10-09/capture.json)。*
 
 ## 认识 Anna：你的 Codex 小伙伴
 

@@ -1,0 +1,43 @@
+{
+  "captured_on": "2026-10-09",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "712da1a4e6563aeb6b705ec073d62ede445f4075",
+  "surface": "Anna Electron desktop, macOS arm64",
+  "data": "Synthetic demo data in isolated local state; no real business records.",
+  "capture": "Native Playwright screenshots of the running app. Home result and Jev picker use viewport crops; no generated or rewritten UI pixels.",
+  "interpretation": "The built-in Crew project is a deterministic interface example. Home and Jev include live calls; screenshot timings do not change benchmark claims.",
+  "images": [
+    {
+      "file": "home-analysis.png",
+      "width_px": 2560,
+      "height_px": 1234,
+      "bytes": 221739,
+      "sha256": "af3cd9ca475c6c398d6e4963449474e6387226dd4cf657dfad7201e01f3e2af7",
+      "scene": "Live Agent run: read a synthetic CSV, calculate with Python in the sandbox and save review.md."
+    },
+    {
+      "file": "crew-overview.png",
+      "width_px": 2880,
+      "height_px": 1520,
+      "bytes": 484626,
+      "sha256": "b0f4007268d8f7dd3ba77b375cb4d7fb9a1c4ae21fca493793178d131f72fad3",
+      "scene": "Built-in deterministic weekly-action showcase, focused on parallel tasks and the review gate."
+    },
+    {
+      "file": "crew-review.png",
+      "width_px": 2880,
+      "height_px": 1520,
+      "bytes": 475568,
+      "sha256": "fce25211c9c9f0754e3c9f7e082577c4bc9feb1710fbda67a00ee7b0f2097d2f",
+      "scene": "Built-in deterministic showcase artifact reader with explicit approve / reject controls."
+    },
+    {
+      "file": "crew-jev.png",
+      "width_px": 960,
+      "height_px": 982,
+      "bytes": 150891,
+      "sha256": "04302eba392dc0e7c63750b6ae24eb4dd32a1f11f042b433914828bc1b6a6952",
+      "scene": "Live Jev assignee suggestion for a synthetic content-editing task; captured before adoption."
+    }
+  ]
+}

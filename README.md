@@ -54,18 +54,35 @@ Home includes execution controls, history, files, and Trace inspection. Crew kee
 
 ## Product walkthrough
 
-![Anna product tour across the Create page, Cowork Hiker dashboard, and Crew workflow](docs/public/assets/demos/anna-product-tour.gif)
+Real screenshots from the current desktop source preview, captured on **October 9, 2026** with synthetic demo data. Home analysis and Jev suggestions use live calls; the Crew graph and review views show the built-in example. Click an image to inspect the details.
 
-*Create, Cowork, and Crew in one loop. The walkthrough illustrates the interface; the Hiker dashboard uses synthetic data. Live model and connector validation is documented separately below.*
+### Home · Turn local files into a readable result
 
-<details>
-<summary>Inside a Crew artifact review</summary>
+Anna reads a CSV, calculates channel conversion and return on spend with Python in the sandbox, and saves a report. Tables and charts stay readable in the conversation.
 
-![Anna artifact reader with an inline design review](docs/superpowers/plans/2026-07-17-crew-build/walkthrough3/37-html-reader-preview.png)
+![Anna Home: a saved channel-analysis report with a comparison table and ROI bar chart](docs/public/assets/screenshots/2026-10-09/home-analysis.png)
 
-A deliverable, its source task, the project channel, and the review decision stay connected in one workspace.
+### Crew · See dependencies, parallel work and review gates
 
-</details>
+The project graph connects tasks, people and Workers. Here, a board draft and a data check feed into a review gate; the channel keeps the related artifact and decision controls beside the graph.
+
+![Anna Crew: parallel tasks converge on a review gate, with the artifact and review card in the project channel](docs/public/assets/screenshots/2026-10-09/crew-overview.png)
+
+### Crew detail · Read the artifact before deciding
+
+Open the artifact at full width, inspect its version and source, then approve it or return it with comments. The project channel remains visible alongside the reader.
+
+![Anna Crew artifact reader: versioned content alongside its review card, with approve and reject-with-comment actions](docs/public/assets/screenshots/2026-10-09/crew-review.png)
+
+### Jev detail · Inspect the suggestion, then assign
+
+For the demo task “发布文案校对” (publication copy review), Jev suggests the writing Worker for a content-editor role. The picker shows the source and keeps **Accept assignment** separate from generating the suggestion; manual selection remains available.
+
+<p align="center">
+  <a href="docs/public/assets/screenshots/2026-10-09/crew-jev.png"><img src="docs/public/assets/screenshots/2026-10-09/crew-jev.png" width="560" alt="Jev suggests Agent Scribe for a content-editor task; the task remains unassigned and the Accept assignment button is visible" /></a>
+</p>
+
+*The Jev timing shown is one captured request, not a new benchmark. [Capture details](docs/public/assets/screenshots/2026-10-09/capture.json).*
 
 ## Meet Anna, your Codex companion
 
