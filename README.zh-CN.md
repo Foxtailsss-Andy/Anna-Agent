@@ -1,121 +1,71 @@
 # Anna
 
-> **通用 Agent 实验源码预览 · macOS arm64 · 2026-10-08 更新。** 工作目录工具、沙箱、MCP、目标续跑和 Crew 协作已接入同一 Harness。查看[修复、验证与边界](docs/releases/general-agent-20261008.md)及[当前 main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain)。
-
-![Anna。Chat、Workflows、Associate。A Governed AI Agent for Enterprise Work。](docs/public/assets/anna-readme-banner-v2.png)
-
 **处理个人任务、连接业务系统、参与项目协作的 AI 伙伴。**
 
 Anna 是一个个人开源项目，探索如何让 AI Agent 从一次对话出发，持续推进任务，并交付可审阅的结果。它以本地优先的桌面应用为载体，通过 **Home、Cowork、Crew** 三个工作空间，将任务、业务系统和协作连接起来。
 
-我们希望工作过程始终清楚：Anna 正在做什么、可以使用哪些工具、哪里需要你作决定，以及结果是如何产生的。
-
 **通用 Agent + Jev Crew · 实验源码预览** · macOS arm64 · [MIT License](LICENSE) · [CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions)
 
-[English](README.md) · [可以体验什么](#可以体验什么) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
+[English](README.md) · [产品全貌](#产品全貌) · [快速开始](#快速开始) · [当前进展](#当前进展) · [Codex 小宠物](#认识-anna你的-codex-小伙伴) · [开发日记](https://github.com/Foxtailsss-Andy/Anna-Agent/wiki/Anna-Development-Diary)
 
-> **先看建议，再决定指派给谁**
->
-> Crew 可以为一个未指派任务建议一位成员或 Worker。在现有选人浮层中点击「建议人选」，查看来源后采纳，也可以直接手动选择。唯一精确角色匹配走规则，其余符合条件的情况由 Jev 做有界语义选择；资料不足时可以待定。生成建议不会指派或执行任务。本源码预览提供明确采纳的建议，详见[变化、证据与限制](docs/releases/jev-crew-preview.md)；[RC2 源码发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)保留为独立历史记录。
+## 产品全貌
 
-## 本次更新
+**一位 Anna，三个工作空间。** 从个人任务开始，也可以连接业务系统，或与成员和 Worker 一起推进项目。
 
-- **从读取到执行**：选择工作目录后，Anna 可分析文件；明确开启写入权限后，可修改文件并在 macOS 沙箱中运行命令。MCP 工具由受保护配置接入。
-- **持续推进目标**：目标模式保留计划，按轮次上限自动续跑，支持暂停、继续、停止及最终确认。工具参数 JSON 格式错误会返回失败反馈供模型纠正，避免直接中断整个 Run。
-- **恢复协作体验**：Crew 保留频道与 Anna 对话历史，支持图和指派提案的确认执行、宽表格/图表、流式过程与 Trace。排队的补充说明会明确显示尚未消费。
-
-Jev 继续负责有界的成员建议判断。下面保留的历史实测为 **p50 低 85.23%、非高峰估算费用低 94.71%、22/22 标签符合率持平**；总 tokens 增加 57.98%，没有把该结果外推为完整 Agent 任务提速。
-
-## Jev 实测对照
-
-本轮冻结 **24 个合成保留案例**，其中 22 个适合模型判断，另 2 个硬预检案例没有调用 C/D。两种模型均 **22/22 符合预先标签**：12 次正确推荐、10 次正确弃权，错误标签判断、API 与格式错误均为 0；相同 22 例上，原角色规则符合标签 12/22。
-
-| 指标（22 个有效案例） | DeepSeek 单次判断（C） | 生产 Jev adapter（D） |
-| --- | ---: | ---: |
-| 请求 → 返回模型 | `deepseek-v4-pro` → 同名 | `jev-1.13.0` → 同名 |
-| 设置 / 真实请求数 | thinking enabled、high；最多 4096 输出 / 22 | Typed Choice / 22 |
-| 观测 p50 / p95 | 2007.078 / 2692.501 ms | 296.349 / 421.889 ms |
-| 实际报告的输入 / 输出 tokens | 4,887 / 2,873 | 11,233 / 1,026 |
-| 高峰、缓存未命中参考估算费用 | $0.017827920 | $0.000471786 |
-
-Jev 的 **p50 低 85.23%**、**p95 低 84.33%**、**参考估算费用低 97.35%**，标签符合率与 DeepSeek **持平**。实际报告的总 tokens **增加 57.98%**，不同 tokenizer 的计数也不能视作等量算力。费用使用 DeepSeek 高峰、缓存未命中价格记预算，未经账单核实；按本轮非高峰时段、仍假定缓存未命中计算，估算费用低 **94.71%**，缓存命中还可能进一步降低 DeepSeek 费用。
-
-这是一次小型、顺序执行的判断对照，不代表生产准确率、浏览器端到端时延，或旧 Crew/Host/OMP 完整链路（B）的提速。**8 个开发案例单独统计**。详见[完整结果、分母与方法](evals/jev-crew/jev03-final-20260922-r1/REPORT.md)。
-
-## 可以体验什么
-
-| 工作空间 | 适用时刻 | 可以做什么 |
+| 工作空间 | 用来做什么 | 主要界面 |
 | --- | --- | --- |
-| **Home** | 处理个人任务，或制作可复用的工作资源。 | 带着文件开始对话，跟进任务计划，查看工具执行过程，审阅文档或 Prompt 产物。界面也保留 Skill 和 Python Tool 创建入口。 |
-| **Cowork** | 围绕已连接的业务系统开展工作。 | 查看业务看板，向 Hiker 助手询问可用数据，进入已有报销流程。具体可用操作由连接器能力与权限决定。 |
-| **Crew** | 与团队成员、专业 Worker 一起推进项目。 | 在项目图中组织任务与依赖，在频道中补充上下文、指派工作，审阅不同版本的产物，或提出意见后退回返工。 |
+| **Home** | 处理个人任务、制作可复用资源 | Chat / Create、历史对话、本地文件、计划与结果 |
+| **Cowork** | 围绕已连接的业务系统开展工作 | 业务看板、客户与合同数据、上下文追问 |
+| **Crew** | 组织团队项目 | 项目、成员与 Worker、任务依赖图、频道与产物评审 |
 
-Home 提供执行控制、历史、文件与 Trace 查看入口。Crew 将项目上下文、任务讨论、产物和评审决策关联起来，方便从一份结果回到产生它的工作过程。
+### Home · 从这里开始一次任务，或创建可复用资源
 
-## 产品演示
+Home 是 Anna 的任务起点：Chat 与 Create 放在一起，旁边保留历史对话，下方提供常见任务入口、工作空间选择和目标模式。可以直接提问，带着本地文件开展工作，也可以进入 Create 制作可复用资源。
 
-以下为 **2026-10-09** 从当前桌面源码预览版截取的真实界面，使用合成演示数据。Home 分析与 Jev 建议经过现场调用；Crew 项目图和评审界面展示内置案例。点击图片可查看细节。
+![Anna Home 完整工作空间：侧栏保留 Home、Cowork、Crew 导航，主区域展示 Chat/Create、常见任务入口与工作空间控件](docs/public/assets/screenshots/2026-10-09/home-workspace.png)
 
-### Home · 从本地文件到可阅读的结果
+### Cowork · 将业务数据与工作流程带到 Anna 身边
 
-Anna 读取 CSV，在沙箱中运行 Python 核算渠道转化率与投入产出比，并保存报告。表格与图表直接在对话中展开，方便阅读和比较。
+Cowork 围绕已连接的业务系统组织工作。图中的 Hiker 客户与合同看板集中展示关键指标、回款进度和账龄，并提供追问入口；侧栏也保留报销助理。实际可用操作由连接器能力和权限决定。
 
-![Anna Home：已保存的渠道分析报告，展示对比表格与投入产出比柱状图](docs/public/assets/screenshots/2026-10-09/home-analysis.png)
+![Anna Cowork 完整工作空间：选中 Cowork，展示 Hiker 客户与合同看板、回款指标以及明确标注的演示客户](docs/public/assets/screenshots/2026-10-09/cowork-workspace.png)
 
-### Crew · 看清依赖、并行工作与评审关口
+*该图使用仓库已有的 Hiker 合成样例，通过本地 MCP 样例服务提供数据，用于展示接入方式与界面；不代表真实 Hiker 租户或业务写入验收。*
 
-项目图连接任务、成员和 Worker。协作看板草图与数据口径核对汇入同一个评审关口，频道中的产物和评审操作紧邻工作图。
+### Crew · 让成员、Worker 与项目工作连在一起
 
-![Anna Crew：并行任务汇入评审关口，右侧项目频道展示相关产物与评审卡](docs/public/assets/screenshots/2026-10-09/crew-overview.png)
+Crew 将项目列表、团队与 SOP 模板，与任务图和项目频道放在同一个空间。任务依赖、并行工作和负责人有清晰位置，讨论、交付物与评审决定也保留在项目上下文中。
 
-### Crew 细节 · 读完产物，再作决定
+![Anna Crew 完整工作空间：保留全局导航、项目与团队入口，主区域展示任务依赖图和项目频道](docs/public/assets/screenshots/2026-10-09/crew-workspace.png)
 
-全幅打开产物，查看版本和来源，再通过或附带批注退回。项目频道与阅读器并排保留，便于对照讨论和交付内容。
+*以上三张总览图均截自当前桌面应用，保留完整导航，拍摄于 2026-10-09。使用隔离演示数据，Crew 项目以应用内置案例为基础。*
 
-![Anna Crew 产物阅读器：版本化内容与评审卡并排显示，底部提供通过和驳回加批注操作](docs/public/assets/screenshots/2026-10-09/crew-review.png)
+<details>
+<summary><strong>展开功能细节：Home 分析结果、Crew 评审与 Jev 建议</strong></summary>
 
-### Jev 细节 · 查看建议，再确认指派
+### Home · 从本地文件到分析报告
 
-面对演示任务「发布文案校对」，Jev 为「内容编辑」角色建议了文案 Worker。选人浮层展示建议来源，并保留独立的**采纳指派**操作；也可以直接手动选择成员。
+这次现场演示中，Anna 读取合成 CSV，在沙箱中运行 Python 核算转化率与投入产出比，并保存报告。下面是对话中表格和图表的结果特写。
 
-<p align="center">
-  <a href="docs/public/assets/screenshots/2026-10-09/crew-jev.png"><img src="docs/public/assets/screenshots/2026-10-09/crew-jev.png" width="560" alt="Jev 为内容编辑任务建议 Agent Scribe；任务仍未指派，界面保留采纳指派按钮" /></a>
-</p>
+![Home 结果细节：已保存的分析报告，展示对比表格与柱状图](docs/public/assets/screenshots/2026-10-09/home-analysis.png)
 
-*图中的 Jev 耗时来自这一次截图请求，不作为新增基准成绩。[截图记录](docs/public/assets/screenshots/2026-10-09/capture.json)。*
+### Crew · 读完产物，再作决定
 
-## 认识 Anna：你的 Codex 小伙伴
+全幅阅读器保留产物版本、来源和项目频道。读完后可以通过，或附带批注退回。图中使用应用内置案例。
 
-戴着鸢尾花、穿着米白上衣和紫色长裙的 Anna，现在也有了自己的桌面小宠物形象。欢迎把她带到 Codex 中，陪你一起工作。
+![Crew 评审细节：版本化产物与明确的通过、驳回加批注操作](docs/public/assets/screenshots/2026-10-09/crew-review.png)
 
-<p align="center">
-  <img src="docs/public/assets/anna-pet/anna.png" width="192" height="208" alt="Anna Codex 小宠物：从发布素材截取的静态形象" />
-  <img src="docs/public/assets/anna-pet/waving.gif" width="192" height="208" alt="Anna Codex 小宠物挥手动画" />
-</p>
+### Jev · 查看建议，再确认指派
+
+现场 Jev 调用为演示中的「内容编辑」任务建议了文案 Worker。选人浮层展示建议来源，并保留独立的**采纳指派**操作，也可以直接手动选择成员。
 
 <p align="center">
-  <a href="https://github.com/Foxtailsss-Andy/Anna-Agent/releases/download/anna-pet-v1.0.0/anna-codex-pet-v1.0.0.zip"><strong>下载 Anna Codex 小宠物</strong></a> · <a href="pets/README.md#中文安装说明">安装说明</a> · <a href="pets/anna-iris">宠物源文件</a>
+  <a href="docs/public/assets/screenshots/2026-10-09/crew-jev.png"><img src="docs/public/assets/screenshots/2026-10-09/crew-jev.png" width="560" alt="Jev 为内容编辑任务建议 Agent Scribe；任务仍未指派，界面保留独立的采纳指派按钮" /></a>
 </p>
 
-*以上为共享宠物素材的静态截图与动画预览。包含 9 组动作和 16 个视线方向，需要支持自定义 v2 宠物的桌面版本。*
+*图中 Jev 耗时来自单次请求，不作为新增基准成绩。[截图来源记录](docs/public/assets/screenshots/2026-10-09/capture.json)。*
 
-## 当前进展
-
-Anna 正在持续开发中，当前源码面向希望体验项目、参与改进的开发者与贡献者。
-
-| 范围 | 当前状态 |
-| --- | --- |
-| **通用 Agent 修复预览** | 工作目录工具、沙箱、MCP、目标模式与 Crew 协作共用 Host/OMP 循环。本地门禁及限定场景的桌面 Goal/Crew 验证通过；详见[结果与剩余边界](docs/releases/general-agent-20261008.md)。 |
-| **Jev Crew 候选** | 可选的单任务建议与明确采纳。合成数据上的真实浏览器 → Jev → 指派 → SQLite 回读已验证。本轮 C/D 判断实测、已验指派行为与 Worker/平台限制见[发布记录](docs/releases/jev-crew-preview.md)。 |
-| **RC2 源码** | 修复工作目录身份/范围测试与 CI 证据依赖；普通对话继续通过共享 Node Harness Host 与 Oh-my-Pi 循环执行。结果见 [RC2 记录](docs/releases/rc2-developer-preview.md)；[RC1 记录](docs/releases/rc1-developer-preview.md) 保留此前行为与失败事实。 |
-| **此前的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |
-| **外部业务操作** | 该次验证连接的 Hiker 服务只开放读取工具。授权写入与读回验收仍需等待服务端开放相应能力。 |
-| **桌面分发** | 当前验证目标为 macOS arm64。本地应用构建尚未签名与公证，Windows/Linux 发布验收仍待完成。 |
-| **应用版本** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) 发布于当前 Harness 执行路径之前。Codex 小宠物以独立素材版本发布。 |
-
-生产可用性、完整故障恢复覆盖及基准测试成绩仍待验证。CI、界面演示和真实外部服务调用各自证明不同范围，具体要求见 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
-
-此前 RC2 使用固定外部 transport 验证本地身份、持久化、Gateway 与 OMP 执行路径，其完整 Provider/MCP 实测门槛保留为 blocked；上方 Jev 数字覆盖本次有界建议判断。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
+</details>
 
 ## 快速开始
 
@@ -133,6 +83,34 @@ npm run desktop:run
 执行 Agent 任务需要在本地配置模型 Provider；业务功能还需要对应的连接器配置。当前文档中的模型配置使用 OpenAI-compatible transport 连接 DeepSeek。
 
 配置路径、状态隔离与排障步骤见 [DEVELOPMENT.md](DEVELOPMENT.md)。模型凭据、连接器密钥和运行状态应放在 Agent 可读任务目录之外。本地优先指桌面应用及状态在本机运行，外部模型与连接器仍会接收你配置的调用请求。
+
+## 本次更新
+
+- **从读取到执行**：选择工作目录后，Anna 可分析文件；明确开启写入权限后，可修改文件并在 macOS 沙箱中运行命令。MCP 工具由受保护配置接入。
+- **持续推进目标**：目标模式保留计划，按轮次上限自动续跑，支持暂停、继续、停止及最终确认。工具参数 JSON 格式错误会返回失败反馈供模型纠正，避免直接中断整个 Run。
+- **恢复协作体验**：Crew 保留频道与 Anna 对话历史，支持图和指派提案的确认执行、宽表格/图表、流式过程与 Trace。排队的补充说明会明确显示尚未消费。
+
+Jev 继续负责有界的成员建议判断。下面保留的历史实测为 **p50 低 85.23%、非高峰估算费用低 94.71%、22/22 标签符合率持平**；总 tokens 增加 57.98%，没有把该结果外推为完整 Agent 任务提速。
+
+> **先看建议，再决定指派给谁**
+>
+> Crew 可以为一个未指派任务建议一位成员或 Worker。在现有选人浮层中点击「建议人选」，查看来源后采纳，也可以直接手动选择。唯一精确角色匹配走规则，其余符合条件的情况由 Jev 做有界语义选择；资料不足时可以待定。生成建议不会指派或执行任务。本源码预览提供明确采纳的建议，详见[变化、证据与限制](docs/releases/jev-crew-preview.md)；[RC2 源码发布](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/workbench-rc2)保留为独立历史记录。
+
+## Jev 实测对照
+
+本轮冻结 **24 个合成保留案例**，其中 22 个适合模型判断，另 2 个硬预检案例没有调用 C/D。两种模型均 **22/22 符合预先标签**：12 次正确推荐、10 次正确弃权，错误标签判断、API 与格式错误均为 0；相同 22 例上，原角色规则符合标签 12/22。
+
+| 指标（22 个有效案例） | DeepSeek 单次判断（C） | 生产 Jev adapter（D） |
+| --- | ---: | ---: |
+| 请求 → 返回模型 | `deepseek-v4-pro` → 同名 | `jev-1.13.0` → 同名 |
+| 设置 / 真实请求数 | thinking enabled、high；最多 4096 输出 / 22 | Typed Choice / 22 |
+| 观测 p50 / p95 | 2007.078 / 2692.501 ms | 296.349 / 421.889 ms |
+| 实际报告的输入 / 输出 tokens | 4,887 / 2,873 | 11,233 / 1,026 |
+| 高峰、缓存未命中参考估算费用 | $0.017827920 | $0.000471786 |
+
+Jev 的 **p50 低 85.23%**、**p95 低 84.33%**、**参考估算费用低 97.35%**，标签符合率与 DeepSeek **持平**。实际报告的总 tokens **增加 57.98%**，不同 tokenizer 的计数也不能视作等量算力。费用使用 DeepSeek 高峰、缓存未命中价格记预算，未经账单核实；按本轮非高峰时段、仍假定缓存未命中计算，估算费用低 **94.71%**，缓存命中还可能进一步降低 DeepSeek 费用。
+
+这是一次小型、顺序执行的判断对照，不代表生产准确率、浏览器端到端时延，或旧 Crew/Host/OMP 完整链路（B）的提速。**8 个开发案例单独统计**。详见[完整结果、分母与方法](evals/jev-crew/jev03-final-20260922-r1/REPORT.md)。
 
 ## Anna 如何推进工作
 
@@ -162,6 +140,41 @@ flowchart TD
 整个循环受执行预算与停止条件约束。Harness 持久化事件和状态，让 Trace（执行轨迹）串联模型调用、工具结果与最终结局；长期记忆仍遵循单独的提议与确认规则。
 
 具体实现与验证范围见 [开发文档](DEVELOPMENT.md)、[架构术语表](CONTEXT.md) 和 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
+
+## 当前进展
+
+> **通用 Agent 实验源码预览 · macOS arm64 · 2026-10-08 更新。** 工作目录工具、沙箱、MCP、目标续跑和 Crew 协作已接入同一 Harness。查看[修复、验证与边界](docs/releases/general-agent-20261008.md)及[当前 main CI](https://github.com/Foxtailsss-Andy/Anna-Agent/actions/workflows/ci.yml?query=branch%3Amain)。
+
+Anna 正在持续开发中，当前源码面向希望体验项目、参与改进的开发者与贡献者。
+
+| 范围 | 当前状态 |
+| --- | --- |
+| **通用 Agent 修复预览** | 工作目录工具、沙箱、MCP、目标模式与 Crew 协作共用 Host/OMP 循环。本地门禁及限定场景的桌面 Goal/Crew 验证通过；详见[结果与剩余边界](docs/releases/general-agent-20261008.md)。 |
+| **Jev Crew 候选** | 可选的单任务建议与明确采纳。合成数据上的真实浏览器 → Jev → 指派 → SQLite 回读已验证。本轮 C/D 判断实测、已验指派行为与 Worker/平台限制见[发布记录](docs/releases/jev-crew-preview.md)。 |
+| **RC2 源码** | 修复工作目录身份/范围测试与 CI 证据依赖；普通对话继续通过共享 Node Harness Host 与 Oh-my-Pi 循环执行。结果见 [RC2 记录](docs/releases/rc2-developer-preview.md)；[RC1 记录](docs/releases/rc1-developer-preview.md) 保留此前行为与失败事实。 |
+| **此前的真实验证** | Home 文档生成、Prompt 创建、停止与下一轮上下文；Crew Worker 交付、评审返工及 Anna 对项目上下文的理解；Hiker 看板读取与 Agent 能力查询。具体范围及未完成项见 [8 月 31 日至 9 月 1 日验证记录](docs/superpowers/handoff/2026-08-31-harness-product-parity.md)。 |
+| **外部业务操作** | 该次验证连接的 Hiker 服务只开放读取工具。授权写入与读回验收仍需等待服务端开放相应能力。 |
+| **桌面分发** | 当前验证目标为 macOS arm64。本地应用构建尚未签名与公证，Windows/Linux 发布验收仍待完成。 |
+| **应用版本** | [`v0.2.0` Developer Preview](https://github.com/Foxtailsss-Andy/Anna-Agent/releases/tag/v0.2.0) 发布于当前 Harness 执行路径之前。Codex 小宠物以独立素材版本发布。 |
+
+生产可用性、完整故障恢复覆盖及基准测试成绩仍待验证。CI、界面演示和真实外部服务调用各自证明不同范围，具体要求见 [当前验收目标](docs/product/anna-harness-product-parity-goal-2026-08-31.md)。
+
+此前 RC2 使用固定外部 transport 验证本地身份、持久化、Gateway 与 OMP 执行路径，其完整 Provider/MCP 实测门槛保留为 blocked；上方 Jev 数字覆盖本次有界建议判断。完整并发调度、问人/回答、恢复、Memory、Sandbox 与 Windows/Linux 验收继续待办。
+
+## 认识 Anna：你的 Codex 小伙伴
+
+戴着鸢尾花、穿着米白上衣和紫色长裙的 Anna，现在也有了自己的桌面小宠物形象。欢迎把她带到 Codex 中，陪你一起工作。
+
+<p align="center">
+  <img src="docs/public/assets/anna-pet/anna.png" width="192" height="208" alt="Anna Codex 小宠物：从发布素材截取的静态形象" />
+  <img src="docs/public/assets/anna-pet/waving.gif" width="192" height="208" alt="Anna Codex 小宠物挥手动画" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/Foxtailsss-Andy/Anna-Agent/releases/download/anna-pet-v1.0.0/anna-codex-pet-v1.0.0.zip"><strong>下载 Anna Codex 小宠物</strong></a> · <a href="pets/README.md#中文安装说明">安装说明</a> · <a href="pets/anna-iris">宠物源文件</a>
+</p>
+
+*以上为共享宠物素材的静态截图与动画预览。包含 9 组动作和 16 个视线方向，需要支持自定义 v2 宠物的桌面版本。*
 
 ## 一起改进 Anna
 

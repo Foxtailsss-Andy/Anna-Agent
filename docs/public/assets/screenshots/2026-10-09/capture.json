@@ -1,11 +1,10 @@
 {
   "captured_on": "2026-10-09",
   "timezone": "Asia/Shanghai",
-  "source_commit": "712da1a4e6563aeb6b705ec073d62ede445f4075",
   "surface": "Anna Electron desktop, macOS arm64",
   "data": "Synthetic demo data in isolated local state; no real business records.",
-  "capture": "Native Playwright screenshots of the running app. Home result and Jev picker use viewport crops; no generated or rewritten UI pixels.",
-  "interpretation": "The built-in Crew project is a deterministic interface example. Home and Jev include live calls; screenshot timings do not change benchmark claims.",
+  "capture": "Native screenshots of the running Electron app. The three workspace overviews retain the full sidebar and 1440 x 900 viewport. Earlier Home-result and Jev-detail images use viewport crops. No generated or rewritten UI pixels.",
+  "interpretation": "Overview first: Home entry, Cowork business workspace and Crew projects. Cowork uses a local MCP sample service, not production Hiker. Crew uses the built-in example. Detail images include prior live Home/Jev calls; no new benchmark claim.",
   "images": [
     {
       "file": "home-analysis.png",
@@ -13,15 +12,8 @@
       "height_px": 1234,
       "bytes": 221739,
       "sha256": "af3cd9ca475c6c398d6e4963449474e6387226dd4cf657dfad7201e01f3e2af7",
-      "scene": "Live Agent run: read a synthetic CSV, calculate with Python in the sandbox and save review.md."
-    },
-    {
-      "file": "crew-overview.png",
-      "width_px": 2880,
-      "height_px": 1520,
-      "bytes": 484626,
-      "sha256": "b0f4007268d8f7dd3ba77b375cb4d7fb9a1c4ae21fca493793178d131f72fad3",
-      "scene": "Built-in deterministic weekly-action showcase, focused on parallel tasks and the review gate."
+      "scene": "Live Agent run: read a synthetic CSV, calculate with Python in the sandbox and save review.md.",
+      "source_commit": "712da1a4e6563aeb6b705ec073d62ede445f4075"
     },
     {
       "file": "crew-review.png",
@@ -29,7 +21,8 @@
       "height_px": 1520,
       "bytes": 475568,
       "sha256": "fce25211c9c9f0754e3c9f7e082577c4bc9feb1710fbda67a00ee7b0f2097d2f",
-      "scene": "Built-in deterministic showcase artifact reader with explicit approve / reject controls."
+      "scene": "Built-in deterministic showcase artifact reader with explicit approve / reject controls.",
+      "source_commit": "712da1a4e6563aeb6b705ec073d62ede445f4075"
     },
     {
       "file": "crew-jev.png",
@@ -37,7 +30,36 @@
       "height_px": 982,
       "bytes": 150891,
       "sha256": "04302eba392dc0e7c63750b6ae24eb4dd32a1f11f042b433914828bc1b6a6952",
-      "scene": "Live Jev assignee suggestion for a synthetic content-editing task; captured before adoption."
+      "scene": "Live Jev assignee suggestion for a synthetic content-editing task; captured before adoption.",
+      "source_commit": "712da1a4e6563aeb6b705ec073d62ede445f4075"
+    },
+    {
+      "file": "home-workspace.png",
+      "width_px": 2880,
+      "height_px": 1800,
+      "bytes": 674166,
+      "sha256": "9715ac466849cfc2848bce5e81b0825da407ec98bebefc189efda03dbe7fd617",
+      "source_commit": "f1622942d0a23eafe46604723034e1a73db8b5c8",
+      "scene": "Full Home entry screen with global navigation, Chat/Create and workspace controls."
+    },
+    {
+      "file": "cowork-workspace.png",
+      "width_px": 2880,
+      "height_px": 1800,
+      "bytes": 552177,
+      "sha256": "457b9503a0f410568bdea7001e46a559f88adc62d0d12b140f0a858392908435",
+      "source_commit": "f1622942d0a23eafe46604723034e1a73db8b5c8",
+      "scene": "Full Cowork dashboard populated via a local MCP fixture using repository Hiker test data, with demo labels in customer names. No production Hiker connection or business write."
+    },
+    {
+      "file": "crew-workspace.png",
+      "width_px": 2880,
+      "height_px": 1800,
+      "bytes": 663507,
+      "sha256": "2c0e15b682347c39f082a45a08eab3d0fbf9acacee2694dfdeb2b8f7f112410c",
+      "source_commit": "f1622942d0a23eafe46604723034e1a73db8b5c8",
+      "scene": "Full Crew workspace with navigation, focused dependency graph and project channel. Built-in synthetic case with the live-demo copy-review task added earlier."
     }
-  ]
+  ],
+  "cowork_fixture_source": "tests/hiker/hiker_fakes.py: DASHBOARD_DATA, COLLECTION_DATA and COUNTRY_DATA; customer names prefixed with a demo label."
 }
